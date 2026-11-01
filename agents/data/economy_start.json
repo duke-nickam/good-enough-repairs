@@ -1,0 +1,22 @@
+{
+  "version": "gdd-1.3-start",
+  "startingCredits": 500,
+  "stationUpkeep": 120,
+  "scrapPrice": 10,
+  "partPrice": { "min": 150, "max": 300 },
+  "penaltyPercent": 20,
+  "fighterPayment": { "min": 200, "max": 350 },
+  "freighterPayment": { "min": 150, "max": 250 },
+  "junkyardPartPrice": 40,
+  "junkyardParts": 15,
+  "junkyardJunk": { "min": 7, "max": 10 },
+  "days": [
+    { "day": 1, "type": "quiet", "ships": 6, "weakMin": 1, "weakMax": 2 },
+    { "day": 2, "type": "quiet", "ships": 7, "weakMin": 1, "weakMax": 2 },
+    { "day": 3, "type": "busy",  "ships": 9, "weakMin": 1, "weakMax": 2 },
+    { "day": 4, "type": "quiet", "ships": 7, "weakMin": 1, "weakMax": 3 },
+    { "day": 5, "type": "busy",  "ships": 10, "weakMin": 1, "weakMax": 3 },
+    { "day": 6, "type": "busy",  "ships": 10, "weakMin": 2, "weakMax": 3 },
+    { "day": 7, "type": "busy",  "ships": 11, "weakMin": 2, "weakMax": 3 }
+  ]
+}
