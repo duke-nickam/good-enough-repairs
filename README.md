@@ -55,6 +55,8 @@ python agents/run.py --mock   # scripted stand-ins, no Claude calls (a few secon
 python agents/sim/economy_sim.py agents/data/economy_start.json   # simulation only
 ```
 
+On macOS or Linux use `python3` instead of `python`; on Windows, `py` also works.
+
 ## Repository structure
 
 ```
