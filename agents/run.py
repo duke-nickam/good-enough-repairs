@@ -34,6 +34,10 @@ ROOT = HERE.parent
 sys.path.insert(0, str(HERE / "sim"))
 import economy_sim as sim  # noqa: E402
 
+# Windows consoles may not handle every character an agent writes; never crash on printing.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 ROLES = HERE / "roles"
 CONTEXT = HERE / "context" / "gdd_economy.md"
 START = HERE / "data" / "economy_start.json"

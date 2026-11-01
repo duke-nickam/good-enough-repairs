@@ -1,2 +1,11 @@
 # Auto detect text files and perform LF normalization
-* text=auto
+# Keep LF line endings on every machine, including Windows
+* text=auto eol=lf
+
+# Binary files
+*.pdf binary
+*.png binary
+*.jpg binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
