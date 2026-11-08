@@ -3,6 +3,7 @@ Every call goes through the GitHub CLI (`gh`), so it uses the designer's GitHub 
 import json
 import shutil
 import subprocess
+import time
 
 from .model import STATUSES, Comment, Issue, Item, attempt_label, attempt_number
 
@@ -179,8 +180,12 @@ class GitHubBoard:
         except GhError as e:
             if "already exists" not in str(e):
                 raise
-            self.items()  # GitHub added it already (the board's auto-add for sub-issues): use that item
-            if number not in self._item_ids:
+            for _ in range(10):  # GitHub added it already; its item can take a few seconds to show up
+                self.items()
+                if number in self._item_ids:
+                    break
+                time.sleep(2)
+            else:
                 raise
         self.set_status(number, status)
         if attempt is not None:

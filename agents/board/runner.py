@@ -24,6 +24,7 @@ class Runner:
         self.board, self.ws, self.agents, self.s = board, ws, agents, settings
         self.max = settings["max_attempts"]
         self.cards = {}
+        self.created = []
 
     # ------------------------------------------------------------ helpers
 
@@ -119,7 +120,15 @@ class Runner:
                 "question", tokens=spent))
             log("Director", f"request #{r.number}: no valid plan, told the designer")
             return
-        created = self.create_plan(r, plan, spent + pending)
+        self.created = []
+        try:
+            created = self.create_plan(r, plan, spent + pending)
+        except Exception:
+            made = ", ".join(f"#{n}" for n in self.created) or "nothing"
+            self.board.comment(r.number, crew_comment(
+                "Runner", f"Creating the plan failed halfway; it created {made}. Delete those issues, then comment "
+                          "here (for example 'plan again') and run the runner.", "plan_failed"))
+            raise
         log("Director", f"request #{r.number}: planned {len(created)} epic(s)")
 
     def create_plan(self, r, plan, tokens):
@@ -129,6 +138,7 @@ class Runner:
         epic_of, tasks, epics = {}, {}, []
         for e in plan["epics"]:
             en = self.board.create_issue(e["title"], f"**Request:** #{r.number}\n\n{e.get('goal', '')}\n", ["epic"])
+            self.created.append(en)
             self.board.add_item(en, "Backlog")
             self.board.set_tokens(en, share)
             self.board.comment(en, crew_comment("Director", f"Planned from request #{r.number}. "
@@ -152,10 +162,11 @@ class Runner:
                         acceptance=t["acceptance"], files=t["files"], reads=t.get("reads") or [],
                         checks=t.get("checks") or [], depends_on=[numbers[d] for d in t.get("depends_on") or []])
             n = self.board.create_issue(t["title"], card.to_markdown(), ["task"])
+            self.created.append(n)
             numbers[k] = n
             self.cards[n] = card
+            self.board.add_item(n, status, attempt=0)  # on the board first, so GitHub's auto-add has nothing to do
             self.board.add_sub_issue(epic_of[k], n)
-            self.board.add_item(n, status, attempt=0)
         lines = []
         for en, e in epics:
             lines.append(f"**#{en} {e['title']}**")
