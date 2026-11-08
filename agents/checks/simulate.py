@@ -66,8 +66,14 @@ day object (every field is required; unused fields are 0):
                                      (GDD: 7-10)
   weakPartsMin               int     weak parts per ship, lowest (GDD: 1)
   weakPartsMax               int     weak parts per ship, highest (GDD: 3)
-  weakConditionMin           int     weak part condition, lowest
-  weakConditionMax           int     weak part condition, highest (below
+  fighterWeakConditionMin    int     fighter weak part condition, lowest
+  fighterWeakConditionMax    int     fighter weak part condition, highest (below
+                                     requiredFighterPercent). A fighter's weak
+                                     part may be at or above
+                                     requiredFreighterPercent, e.g. 60-69: it
+                                     fails the fighter but fits a freighter
+  freighterWeakConditionMin  int     freighter weak part condition, lowest
+  freighterWeakConditionMax  int     freighter weak part condition, highest (below
                                      requiredFreighterPercent)
   healthyConditionMin        int     other part condition, lowest (at least
                                      requiredFighterPercent)
@@ -80,17 +86,22 @@ Arrival rules used by the sim:
   ceil(countdownSeconds / shipEverySeconds).
 - When the countdown reaches 0 no new ships arrive. Ships still waiting
   outside a bay then leave unpaid (turned away). Docked ships are finished,
-  and the day ends when the last docked ship flies away.
+  and the day ends when the last docked ship flies away. (This turn-away rule
+  is an assumption the designer has not confirmed.)
 
 Modelling notes (the sim is a QA tool, not part of the game):
 - Fixed GDD rules in the sim: 3 bays, 10 inventory slots, 15 junkyard parts,
   bankruptcy checked only at day end, 7 days.
 - Time costs: each buy and each part move takes playerActionMs. A part move
-  that brings a donor part in (donor swap) counts as two moves. Each release
+  that brings a donor part in and refills the donor from the inventory counts
+  as two moves. Taking a part from a donor's own weak slot is one move: it
+  is a swap, and the ship's old part lands in that slot. Each release
   takes shipTurnoverMs. Each ship that lands on an empty bay at the day start
   takes dayStartLandingMs. Salvage at the day start takes no time. Binning
   inside a move or a buy and the penalty fills inside a release take no
   extra time.
+- A weak part is below its own ship's required level. The swapper uses such
+  parts across ship types: a fighter's 60-69% part goes into a freighter.
 - A junk junkyard part has condition 0. Conditions are whole percents.
 - The releaser discards the parts it replaces (no payment, no scrap).
 - The swapper buys a new part only when no harvest is possible, so buying
@@ -144,8 +155,10 @@ DAY_INT_FIELDS = [
     ("junkParts", 0, JUNKYARD_SIZE),
     ("weakPartsMin", 0, 5),
     ("weakPartsMax", 0, 5),
-    ("weakConditionMin", 0, 100),
-    ("weakConditionMax", 0, 100),
+    ("fighterWeakConditionMin", 0, 100),
+    ("fighterWeakConditionMax", 0, 100),
+    ("freighterWeakConditionMin", 0, 100),
+    ("freighterWeakConditionMax", 0, 100),
     ("healthyConditionMin", 0, 100),
     ("healthyConditionMax", 0, 100),
 ]
@@ -270,8 +283,13 @@ def _logic_errors(s):
                         % WEAK_RANGE)
         if d["weakPartsMax"] > s["slotsPerShip"]:
             errs.append(where + "weakPartsMax cannot exceed slotsPerShip")
-        if d["weakConditionMin"] > d["weakConditionMax"] or d["weakConditionMax"] >= req_f:
-            errs.append(where + "weak conditions must be ordered and below "
+        if (d["fighterWeakConditionMin"] > d["fighterWeakConditionMax"]
+                or d["fighterWeakConditionMax"] >= req_x):
+            errs.append(where + "fighter weak conditions must be ordered and below "
+                        "requiredFighterPercent")
+        if (d["freighterWeakConditionMin"] > d["freighterWeakConditionMax"]
+                or d["freighterWeakConditionMax"] >= req_f):
+            errs.append(where + "freighter weak conditions must be ordered and below "
                         "requiredFreighterPercent")
         if d["healthyConditionMin"] > d["healthyConditionMax"] or d["healthyConditionMin"] < req_x:
             errs.append(where + "healthy conditions must be ordered and at least "
@@ -333,13 +351,17 @@ def make_ship(cfg, day, rng):
     kind = rng.choice(["fighter", "freighter"])
     if kind == "fighter":
         low, high = cfg["fighterPayment"]
+        weak_lo = day["fighterWeakConditionMin"]
+        weak_hi = day["fighterWeakConditionMax"]
     else:
         low, high = cfg["freighterPayment"]
+        weak_lo = day["freighterWeakConditionMin"]
+        weak_hi = day["freighterWeakConditionMax"]
     slots = [rng.randint(day["healthyConditionMin"], day["healthyConditionMax"])
              for _ in range(cfg["slotsPerShip"])]
     weak_count = rng.randint(day["weakPartsMin"], day["weakPartsMax"])
     for i in rng.sample(range(len(slots)), weak_count):
-        slots[i] = rng.randint(day["weakConditionMin"], day["weakConditionMax"])
+        slots[i] = rng.randint(weak_lo, weak_hi)
     return {"kind": kind, "payment": rng.randint(low, high), "slots": slots}
 
 
@@ -589,7 +611,9 @@ class Swapper:
             actions += 1
 
     def _fix(self, g, ship, i):
-        return self._from_inventory(g, ship, i) or self._from_donor(g, ship, i)
+        return (self._from_weak_donor(g, ship, i)
+                or self._from_inventory(g, ship, i)
+                or self._from_donor(g, ship, i))
 
     def _from_inventory(self, g, ship, i):
         k = best_index(g.inventory, g.req(ship))
@@ -599,6 +623,28 @@ class Swapper:
         old = ship["slots"][i]
         ship["slots"][i] = part
         g.stash(old, g.lowest_req())
+        g.move(1)
+        return True
+
+    def _from_weak_donor(self, g, ship, i):
+        # Cross-type use: a docked ship's weak part may still pass this ship,
+        # e.g. a fighter's 65% part fits a freighter. One swap move: this
+        # ship's old part takes that slot, which was weak anyway.
+        need = g.req(ship)
+        best = None
+        for donor in g.docked():
+            if donor is ship:
+                continue
+            donor_req = g.req(donor)
+            for j, c in enumerate(donor["slots"]):
+                if need <= c < donor_req and (best is None or c < best[0]):
+                    best = (c, donor, j)
+        if best is None:
+            return False
+        c, donor, j = best
+        old = ship["slots"][i]
+        ship["slots"][i] = c
+        donor["slots"][j] = old
         g.move(1)
         return True
 
