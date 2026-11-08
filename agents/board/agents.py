@@ -31,7 +31,10 @@ Rules: each task belongs to one agent and writes only its listed files (text fil
 result; a check script (optional) must already exist or be written by an earlier task it depends on.
 A task depends on every task that writes a file its checks or Reads use; a folder counts as every file in it. If a
 check should not need another task's file, give the check only this task's own files. Never list
-the GDD (docs/) or anything in agents/board/ or .github/ as a file to write. Keep the plan as small as the request
+the GDD (docs/) or anything in agents/board/ or .github/ as a file to write.
+You see the GDD and the repo's file names, not the files' contents: never state what a file holds unless the GDD
+says so. If a task needs a fact the GDD leaves open (a list, a name, a value two tasks must agree on), ask the
+designer instead of choosing it. Formats that the plan's own tasks create are theirs to define. Keep the plan as small as the request
 allows: every task costs tokens."""
 
 WORK_FORMAT = """Reply in exactly this format, nothing before it:
