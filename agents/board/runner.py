@@ -293,6 +293,11 @@ class Runner:
                     reads.setdefault(p, self.ws.read(p))
             tries = 1 + max(0, int(self.s.get("check_retries", 0)))
             feedback, check_log = None, []
+
+            def keep_tries(why):
+                """Files from earlier failed tries are committed, so an attempt never leaves the repo dirty."""
+                if check_log:
+                    self.ws.commit(list(card.files), f"#{n} {t.title} - {who}, attempt {attempt} ({why})")
             for k in range(1, tries + 1):  # self-check: the agent sees failed checks and fixes them in this attempt
                 try:
                     text, usage, model = self.agents.work(agent, card.to_markdown(), self.thread_text(issue), files,
@@ -300,9 +305,11 @@ class Runner:
                     usages.append(usage)
                     written, summary, question = parse_work(text)
                 except (AgentError, ValueError) as e:
+                    keep_tries("failed checks, then an unusable reply")
                     self.reject(t, attempt, f"The agent's reply was unusable: {e}", usages, who)
                     return
                 if question:
+                    keep_tries("failed checks, then a question")
                     total = self.add_tokens(t, usages)
                     self.board.set_status(n, "Needs designer")
                     alert(self.s, "needs_designer")
@@ -314,6 +321,7 @@ class Runner:
                     return
                 stray = [p for p in written if p not in card.files]
                 if stray:
+                    keep_tries("failed checks, then files outside the card")
                     self.reject(t, attempt, "Wrote files outside the card: " + ", ".join(stray), usages, who)
                     return
                 for p, c in written.items():

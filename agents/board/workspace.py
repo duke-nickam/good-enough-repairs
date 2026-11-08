@@ -34,6 +34,11 @@ class GitWorkspace:
 
     def finish(self):
         if self.home_branch and self.git("rev-parse", "--abbrev-ref", "HEAD") != self.home_branch:
+            if self.git("status", "--porcelain", "--untracked-files=no"):
+                raise WorkspaceError("The run left uncommitted changes on "
+                                     f"{self.git('rev-parse', '--abbrev-ref', 'HEAD')}. Nothing was lost: check them "
+                                     "in GitHub Desktop, then commit or discard them and switch back to "
+                                     f"{self.home_branch}.")
             self.git("checkout", self.home_branch)
 
     def use_branch(self, branch):
@@ -60,6 +65,9 @@ class GitWorkspace:
         p.write_text(content, encoding="utf-8", newline="\n")
 
     def commit(self, paths, message):
+        paths = [p for p in paths if (self.root / p).exists() or self.git("ls-files", "--", p)]
+        if not paths:
+            return None
         self.git("add", "--", *paths)
         if not self.git("diff", "--cached", "--name-only"):
             return None  # nothing changed
