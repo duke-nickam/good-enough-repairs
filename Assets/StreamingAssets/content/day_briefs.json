@@ -3,37 +3,37 @@
     {
       "day": 1,
       "type": "quiet",
-      "reason": "The yard is calm this morning and nobody is in a hurry. Take your time with the first hulls. The day ends when the last ship flies away."
+      "reason": "The yard is calm this morning and nobody is in a hurry. The day ends when the last ship flies away."
     },
     {
       "day": 2,
       "type": "busy",
-      "reason": "Word got around the lanes overnight and the ships are queuing up outside. The clock is the real enemy today. More ships will come than anyone can finish, so pick the easy ones first."
+      "reason": "Word got around overnight and ships are queuing up outside. The clock is the real enemy, so pick the easy ones first."
     },
     {
       "day": 3,
       "type": "quiet",
-      "reason": "A steady stream of hulls came in from the outer lanes, all with plenty of patient work for their size. Nothing urgent, just careful hands. The day ends when the last ship flies away."
+      "reason": "It is a quiet day because a fixed batch of hulls is booked in from the outer lanes. The day ends when the last one flies away."
     },
     {
       "day": 4,
       "type": "busy",
-      "reason": "Half the sector is limping toward the station and the docks are filling fast. Time is what you are short of today. More ships will come than you can finish, so do not chase the hard ones first."
+      "reason": "Half the sector is limping toward the station and the docks are filling fast. Time is short today, so do not chase the hard ones first."
     },
     {
       "day": 5,
       "type": "quiet",
-      "reason": "Quiet lanes, and the wrecks that come in are the kind you know well. Every part has a second life if you look for it. The day ends when the last ship flies away."
+      "reason": "Quiet lanes, and the wrecks that come in are the kind you know well. The day ends when the last ship flies away."
     },
     {
       "day": 6,
       "type": "busy",
-      "reason": "The convoys are back and every bay will be full before the clock runs out. Time is the limit, not the work. More ships will come than anyone can finish, so keep the bays moving."
+      "reason": "The convoys are back and every bay will fill before the clock runs out. Time is the limit, so keep the bays moving."
     },
     {
       "day": 7,
       "type": "busy",
-      "reason": "Last push of the run, and the whole sector seems to be heading our way. Time is the only thing that matters today. More ships will come than anyone can finish, so make every release count."
+      "reason": "Last push of the run, and the whole sector seems to be heading our way. Time is the only thing that matters, so make every release count."
     }
   ]
 }

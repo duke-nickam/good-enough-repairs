@@ -33,15 +33,15 @@
     "run_end_bankrupt": [
       "The shutters are down and the station's quiet. Some runs you squeeze every part and still come up short.",
       "I gave it everything I had, and it wasn't enough this time. Pack the tools, the next lot of limping ships will need me.",
-      "Nothing left in the till. The lights stay on for the next mechanic, and I'll remember every lesson this run taught me."
+      "Nothing left in the till. Lights off for now, but the spanners are still here, and next run I'll squeeze every lesson this one taught me."
     ],
     "tutorial_hint": [
       "That engine is too weak for a fighter, but a freighter would take it."
     ],
     "fallback_hint": [
-      "That spare in your inventory still has some life in it. Shame to waste it on the scrap heap.",
+      "That spare on screen still has some life in it. Shame to waste it on the scrap heap.",
       "Look at the spare part on screen. Plenty left in that one, if you know which ship it's wanted on.",
-      "Don't be too quick to bin things. The part sitting in your inventory would fit another bay happily."
+      "Don't be too quick to bin things. The spare on screen would fit another bay happily."
     ]
   }
 }
