@@ -44,7 +44,8 @@ QUESTION: <the question, and why the GDD does not answer it>
 
 You cannot run anything yourself, and you don't need to: after you reply, the runner runs the task's checks on
 your files. If they fail, you get their output and can fix your files before the reviewer sees them. Results of
-earlier attempts are in the task's thread. Never write that you could not run a check."""
+earlier attempts are in the task's thread. Never write that you could not run a check.
+All tasks this one depends on are Done; their files are final."""
 
 REVIEW_FORMAT = """Reply with one JSON object only, no other text:
 {"verdict": "approve" or "reject", "summary": "<one sentence>",
