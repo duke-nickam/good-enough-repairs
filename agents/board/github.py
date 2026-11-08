@@ -164,6 +164,9 @@ class GitHubBoard:
         url = gh(*args, stdin=body)
         return int(url.rstrip("/").split("/")[-1])
 
+    def set_body(self, number, body):
+        gh("issue", "edit", str(number), "--repo", self.repo, "--body-file", "-", stdin=body)
+
     def add_sub_issue(self, parent, child):
         try:
             child_id = gh("api", f"repos/{self.repo}/issues/{child}", "--jq", ".id")

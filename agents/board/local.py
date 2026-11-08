@@ -43,6 +43,10 @@ class LocalBoard:
         self._save()
         return n
 
+    def set_body(self, number, body):
+        self.d["issues"][str(number)]["body"] = body
+        self._save()
+
     def add_sub_issue(self, parent, child):
         pass
 

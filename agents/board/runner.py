@@ -5,6 +5,7 @@ Each pass: the Director answers new requests, designer moves are applied, then e
 continues where it left off."""
 import datetime
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -143,7 +144,7 @@ class Runner:
         log("Director", f"request #{r.number}: planned {len(created)} epic(s)")
 
     def create_plan(self, r, plan, tokens):
-        """Epics first, then tasks in dependency order, so every card names real issue numbers."""
+        """Epics first, then every task issue, then the cards, which can now name any task by its number."""
         status = "Todo" if self.s.get("autoapprove_tasks") else "Backlog"
         share = tokens // len(plan["epics"])
         epic_of, tasks, epics = {}, {}, []
@@ -167,14 +168,23 @@ class Runner:
             order.append(k)
         for k in tasks:
             visit(k)
-        for k in order:
-            t = tasks[k]
-            card = Card(agent=t["agent"], reviewer=t["reviewer"], epic=epic_of[k], what=t.get("what", ""),
-                        acceptance=t["acceptance"], files=t["files"], reads=t.get("reads") or [],
-                        checks=t.get("checks") or [], depends_on=[numbers[d] for d in t.get("depends_on") or []])
-            n = self.board.create_issue(t["title"], card.to_markdown(), ["task"])
+        for k in order:  # first every task issue, so all numbers are known before the cards are written
+            n = self.board.create_issue(tasks[k]["title"], "(The task card follows.)", ["task"])
             self.created.append(n)
             numbers[k] = n
+        keys = sorted(numbers, key=len, reverse=True)
+
+        def refs(text):
+            """The Director's task keys ("t1") become issue numbers ("#18")."""
+            for key in keys:
+                text = re.sub(rf"(?<![#\w]){re.escape(key)}(?!\w)", f"#{numbers[key]}", text)
+            return text
+        for k in order:
+            t, n = tasks[k], numbers[k]
+            card = Card(agent=t["agent"], reviewer=t["reviewer"], epic=epic_of[k], what=refs(t.get("what", "")),
+                        acceptance=[refs(a) for a in t["acceptance"]], files=t["files"], reads=t.get("reads") or [],
+                        checks=t.get("checks") or [], depends_on=[numbers[d] for d in t.get("depends_on") or []])
+            self.board.set_body(n, card.to_markdown())
             self.cards[n] = card
             self.board.add_item(n, status, attempt=0)  # on the board first, so GitHub's auto-add has nothing to do
             self.board.add_sub_issue(epic_of[k], n)

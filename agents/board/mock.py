@@ -16,7 +16,7 @@ PLAN = {
              "acceptance": ["Valid JSON with a 'line' field", "Proud and cheeky, no economy numbers"],
              "files": ["Assets/Data/Content/greeting.json"], "reads": [], "checks": [], "depends_on": []},
             {"key": "t2", "title": "Load the greeting line", "agent": "programmer", "reviewer": "qa_playtester",
-             "what": "Load greeting.json at start with JsonUtility.",
+             "what": "Load greeting.json (the file from t1) at start with JsonUtility.",
              "acceptance": ["Reads the file through a TextAsset", "No hard-coded text"],
              "files": ["Assets/Scripts/Data/GreetingLoader.cs"], "reads": [], "checks": [], "depends_on": ["t1"]},
         ],
