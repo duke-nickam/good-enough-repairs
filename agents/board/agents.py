@@ -29,6 +29,7 @@ Agent keys: """ + ", ".join(AGENTS) + """.
 Epics already on the board for this request are planned: plan only what is new.
 Rules: each task belongs to one agent and writes only its listed files (text files only). The reviewer judges the
 result; a check script (optional) must already exist or be written by an earlier task it depends on.
+Every check names the files it checks as arguments, and a check script checks only the files it is given.
 A task depends on every task that writes a file its checks or Reads use; a folder counts as every file in it. If a
 check should not need another task's file, give the check only this task's own files. Never list
 the GDD (docs/) or anything in agents/board/ or .github/ as a file to write.
@@ -197,6 +198,10 @@ def file_dependency_problems(keys):
         return seen
     problems = []
     for k, t in keys.items():
+        for c in t.get("checks") or []:
+            if not [a for a in c.split()[2:] if "/" in a or "." in a]:
+                problems.append(f"{k}: the check '{c}' names no files. Give every check the files it checks as "
+                                f"arguments; a check script checks only the files it is given")
         mine, before = set(t.get("files") or []), deps(k)
         for path in touched_paths(t):
             folder = path.rstrip("/") + "/"
