@@ -112,6 +112,8 @@ Both toggles are Off by default. Every default in this system keeps the designer
 
 Stopping the runner is pausing it: all state is on the board. When it starts again, a task found In progress is retried in place with the same Attempt (no rejection happened), and a task found Waiting for review or In review gets its review.
 
+A sound on the PC tells the designer when a task goes to Needs designer and when a run stops (`sound` in the settings, on by default).
+
 ## Agents, reviewers and communication
 
 Only the GDD's seven agents work on the board: Director, Programmer, Economy Balancer, UX Designer, Artist, Sound Designer, QA Playtester. A new agent needs the designer's approval and a GDD update.

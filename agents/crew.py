@@ -24,7 +24,7 @@ sys.path.insert(0, str(HERE))
 
 from board.agents import ClaudeAgents  # noqa: E402
 from board.model import STATUSES  # noqa: E402
-from board.runner import Runner, log  # noqa: E402
+from board.runner import Runner, alert, log  # noqa: E402
 from board.workspace import GitWorkspace, MockWorkspace, WorkspaceError  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -141,6 +141,7 @@ def main():
                 ws.finish()
             if not args.watch:
                 log("Runner", "nothing ready to work on. Stopped.")
+                alert(settings, "stopped")
                 break
             log("Runner", f"waiting {settings['poll_minutes']} min (Ctrl+C stops)")
             time.sleep(settings["poll_minutes"] * 60)

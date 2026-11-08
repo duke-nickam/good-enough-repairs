@@ -23,7 +23,7 @@ python agents/crew.py --watch   # keeps running, checks the board every few minu
 python agents/crew.py --mock    # scripted demo: no GitHub, no Claude
 ```
 
-Settings and toggles: [`agents/board/settings.json`](agents/board/settings.json) (`director_autoplan`, `autoapprove_tasks`, both off by default). Close Unity while the runner works: it switches branches.
+Settings and toggles: [`agents/board/settings.json`](agents/board/settings.json) (`director_autoplan` and `autoapprove_tasks` off, `sound` on, by default). Close Unity while the runner works: it switches branches.
 
 ## Repository structure
 

@@ -19,6 +19,17 @@ def log(who, msg):
     print(f"[{datetime.datetime.now():%H:%M:%S}] {who:<17} {msg}", flush=True)
 
 
+def alert(settings, kind):
+    """A sound on the designer's PC: 'needs_designer' (a task waits for you) or 'stopped' (the run ended)."""
+    if not settings.get("sound", True):
+        return
+    try:
+        import winsound  # Windows only
+        winsound.MessageBeep(winsound.MB_ICONEXCLAMATION if kind == "needs_designer" else winsound.MB_ICONASTERISK)
+    except ImportError:
+        print("\a", end="", flush=True)  # other systems: the terminal bell
+
+
 class Runner:
     def __init__(self, board, ws, agents, settings):
         self.board, self.ws, self.agents, self.s = board, ws, agents, settings
@@ -251,6 +262,7 @@ class Runner:
         epic = next((i for i in items if i.number == card.epic), None) if card else None
         if not card or not epic:
             self.board.set_status(n, "Needs designer")
+            alert(self.s, "needs_designer")
             self.board.comment(n, crew_comment("Runner", "This task has no readable card or epic. Fix the card "
                                                          "and move it to Todo.", "needs_designer"))
             log("Runner", f"#{n}: unreadable card, Needs designer")
@@ -290,6 +302,7 @@ class Runner:
             if question:
                 total = self.add_tokens(t, usages)
                 self.board.set_status(n, "Needs designer")
+                alert(self.s, "needs_designer")
                 self.board.comment(n, crew_comment(who, f"Question for the designer (attempt {attempt}):\n\n{question}"
                                                         f"\n\nUsed: {describe_tokens(usage)}. Task total: {total:,}.",
                                                    "needs_designer", attempt=attempt))
@@ -340,6 +353,7 @@ class Runner:
         total = self.add_tokens(t, usages)
         if attempt >= self.max:
             self.board.set_status(n, "Needs designer")
+            alert(self.s, "needs_designer")
             self.board.comment(n, crew_comment(who, f"Rejected on attempt {attempt}/{self.max}: {text}\n\n"
                                                     f"This was the last attempt: Needs designer. Task total: {total:,} "
                                                     "tokens.", "needs_designer", attempt=attempt))

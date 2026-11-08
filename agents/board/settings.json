@@ -6,6 +6,7 @@
   "autoapprove_tasks": false,
   "max_attempts": 3,
   "poll_minutes": 5,
+  "sound": true,
   "gdd": "docs/Good Enough Repairs - Final GDD v1.3.md",
   "models": {
     "director": "sonnet",
