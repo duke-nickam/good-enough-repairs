@@ -1,0 +1,47 @@
+{
+  "moments": {
+    "day_start": [
+      "Another morning, another pile of dents. Coffee's on and the spanners are where I left them.",
+      "They come in here thinking they're important. Let's see what they look like by sundown.",
+      "Every ship that docks here leaves a little lighter in the wallet and a little heavier in my toolbox. Let's get to work."
+    ],
+    "release_warning": [
+      "Not quite there yet. I can fill that slot, but I'll charge you for the part. Buying it yourself is the cheaper road, just saying.",
+      "This one's still limping. I'll patch it with a stock part if you say the word, and the bill comes out of your pay. Your call.",
+      "Releasing now means I fit a part from my own shelf, and that doesn't come cheap. You'd save more fitting one you bought yourself."
+    ],
+    "penalty_fill": [
+      "There, that'll do. Wasn't pretty, but it'll fly. Stock rates, no hard feelings.",
+      "Slotted it in from the shelf. Stock parts never complain, and they never come cheap.",
+      "Fitted and sealed. Next time, bring a part you've already paid for and we'll both sleep better."
+    ],
+    "day_end": [
+      "Doors closed, bays empty. The tally's on the counter, and I earned every bit of it.",
+      "That's the last ship of the day. Go on, check the numbers. I'm not nervous, you're nervous.",
+      "Good day's work. Tools oiled, bays swept, and a few good parts saved for tomorrow."
+    ],
+    "bankruptcy": [
+      "The books have gone red and the coffee's cold. Tomorrow I start again, same as always.",
+      "Can't pay the rent on sparks alone. Shut the shutters, I'll find another angle.",
+      "Empty till, full toolbox. I've been broke before and I've always come back squeezing."
+    ],
+    "run_end_win": [
+      "Look at that. Stranded ships sorted, and every one of them paid up. I'll be bragging about this run for years.",
+      "They called this station a junk heap. Let them come back and say it now, I'll be right here with a spanner.",
+      "Every ship flying home on a patched part. Best feeling in the galaxy, and I earned it the hard way."
+    ],
+    "run_end_bankrupt": [
+      "The shutters are down and the station's quiet. Some runs you squeeze every part and still come up short.",
+      "I gave it everything I had, and it wasn't enough this time. Pack the tools, the next lot of limping ships will need me.",
+      "Nothing left in the till. The lights stay on for the next mechanic, and I'll remember every lesson this run taught me."
+    ],
+    "tutorial_hint": [
+      "That engine is too weak for a fighter, but a freighter would take it."
+    ],
+    "fallback_hint": [
+      "That spare in your inventory still has some life in it. Shame to waste it on the scrap heap.",
+      "Look at the spare part on screen. Plenty left in that one, if you know which ship it's wanted on.",
+      "Don't be too quick to bin things. The part sitting in your inventory would fit another bay happily."
+    ]
+  }
+}

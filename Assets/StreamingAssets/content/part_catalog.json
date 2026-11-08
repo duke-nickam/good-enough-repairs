@@ -1,0 +1,29 @@
+{
+  "parts": [
+    {
+      "type": "engine",
+      "name": "Engine Block",
+      "description": "Keeps the ship moving when it matters, and it will take any hull that's still got something left to push."
+    },
+    {
+      "type": "hull_plate",
+      "name": "Hull Plate",
+      "description": "Patched, dented and still holding the air in, which is more than the factory ever promised for this one."
+    },
+    {
+      "type": "shield_generator",
+      "name": "Shield Generator",
+      "description": "Throws up a bubble against the worst of the universe, and fits a fighter's pride just as well as a freighter's cargo."
+    },
+    {
+      "type": "thruster",
+      "name": "Thruster",
+      "description": "Gives the ship its shove out of the bay, and it doesn't care whether the hull is armored or just stubborn."
+    },
+    {
+      "type": "power_core",
+      "name": "Power Core",
+      "description": "The heart of the ship's power, bolted in with care, and it runs the same whether the pilot is brave or just lucky."
+    }
+  ]
+}
