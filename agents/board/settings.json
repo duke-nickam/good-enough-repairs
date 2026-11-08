@@ -16,10 +16,11 @@
     "ux_designer": "haiku",
     "artist": "haiku",
     "sound_designer": "haiku",
-    "qa_playtester": "haiku"
+    "qa_playtester": "sonnet"
   },
   "retry_models": {
-    "ux_designer": "sonnet"
+    "ux_designer": "sonnet",
+    "economy_balancer": "sonnet"
   },
   "reads": {
     "director": ["*"],

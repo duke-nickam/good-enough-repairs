@@ -196,7 +196,8 @@ class Runner:
             if t.status == "Todo" and t.attempt > 0:
                 issue = self.board.issue(t.number)
                 last = issue.last_marker()
-                if last and last.get("event") == "needs_designer":
+                # Back in Todo from Needs designer, or a Done task the designer reopened: new conditions, fresh attempts
+                if last and last.get("event") in ("needs_designer", "approved", "accepted"):
                     rnd = sum(1 for c in issue.comments if c.marker and c.marker.get("event") == "reset") + 2
                     self.board.set_attempt(t.number, 0)
                     self.board.comment(t.number, crew_comment(

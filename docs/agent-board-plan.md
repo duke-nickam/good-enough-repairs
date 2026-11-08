@@ -123,7 +123,7 @@ Only the GDD's seven agents work on the board: Director, Programmer, Economy Bal
 - **Code checks:** checks code can decide (the economy simulation's five targets, text rules such as length, placeholders and no economy numbers) run right after the agent writes its files. On a failure the agent gets the output and fixes its files within the same attempt, up to `check_retries` times (2 by default); the reviewer then sees the results. Their pass or fail is computed, so no agent can argue its way past them.
 - **Communication:** agents never call each other. They talk through task comments: the agent posts its result, the reviewer posts approval or reasons to reject, and the next attempt reads the whole thread. The designer reads the same thread and answers in it.
 - **Stop rule:** a task rejected on attempt 3/3 goes to Needs designer, matching the GDD's "after 3 failed tuning rounds, the designer decides".
-- **Models:** the settings name a model per agent, from the GDD (large for the Director and Programmer, fast for the rest). The UX Designer moves to the large model on a retry, the GDD's "large model if it makes too many mistakes".
+- **Models:** the settings name a model per agent, from the GDD (large for the Director and Programmer, fast for the rest). The UX Designer and the Economy Balancer move to the large model on a retry, the GDD's "large model if it makes too many mistakes". The QA Playtester uses the large model: the fast one misread check results in reviews (designer decision, Nov 8, 2026 (CET)).
 
 ## Branches, commits and pull requests
 
