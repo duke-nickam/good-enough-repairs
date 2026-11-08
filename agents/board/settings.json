@@ -1,0 +1,40 @@
+{
+  "repo": "duke-nickam/good-enough-repairs",
+  "project_owner": "duke-nickam",
+  "project_title": "Good Enough Repairs - agent board",
+  "director_autoplan": false,
+  "autoapprove_tasks": false,
+  "max_attempts": 3,
+  "poll_minutes": 5,
+  "gdd": "docs/Good Enough Repairs - Final GDD v1.3.md",
+  "models": {
+    "director": "sonnet",
+    "programmer": "sonnet",
+    "economy_balancer": "haiku",
+    "ux_designer": "haiku",
+    "artist": "haiku",
+    "sound_designer": "haiku",
+    "qa_playtester": "haiku"
+  },
+  "retry_models": {
+    "ux_designer": "sonnet"
+  },
+  "reads": {
+    "director": ["*"],
+    "programmer": ["Game Mechanics", "UI / screens", "Technical Strategy"],
+    "economy_balancer": ["Economy & balancing", "Win/lose conditions & progression"],
+    "ux_designer": ["Setting & theme", "Game Mechanics", "The secret strategy: part swapping", "UI / screens", "Art & audio direction"],
+    "artist": ["Art & audio direction"],
+    "sound_designer": ["Art & audio direction"],
+    "qa_playtester": ["Game Mechanics", "Economy & balancing", "Win/lose conditions & progression"]
+  },
+  "token_budget": {
+    "director": 1200000,
+    "programmer": 12000000,
+    "economy_balancer": 1600000,
+    "ux_designer": 2400000,
+    "artist": 800000,
+    "sound_designer": 400000,
+    "qa_playtester": 4000000
+  }
+}

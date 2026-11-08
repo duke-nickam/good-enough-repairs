@@ -6,6 +6,20 @@ Game design: [`docs/`](docs/) (Final GDD v1.3, PDF and Markdown). MVP cut order 
 
 This repository is the Unity project. The AI agents that help build it live next to the Unity folders in [`agents/`](agents/), outside `Assets/`, so Unity never imports them.
 
+## The agent board
+
+From now on the agents' work is planned and tracked on a GitHub board, like Jira. The designer opens a **request** (issue template "Request to the Director"); the **Director** plans it as **epics** with one **task** per agent; the designer approves the tasks; the runner wakes each task's agent, runs the checks, has the task's reviewer approve or reject it, and moves the card. Agents talk through task comments. Each task shows **Attempt** (0/3 to 3/3) and **Used tokens**; after 3 rejections it goes to **Needs designer**. Each epic is one branch and one pull request the designer squash-merges. Full design: [`docs/agent-board-plan.md`](docs/agent-board-plan.md).
+
+```bash
+python agents/crew.py setup     # one time (needs: winget install GitHub.cli, gh auth login, gh auth refresh -s project)
+python agents/crew.py check     # is everything ready?
+python agents/crew.py           # one pass: works until nothing is ready
+python agents/crew.py --watch   # keeps running, checks the board every few minutes
+python agents/crew.py --mock    # scripted demo: no GitHub, no Claude
+```
+
+Settings and toggles: [`agents/board/settings.json`](agents/board/settings.json) (`director_autoplan`, `autoapprove_tasks`, both off by default). Close Unity while the runner works: it switches branches.
+
 ## The agent crew: economy tuning
 
 **What it produces:** `Assets/Data/economy.json`, every economy value of the game (starting credits, part prices, ship payments, upkeep, scrap, junkyard and penalty prices, and the 7-day difficulty ramp). The game loads it at start through [`EconomyLoader.cs`](Assets/Scripts/Data/EconomyLoader.cs), so tuning never needs a code change.
@@ -64,15 +78,18 @@ Assets/
   Data/economy.json           crew output, loaded by the game
   Scripts/Data/               EconomyConfig.cs, EconomyLoader.cs
 Packages/  ProjectSettings/   Unity
+.github/ISSUE_TEMPLATE/       request template for the Director
 agents/
-  run.py                      orchestration (raw Python, no framework)
-  roles/                      one prompt per agent
+  crew.py                     agent board runner
+  board/                      runner code, settings.json, roles/ (one prompt per agent)
+  run.py                      economy crew, Assignment 3 (raw Python, no framework)
+  roles/                      economy crew prompts
   context/gdd_economy.md      the GDD section the agents read
   data/economy_start.json     the GDD's starting values
   sim/economy_sim.py          economy simulation and target checks
   reports/                    one report per crew run
   diagram.md                  Mermaid diagram
-docs/                         GDD
+docs/                         GDD, agent board plan
 ```
 
 Author: Nikola Bulog - ELVTR AI Game Development course, Assignment #3.

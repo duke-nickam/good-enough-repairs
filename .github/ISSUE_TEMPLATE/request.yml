@@ -1,0 +1,12 @@
+name: Request to the Director
+description: Ask the Director for work. It plans the request as epics and tasks on the agent board.
+labels: ["request"]
+body:
+  - type: textarea
+    id: request
+    attributes:
+      label: What do you need?
+      description: What the work is for, and anything the Director should know. It asks in the comments if something is unclear.
+    validations:
+      required: true
+      

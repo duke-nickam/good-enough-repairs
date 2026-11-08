@@ -9,7 +9,7 @@ The MVP plan from the GDD, with what to cut if the two weeks get tight. The rule
 - Move, bin, buy and release (with penalty fill)
 - 10-slot inventory and the junkyard
 - Credits, upkeep, bankruptcy, end-of-day summary
-- `economy.json` and the economy simulation (the agent crew)
+- `economy.json` and the buyer/swapper economy simulation
 
 ## Cut order
 
@@ -28,4 +28,4 @@ The MVP plan from the GDD, with what to cut if the two weeks get tight. The rule
 
 ## Worst-case economy check
 
-A bad day must stay recoverable. The agent crew checks this on every economy change: target 3 forces a worst-case day 4 (every ship with 3 weak parts, the junkyard all junk), and the swapper bot must still survive the run in 75%+ of runs. If a change breaks it, the file is not approved. See the [crew reports](../agents/reports/).
+A bad day must stay recoverable. The QA Playtester checks this on every economy change: on a worst-case day 4 (every ship with 3 weak parts, the junkyard all junk), the swapper bot must still survive the run in 75%+ of runs. If a change breaks it, the file is not approved.
