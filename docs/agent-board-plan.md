@@ -20,7 +20,7 @@ The board is GitHub Issues plus a GitHub Projects board in the game's repo: free
 
 - An epic links to its request; the request gets a comment listing the epic and tasks it produced, and closes when its epic is done.
 - Each task carries: the assigned agent, acceptance criteria, the files it may change, and the tasks it depends on.
-- Two views: the task board (epics and tasks in columns) and a requests list (open requests, nothing to drag).
+- The board shows epics and tasks in columns. Requests stay off the board: the repo's issue list, filtered by the `request` label, lists them.
 - Paperclip, a dedicated tool for running agent teams, is worth a look after the MVP.
 
 ## Statuses and fields
