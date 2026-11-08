@@ -8,7 +8,7 @@
   "check_retries": 2,
   "poll_minutes": 5,
   "sound": true,
-  "gdd": "docs/Good Enough Repairs - Final GDD v1.3.md",
+  "gdd": "docs/Good Enough Repairs - GDD.md",
   "models": {
     "director": "sonnet",
     "programmer": "sonnet",

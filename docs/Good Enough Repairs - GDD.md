@@ -1,6 +1,6 @@
-# Good Enough Repairs - Final GDD (v1.3)
+# Good Enough Repairs - Final GDD (v1.4)
 
-Author: Nikola Bulog · Version 1.3 · October 23, 2026 (CEST)
+Author: Nikola Bulog · Version 1.4 · November 8, 2026 (CET)
 
 ## About this document
 
@@ -12,6 +12,7 @@ This is the final GDD: it describes the smallest playable version of the game (t
 | 1.1 | Oct 20, 2026 | Added AI Architecture and Technical Strategy, updated mechanics |
 | 1.2 | Oct 22, 2026 | Changes from the first agent stress test and own review |
 | 1.3 | Oct 23, 2026 | Final GDD: changes from the second stress test and own review (see Appendix: Revision notes) |
+| 1.4 | Nov 8, 2026 | Part types defined. Designer decisions from the economy epic: weak parts per ship type, starting credits, junkyard price, balance targets, busy days, simulation timing |
 
 ## Executive Summary
 
@@ -72,9 +73,9 @@ A day starts. A battered freighter slides in from the left and docks in the firs
 
 ### Ships and parts
 
-- Each ship has a fixed set of part slots (e.g., engine, hull plate, shield generator, thruster, power core). Fighters and freighters use the same part types, so a part fits the matching slot on either ship.
+- Each ship has five part slots: engine, hull plate, shield generator, thruster and power core. Fighters and freighters use the same part types, so a part fits the matching slot on either ship.
 - Each installed part has a condition from 0-100%, shown as a condition bar.
-- There is no overall average: the weakest part decides. Ships arrive with 1-3 parts below the required level (the Economy Balancer sets how this rises with the difficulty ramp), which must be replaced with better ones (the others can be swapped for worse parts, as long as they stay above the level).
+- There is no overall average: the weakest part decides. Ships arrive with 1-3 parts below that ship's own required level (the Economy Balancer sets how this rises with the difficulty ramp), which must be replaced with better ones (the others can be swapped for worse parts, as long as they stay above the level). A fighter's weak part can be 60-69%: too weak for the fighter, good enough for a freighter.
 - A ship is repaired when each of its parts is at or above the required level for that ship type: 60% on freighters, 70% on fighters. Parts never need to be at 100%.
 - A ship can always be released. If a slot is empty or below the required level, a warning first shows the net result (payment minus penalty parts), and releasing fills that slot with a new part at the penalty price, 20% above the shop price, so buying the part yourself is always better.
 
@@ -99,7 +100,7 @@ A day starts. A battered freighter slides in from the left and docks in the firs
 - A screen opened from the day start screen before each game day, carried over from the jam version. It lists the 15 salvaged parts available that day.
 - 7-10 of them are junk, unusable on any ship. The rest are good enough to use. As the mechanic's skill grows during the run, he finds more usable parts.
 - The player salvages the parts they want with one click, and each goes into the inventory; if the inventory's 10 slots are full, the bin is on this screen too, so a part can be binned to make room.
-- Every junkyard part costs the same, whatever its condition: always more than the bin pays (10), far less than a new part (150-300). So buying junk to bin it never makes money.
+- Every junkyard part costs the same, whatever its condition: always more than the bin pays (10), at most 20% of the cheapest new part. So buying junk to bin it never makes money.
 
 ## The secret strategy: part swapping
 
@@ -129,21 +130,28 @@ The economy is tuned so that pure buying loses money and smart swapping makes mo
 
 | Item | Amount in credits  | Why |
 |---|---|---|
-| Starting credits | 500 | Enough to survive a few mistakes (the Economy Balancer may lower it, even to 0) |
+| Starting credits | 500 | Enough to survive a few mistakes; the Economy Balancer sets it to meet the balance targets |
 | New part price | 150-300 | Higher than most single-ship payments |
 | Fighter payment | 200-350 | Pays more, but needs 70% parts |
 | Freighter payment | 150-250 | Pays less |
 | Station upkeep | 120 per day | Constant pressure to keep earning |
 | Scrap price (bin) | 10 per part | Small reward for clearing the inventory, never worth more than a swap |
-| Junkyard part price | Same for every part: above 10, far below 150 | Cheap parts let salvaging and swapping beat buying, and binning them never pays |
+| Junkyard part price | Same for every part: above 10, at most 20% of the cheapest new part | Cheap parts let salvaging and swapping beat buying, and binning them never pays |
 | Penalty part price | New part price + 20% | Buying the part yourself is always cheaper than releasing an unfinished ship. Filling one weak part must cost more than the lowest ship payment |
 
-Balance check to run in playtests: a player who only buys new parts should go bankrupt by about day 3. A player who swaps well should end each day with slightly more money than they started, also on the hardest days.
+Balance targets, checked by the economy simulation and later in playtests:
+
+- A player who only buys new parts goes bankrupt on day 2 to 4 (median).
+- A player who only releases unrepaired ships loses money over the run.
+- A good swapper's average net per day is above 0 and at most 30% of that day's starting balance, for an average-speed player (faster players may earn more). At most half of the swapper's runs have a day that ends below its start.
+- On busy days, every ship a good swapper serves earns money on average, so serving more ships earns more.
+
+Simulation assumptions until playtests correct them: a player action takes about 3 seconds with thinking (buy and move are instant), a ship turnover (from a release to the next ship's landing) about 5 seconds, and a landing at the start of a day about 2.5 seconds.
 
 ## Win/lose conditions & progression
 
 - Tutorial: the first time the game starts, it asks "First time playing?" (tutorial) or "I know how to play". The tutorial is day 0: a guided quiet day with fixed ships and step-by-step instructions. It leads the player through swapping and can't be lost. There is no junkyard on day 0, since the player doesn't know yet what parts are for. After day 0 the credits and inventory are reset, and the real run starts at day 1. Players who skip it go straight to the main run.
-- Structure: the game is played in game days (rounds). Each day is one of two kinds, and the start of the day tells the player which one and why. On a quiet day, a fixed number of ships (5-10) arrives, and the day ends when the last one flies away. On a busy day, more ships come than anyone could finish, so time is the only limit: ships keep arriving until a countdown (2-5 minutes) reaches 0, and the player tries to serve as many as possible. At 0 no new ships arrive, and the day ends when the last docked ship flies away, the same as on a quiet day. The two kinds are mixed, with more busy days later in the run. Upkeep is paid at the start of each day.
+- Structure: the game is played in game days (rounds). Each day is one of two kinds, and the start of the day tells the player which one and why. On a quiet day, a fixed number of ships (5-10) arrives, and the day ends when the last one flies away. On a busy day, more ships come than anyone could finish, so time is the only limit: ships keep arriving until a countdown (2-5 minutes) reaches 0, and the player tries to serve as many as possible: the race is to earn more. At 0 no new ships arrive, and the day ends when the last docked ship flies away, the same as on a quiet day. The two kinds are mixed, with more busy days later in the run. Upkeep is paid at the start of each day.
 - No timer per ship: a docked ship waits as long as needed. The pressure comes from the day's limit and from money, not from individual ships leaving. Because a ship can always be released, every day can end.
 - Money during the day: the credit counter changes live with every purchase, payment and scrap sale, and it may go below 0 and back up again. Only the balance at the end of the day counts: if it is below 0 then, the player is bankrupt. Holding the last ship back gains nothing, because the run only continues when the day ends.
 - End of the run: after day 7, or after a bankruptcy, a final screen shows the run summary (credits earned, ships repaired, parts saved from the junkyard) and a closing line from the mechanic that depends on how the run went.
@@ -186,7 +194,7 @@ The game has no AI at runtime: every rule runs in normal game code. AI is used t
 |---|---|---|---|
 | Director | Turns the GDD into feature cards on a feature board, gives each agent its subtasks, rejects anything outside the scope, and takes open questions to the designer. | A work session starts, or QA reports on a feature | The player gets a small, finished game: every feature traces back to the core loop. |
 | Programmer | Writes all the game logic: docking bays, parts, inventory, junkyard, the player actions, and the events other agents connect to. | A feature card has a coding subtask | Moving a part between ships is instant and reliable, and a ship can always be released. |
-| Economy Balancer | Sets prices, payments, scrap value, upkeep and junkyard contents, and decides how damaged each arriving ship is. | A card needs balance numbers, or the simulation fails | A player who only buys new parts goes bankrupt by about day 3, and ships usually arrive with a healthy part worth harvesting. |
+| Economy Balancer | Sets prices, payments, scrap value, upkeep and junkyard contents, and decides how damaged each arriving ship is. | A card needs balance numbers, or the simulation fails | A player who only buys new parts goes bankrupt on day 2 to 4, and ships usually arrive with a healthy part worth harvesting. |
 | UX Designer | Decides how the game responds to every player action, then places the art and sound in the scene and connects them to the Programmer's events. When a moment is confusing in screenshots or playtests, it adds or proposes effects, messages and warnings. It also writes the mechanic's lines. | A card needs a layout, or art and sound placed; or a feature is finished and needs a review | The player sees at a glance which parts are spare, moves one in a couple of clicks, and always knows how much of the day is left. |
 | Artist | Makes the 2D art for the ships, parts, station, junkyard and icons, and imports it into Unity. | A card asks for a new image | Condition bars read at a glance, and the station looks rugged but well kept. |
 | Sound Designer | Makes or picks the sound effects and music, and imports them into Unity. | A card asks for a new sound | Every install clunks, every payment rings, and the music tells the player the day is ending. |

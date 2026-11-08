@@ -2,7 +2,7 @@
 
 A 2D management / repair puzzle game made in **Unity 6 (URP 2D)**. You are the space mechanic who keeps fighters and freighters flying. Ships dock with weak parts, and the winning move is not to buy new parts but to **swap** them: a fighter's 65% engine fails the fighter's 70% level, yet it is good enough for a freighter. Survive 7 days without going bankrupt.
 
-Game design: [`docs/`](docs/) (Final GDD v1.3, PDF and Markdown). MVP cut order and checkpoints: [`docs/production-plan.md`](docs/production-plan.md).
+Game design: [the GDD](docs/Good%20Enough%20Repairs%20-%20GDD.md). MVP cut order and checkpoints: [`docs/production-plan.md`](docs/production-plan.md).
 
 This repository is the Unity project. The AI agents that help build it live next to the Unity folders in [`agents/`](agents/), outside `Assets/`, so Unity never imports them.
 
