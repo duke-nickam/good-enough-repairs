@@ -172,8 +172,16 @@ class GitHubBoard:
 
     def add_item(self, number, status, attempt=None):
         url = f"https://github.com/{self.repo}/issues/{number}"
-        item = gh_json("project", "item-add", str(self.number), "--owner", self.owner, "--url", url, "--format", "json")
-        self._item_ids[number] = item["id"]
+        try:
+            item = gh_json("project", "item-add", str(self.number), "--owner", self.owner, "--url", url,
+                           "--format", "json")
+            self._item_ids[number] = item["id"]
+        except GhError as e:
+            if "already exists" not in str(e):
+                raise
+            self.items()  # GitHub added it already (the board's auto-add for sub-issues): use that item
+            if number not in self._item_ids:
+                raise
         self.set_status(number, status)
         if attempt is not None:
             self.set_attempt(number, attempt)
