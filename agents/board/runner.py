@@ -4,6 +4,7 @@ Each pass: the Director answers new requests, designer moves are applied, then e
 (agent -> checks -> reviewer) until nothing is ready. All state lives on the board, so a stopped runner
 continues where it left off."""
 import datetime
+import hashlib
 import json
 import re
 import shlex
@@ -303,7 +304,7 @@ class Runner:
                 for p in (dc.files if dc else []):
                     reads.setdefault(p, self.ws.read(p))
             tries = 1 + max(0, int(self.s.get("check_retries", 0)))
-            feedback, check_log = None, []
+            feedback, check_log, checks_text = None, [], ""
 
             def keep_tries(why):
                 """Files from earlier failed tries are committed, so an attempt never leaves the repo dirty."""
@@ -337,9 +338,14 @@ class Runner:
                     return
                 for p, c in written.items():
                     self.ws.write(p, c)
+                last_text = checks_text if k > 1 else None
                 checks_ok, checks_text = self.run_checks(card, written)
                 check_log.append(f"try {k} {'pass' if checks_ok else 'FAIL'}")
                 if checks_ok or k == tries:
+                    break
+                if checks_text == last_text:  # no progress: the next try would fail the same way
+                    check_log.append("stopped: same failure as the try before")
+                    log(who, f"#{n}: same check failure twice, no more self-check tries")
                     break
                 log(who, f"#{n}: checks failed, self-check try {k + 1}/{tries}")
                 files = {p: self.ws.read(p) for p in card.files}
@@ -353,9 +359,27 @@ class Runner:
                                                attempt=attempt, summary=summary[:500]))
         # ------------------------------------------------ review
         reviewer = AGENTS[card.reviewer]
-        self.board.set_status(n, "In review")
         if resume_review:
             checks_ok, checks_text = self.run_checks(card, written)
+        failed = None if checks_ok else hashlib.sha1(checks_text.encode("utf-8")).hexdigest()[:12]
+        before = None  # the previous attempt's failed checks, only since the last designer input
+        for c in reversed(issue.comments):
+            m = c.marker
+            if m and m.get("event") in ("rejected", "reset", "needs_designer", "approved", "accepted"):
+                before = m.get("failed") if m.get("event") == "rejected" else None
+                break
+        if failed and failed == before:  # no progress across attempts: the agent cannot fix this itself
+            total = self.add_tokens(t, usages)
+            self.board.set_status(n, "Needs designer")
+            alert(self.s, "needs_designer")
+            self.board.comment(n, crew_comment(
+                "Runner", f"Attempt {attempt} failed its checks exactly like the attempt before, so the agent "
+                          f"cannot fix it by itself (for example the check needs another task's file). No review "
+                          f"was run.\n\nChecks:\n{checks_text}\n\nTask total: {total:,} tokens.",
+                "needs_designer", attempt=attempt))
+            log("Runner", f"#{n}: same check failure as the last attempt, Needs designer")
+            return
+        self.board.set_status(n, "In review")
         log(reviewer, f"#{n}: reviewing (checks {'pass' if checks_ok else 'FAIL'})")
         try:
             verdict, usage, _ = self.agents.review(card.reviewer, card.to_markdown(), summary, written, checks_text,
@@ -378,9 +402,9 @@ class Runner:
             reason = verdict.get("summary", "")
             if not checks_ok and verdict.get("verdict") == "approve":
                 reason = "The reviewer approved, but a check failed, so it is rejected. " + reason
-            self.reject(t, attempt, f"{reason}\n\n{lines}\n\nChecks:\n{checks_text}", usages, reviewer)
+            self.reject(t, attempt, f"{reason}\n\n{lines}\n\nChecks:\n{checks_text}", usages, reviewer, failed=failed)
 
-    def reject(self, t, attempt, text, usages, who):
+    def reject(self, t, attempt, text, usages, who, failed=None):
         n = t.number
         total = self.add_tokens(t, usages)
         if attempt >= self.max:
@@ -393,7 +417,8 @@ class Runner:
         else:
             self.board.set_status(n, "Todo")
             self.board.comment(n, crew_comment(who, f"Rejected on attempt {attempt}/{self.max}: {text}\n\n"
-                                                    f"Task total: {total:,} tokens.", "rejected", attempt=attempt))
+                                                    f"Task total: {total:,} tokens.", "rejected", attempt=attempt,
+                                               failed=failed))
             log(who, f"#{n}: rejected, back to Todo")
 
     # ------------------------------------------------------------ checks

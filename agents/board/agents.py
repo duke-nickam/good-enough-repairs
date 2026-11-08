@@ -28,7 +28,9 @@ or a plan:
 Agent keys: """ + ", ".join(AGENTS) + """.
 Epics already on the board for this request are planned: plan only what is new.
 Rules: each task belongs to one agent and writes only its listed files (text files only). The reviewer judges the
-result; a check script (optional) must already exist or be written by an earlier task it depends on. Never list
+result; a check script (optional) must already exist or be written by an earlier task it depends on.
+A task depends on every task that writes a file its checks or Reads use; a folder counts as every file in it. If a
+check should not need another task's file, give the check only this task's own files. Never list
 the GDD (docs/) or anything in agents/board/ or .github/ as a file to write. Keep the plan as small as the request
 allows: every task costs tokens."""
 
@@ -155,6 +157,7 @@ def validate_plan(plan, repo_files):
         for d in t.get("depends_on") or []:
             if d not in keys:
                 p.append(f"{k}: depends on unknown task {d!r}")
+    p += file_dependency_problems(keys)
     seen, stack = set(), set()
 
     def cyclic(k):
@@ -170,6 +173,38 @@ def validate_plan(plan, repo_files):
     if any(cyclic(k) for k in keys):
         p.append("the dependencies form a loop")
     return p
+
+
+def touched_paths(task):
+    """Files and folders a task's checks and Reads use: the check script and every path argument."""
+    paths = list(task.get("reads") or [])
+    for c in task.get("checks") or []:
+        paths += [a for a in c.split()[1:] if "/" in a or "." in a]
+    return paths
+
+
+def file_dependency_problems(keys):
+    """A task that uses a file another task writes must depend on that task (directly or through others)."""
+    def deps(k, seen=None):
+        seen = set() if seen is None else seen
+        for d in keys.get(k, {}).get("depends_on") or []:
+            if d in keys and d not in seen:
+                seen.add(d)
+                deps(d, seen)
+        return seen
+    problems = []
+    for k, t in keys.items():
+        mine, before = set(t.get("files") or []), deps(k)
+        for path in touched_paths(t):
+            folder = path.rstrip("/") + "/"
+            for w, other in keys.items():
+                if w == k or w in before:
+                    continue
+                hit = [f for f in other.get("files") or [] if f not in mine and (f == path or f.startswith(folder))]
+                if hit:
+                    problems.append(f"{k}: its checks or Reads use {', '.join(hit)}, written by {w}, but {k} does not "
+                                    f"depend on {w}. Add {w} to its depends_on, or narrow the check to {k}'s own files")
+    return problems
 
 
 class ClaudeAgents:
