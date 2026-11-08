@@ -3,31 +3,37 @@
 
 Usage:
     python agents/checks/simulate.py BALANCE_JSON [--games N] [--seed S]
-                                     [--max-daily-net N]
 
 Plays the 7 game days with three bots on the same seeded worlds, prints a
-result table and checks the balance targets from the GDD. Exit code 0 only
-if the balance file is valid and no target fails; 1 otherwise. A target
-printed as SKIP is not checked (see --max-daily-net). Pure standard library.
-The same file, --games, --seed and --max-daily-net give the same output.
+result table and checks the balance targets from the GDD. Every target is
+always checked. Exit code 0 only if the balance file is valid and every
+target passes; 1 otherwise. The same file, --games and --seed give the same
+output. Pure standard library.
 
 BALANCE FILE FORMAT (JSON, must be readable by Unity's JsonUtility)
 - One object at the top level, never an array.
 - No maps with named keys: the day list is an array of objects.
 - Percentages are whole numbers 0-100. Money is whole credits.
-  Time is whole seconds.
+  Time is whole milliseconds.
 
 Top-level fields:
   startingCredits            int     starting credits (GDD: 500, may be lowered)
-  newPartPrice               int     shop price of a new part (GDD: 150-300)
+  newPartPrice               int     shop price of a new part (GDD: 150-300).
+                                     The file has one shop price, which is also
+                                     the cheapest new part price
   penaltyPercent             int     a penalty fill costs this % above newPartPrice
                                      (GDD: 20, range 0-100)
   scrapPrice                 int     paid per binned part (GDD: 10)
   upkeep                     int     paid at the start of each day (GDD: 120)
-  actionSeconds              int     game seconds one player action takes: a buy,
-                                     a part move (swap or fill) or a release.
-                                     The GDD gives no value; the designer must set
-                                     it. Range 1-3600.
+  playerActionMs             int     time of one buy or one part move: the time
+                                     the player takes between actions. Designer
+                                     estimate: 3000. Range 0-60000
+  shipTurnoverMs             int     time of one release: from the release start
+                                     to the landing end of the next ship. Designer
+                                     estimate: 5000. Range 0-60000
+  dayStartLandingMs          int     time for each ship that lands on an empty bay
+                                     at the day start. Designer estimate: 2500.
+                                     Range 0-60000
   slotsPerShip               int     part slots per ship, 4-5 (GDD MVP scope)
   requiredFreighterPercent   int     required level for freighters (GDD: 60)
   requiredFighterPercent     int     required level for fighters (GDD: 70)
@@ -37,8 +43,9 @@ Top-level fields:
   days                       array   exactly 7 day objects, day 1 first
 
 junkyard object:
-  price                      int     paid per salvaged part. Above scrapPrice,
-                                     below newPartPrice
+  price                      int     paid per salvaged part. Above scrapPrice, and
+                                     at most 20% of newPartPrice (price * 5 must
+                                     not be more than newPartPrice). Lower is fine
   usableConditionMin         int     lowest condition of a usable junkyard part
                                      (at least requiredFreighterPercent)
   usableConditionMax         int     highest condition of a usable junkyard part
@@ -78,13 +85,31 @@ Arrival rules used by the sim:
 Modelling notes (the sim is a QA tool, not part of the game):
 - Fixed GDD rules in the sim: 3 bays, 10 inventory slots, 15 junkyard parts,
   bankruptcy checked only at day end, 7 days.
-- Each buy, part move and release takes actionSeconds of game time.
-  Salvage at the day start takes no time. Binning inside a move and the
-  penalty fills inside a release take no extra time.
+- Time costs: each buy and each part move takes playerActionMs. A part move
+  that brings a donor part in (donor swap) counts as two moves. Each release
+  takes shipTurnoverMs. Each ship that lands on an empty bay at the day start
+  takes dayStartLandingMs. Salvage at the day start takes no time. Binning
+  inside a move or a buy and the penalty fills inside a release take no
+  extra time.
 - A junk junkyard part has condition 0. Conditions are whole percents.
 - The releaser discards the parts it replaces (no payment, no scrap).
 - The swapper buys a new part only when no harvest is possible, so buying
-  stays the last resort.
+  stays the last resort. It bins parts below every requirement.
+- Ship money is counted per day: a day's net is the balance at its end minus
+  the balance at its start (before upkeep), so upkeep and salvage count.
+
+Targets (all always checked; a failing target makes the run exit 1):
+- buyer: median bankruptcy day is at most 3
+- swapper: no bankruptcy in any game
+- swapper: mean net per day is above 0 on every day
+- swapper: mean net per day is at most 20% of that day's mean start balance
+- swapper: at most 50% of games contain a day that ends below its start
+- swapper: a bad-luck day (most junk, most weak parts, the worst start seen
+  on the hardest day) ends at or above 0
+- releaser: mean final balance is below the starting credits
+- penalty price is above the new part price
+- penalty price is above the lowest ship payment
+- junkyard price is above the scrap price and at most 20% of the new part price
 """
 
 import argparse
@@ -106,7 +131,10 @@ JUNK_RANGE = (7, 10)    # GDD: junk parts per junkyard
 WEAK_RANGE = (1, 3)     # GDD: weak parts per ship
 SLOT_RANGE = (4, 5)     # GDD MVP scope: 4-5 part slots
 PENALTY_PERCENT_RANGE = (0, 100)
-ACTION_SECONDS_RANGE = (1, 3600)  # sanity bound only; the value is the designer's
+TIME_MS_RANGE = (0, 60000)
+NET_LIMIT_PERCENT = 20       # designer: mean net per day at most 20% of day start
+JUNK_PRICE_PERCENT = 20      # designer: junkyard price at most 20% of new part
+LOSING_GAMES_MAX_PERCENT = 50  # designer: at most 50% of games with a losing day
 NEW_CONDITION = 100     # a new part is 100%
 
 DAY_INT_FIELDS = [
@@ -266,8 +294,12 @@ def validate_balance(data):
                                PENALTY_PERCENT_RANGE[0], PENALTY_PERCENT_RANGE[1])
     s["scrapPrice"] = _int(data, "scrapPrice", "", errors, 0, 10 ** 9)
     s["upkeep"] = _int(data, "upkeep", "", errors, 0, 10 ** 9)
-    s["actionSeconds"] = _int(data, "actionSeconds", "", errors,
-                              ACTION_SECONDS_RANGE[0], ACTION_SECONDS_RANGE[1])
+    s["playerActionMs"] = _int(data, "playerActionMs", "", errors,
+                               TIME_MS_RANGE[0], TIME_MS_RANGE[1])
+    s["shipTurnoverMs"] = _int(data, "shipTurnoverMs", "", errors,
+                               TIME_MS_RANGE[0], TIME_MS_RANGE[1])
+    s["dayStartLandingMs"] = _int(data, "dayStartLandingMs", "", errors,
+                                  TIME_MS_RANGE[0], TIME_MS_RANGE[1])
     s["slotsPerShip"] = _int(data, "slotsPerShip", "", errors, SLOT_RANGE[0], SLOT_RANGE[1])
     s["requiredFreighterPercent"] = _int(data, "requiredFreighterPercent", "", errors, 0, 100)
     s["requiredFighterPercent"] = _int(data, "requiredFighterPercent", "", errors, 0, 100)
@@ -290,10 +322,11 @@ def penalty_price(cfg):
 
 
 def arrival_times(day):
-    """Arrival time in seconds of every ship on the day, in order."""
+    """Arrival time in milliseconds of every ship on the day, in order."""
     if day["type"] == "quiet":
         return [0] * day["ships"]
-    return list(range(0, day["countdownSeconds"], day["shipEverySeconds"]))
+    step = day["shipEverySeconds"] * 1000
+    return list(range(0, day["countdownSeconds"] * 1000, step))
 
 
 def make_ship(cfg, day, rng):
@@ -337,15 +370,19 @@ def best_index(values, need):
 
 
 class Game:
+    """Clock is in milliseconds. Ships arrive at their scheduled times."""
+
     def __init__(self, cfg, credits):
         self.cfg = cfg
         self.credits = credits
         self.penalty = penalty_price(cfg)
-        self.action_seconds = cfg["actionSeconds"]
+        self.move_ms = cfg["playerActionMs"]
+        self.turnover_ms = cfg["shipTurnoverMs"]
+        self.landing_ms = cfg["dayStartLandingMs"]
         self.bays = [None] * BAYS
         self.inventory = []
         self.queue = []       # arrived ships waiting for a bay, in arrival order
-        self.future = []      # (arrival time, ship) not yet arrived
+        self.future = []      # (arrival time ms, ship) not yet arrived
         self.countdown = None
         self.closed = False
         self.clock = 0
@@ -358,12 +395,16 @@ class Game:
 
     def start_day(self, day, arrivals, expected_weak):
         self.clock = 0
-        self.countdown = day["countdownSeconds"] if day["type"] == "busy" else None
+        self.countdown = None
+        if day["type"] == "busy":
+            self.countdown = day["countdownSeconds"] * 1000
         self.closed = False
         self.future = list(arrivals)
         self.queue = []
         self.expected_weak = expected_weak
         self._admit()
+        landed = sum(1 for s in self.bays if s is not None)
+        self._advance(self.clock + landed * self.landing_ms)
 
     def req(self, ship):
         if ship["kind"] == "fighter":
@@ -409,9 +450,9 @@ class Game:
             self.queue = []
             self.future = []
 
-    def act(self):
-        """One player action (buy, move or release) takes game time."""
-        self._advance(self.clock + self.action_seconds)
+    def move(self, count=1):
+        """Buy or part move(s): the player's time between actions."""
+        self._advance(self.clock + count * self.move_ms)
 
     def idle(self):
         """Nothing to do: wait for the next ship to arrive."""
@@ -419,7 +460,7 @@ class Game:
             raise RuntimeError("idle with no ship to wait for")
         self._advance(self.future[0][0])
 
-    def bin(self, part):
+    def bin(self):
         self.credits += self.cfg["scrapPrice"]
         self.binned += 1
 
@@ -427,14 +468,22 @@ class Game:
         if len(self.inventory) < INVENTORY_SLOTS:
             self.inventory.append(part)
         else:
-            self.bin(part)
+            self.bin()
 
-    def buy(self, ship, i):
+    def stash(self, part, bin_below=None):
+        """Keep a removed part in the inventory, or bin it. A part below
+        bin_below is binned at once, even if the inventory has room."""
+        if bin_below is not None and part < bin_below:
+            self.bin()
+        else:
+            self.put_removed(part)
+
+    def buy(self, ship, i, bin_below=None):
         self.credits -= self.cfg["newPartPrice"]
         old = ship["slots"][i]
         ship["slots"][i] = NEW_CONDITION
-        self.put_removed(old)
-        self.act()
+        self.stash(old, bin_below)
+        self.move()
 
     def salvage(self, part):
         self.credits -= self.cfg["junkyard"]["price"]
@@ -454,7 +503,7 @@ class Game:
         idx = next(k for k, s in enumerate(self.bays) if s is ship)
         self.bays[idx] = None
         self.released += 1
-        self.act()
+        self._advance(self.clock + self.turnover_ms)
 
 
 # ---------------------------------------------------------------- bots
@@ -526,7 +575,7 @@ class Swapper:
         if not ships:
             return False
         ship = min(ships, key=lambda s: len(g.weak_slots(s)))
-        g.buy(ship, g.weak_slots(ship)[0])
+        g.buy(ship, g.weak_slots(ship)[0], g.lowest_req())
         return True
 
     def _repair(self, g, ship):
@@ -540,17 +589,7 @@ class Swapper:
             actions += 1
 
     def _fix(self, g, ship, i):
-        if self._from_inventory(g, ship, i) or self._from_donor(g, ship, i):
-            g.act()
-            return True
-        return False
-
-    def _stash(self, g, part):
-        # Parts below every requirement are useless: scrap them.
-        if part < g.lowest_req():
-            g.bin(part)
-        else:
-            g.put_removed(part)
+        return self._from_inventory(g, ship, i) or self._from_donor(g, ship, i)
 
     def _from_inventory(self, g, ship, i):
         k = best_index(g.inventory, g.req(ship))
@@ -559,7 +598,8 @@ class Swapper:
         part = g.inventory.pop(k)
         old = ship["slots"][i]
         ship["slots"][i] = part
-        self._stash(g, old)
+        g.stash(old, g.lowest_req())
+        g.move(1)
         return True
 
     def _from_donor(self, g, ship, i):
@@ -583,7 +623,8 @@ class Swapper:
         donor["slots"][j] = refill
         old = ship["slots"][i]
         ship["slots"][i] = c
-        self._stash(g, old)
+        g.stash(old, g.lowest_req())
+        g.move(2)           # two drags: donor to ship, inventory to donor
         return True
 
 
@@ -622,21 +663,19 @@ def run_all(cfg, games, base_seed):
     bots = {"buyer": Buyer, "swapper": Swapper, "releaser": Releaser}
     seeds = range(base_seed, base_seed + games)
     results = {name: [] for name in names}
-    starts = {}
     for seed in seeds:
         world = build_world(cfg, cfg["days"], seed)
         for name in names:
-            r = play(cfg, cfg["days"], world, bots[name](), cfg["startingCredits"])
-            results[name].append(r)
-            if name == "swapper":
-                for entry in r["days"]:
-                    starts.setdefault(entry["day"], []).append(entry["start"])
+            results[name].append(
+                play(cfg, cfg["days"], world, bots[name](), cfg["startingCredits"]))
     hard = max(cfg["days"],
                key=lambda d: len(arrival_times(d)) * (d["weakPartsMin"] + d["weakPartsMax"]))
+    hard_starts = [e["start"] for r in results["swapper"]
+                   for e in r["days"] if e["day"] == hard["day"]]
+    worst_start = min(hard_starts) if hard_starts else cfg["startingCredits"]
     bad_day = dict(hard)
     bad_day["junkParts"] = JUNK_MAX
     bad_day["weakPartsMin"] = bad_day["weakPartsMax"]
-    worst_start = min(starts.get(hard["day"], [cfg["startingCredits"]]))
     bad_finals = []
     for seed in seeds:
         world = build_world(cfg, [bad_day], seed)
@@ -649,19 +688,21 @@ def bust_day(r):
     return r["bust"] if r["bust"] is not None else DAY_COUNT + 1
 
 
-def daily_nets(swapper_results):
-    nets = {d: [] for d in range(1, DAY_COUNT + 1)}
+def day_stats(swapper_results):
+    """Per day: the swapper's net and start balance in every game that reached it."""
+    stats = {d: {"net": [], "start": []} for d in range(1, DAY_COUNT + 1)}
     for r in swapper_results:
         for e in r["days"]:
-            nets[e["day"]].append(e["end"] - e["start"])
-    return nets
+            stats[e["day"]]["net"].append(e["end"] - e["start"])
+            stats[e["day"]]["start"].append(e["start"])
+    return stats
 
 
-def make_targets(cfg, run, max_net):
-    """Return (status, text) pairs. status is True (PASS), False (FAIL) or
-    None (SKIP: not checked)."""
+def make_targets(cfg, run):
+    """Return (passed, text) pairs. Every target is always checked."""
     results = run["results"]
-    nets = daily_nets(results["swapper"])
+    swap = results["swapper"]
+    stats = day_stats(swap)
     out = []
 
     busts = [bust_day(r) for r in results["buyer"]]
@@ -670,24 +711,30 @@ def make_targets(cfg, run, max_net):
                 "buyer goes bankrupt by about day %d (median bankruptcy day %.1f)"
                 % (BUYER_TARGET_DAY, med)))
 
-    swap_bankrupt = sum(1 for r in results["swapper"] if r["bust"] is not None)
+    swap_bankrupt = sum(1 for r in swap if r["bust"] is not None)
     out.append((swap_bankrupt == 0,
                 "swapper never goes bankrupt (%d bankrupt games)" % swap_bankrupt))
 
-    failing = [d for d in nets if not nets[d] or statistics.mean(nets[d]) <= 0]
+    no_games = [d for d in stats if not stats[d]["net"]]
+    losing_days = [d for d in stats
+                   if stats[d]["net"] and statistics.mean(stats[d]["net"]) <= 0]
+    failing = no_games + losing_days
     out.append((not failing,
                 "swapper ends each day above its start on average, hardest days included "
-                "(failing days: %s)" % (", ".join(str(d) for d in failing) or "none")))
+                "(failing days: %s)" % (", ".join(str(d) for d in sorted(failing)) or "none")))
 
-    if max_net is None:
-        out.append((None,
-                    "swapper mean net per day has an upper limit (not checked: no limit "
-                    "given, use --max-daily-net)"))
-    else:
-        over = [d for d in nets if nets[d] and statistics.mean(nets[d]) > max_net]
-        out.append((not over,
-                    "swapper mean net per day is at most %d (days over: %s)"
-                    % (max_net, ", ".join(str(d) for d in over) or "none")))
+    over = [d for d in stats if stats[d]["net"]
+            and statistics.mean(stats[d]["net"])
+            > NET_LIMIT_PERCENT / 100.0 * statistics.mean(stats[d]["start"])]
+    out.append((not over,
+                "swapper mean net per day is at most %d%% of that day's starting balance "
+                "(days over: %s)" % (NET_LIMIT_PERCENT, ", ".join(str(d) for d in over) or "none")))
+
+    losing = sum(1 for r in swap if any(e["end"] - e["start"] < 0 for e in r["days"]))
+    share = 100.0 * losing / len(swap)
+    out.append((share <= LOSING_GAMES_MAX_PERCENT,
+                "at most %d%% of swapper games have a day that ends below its start "
+                "(actual %.1f%%)" % (LOSING_GAMES_MAX_PERCENT, share)))
 
     hard = run["hard"]
     worst = min(run["bad_finals"])
@@ -715,11 +762,11 @@ def make_targets(cfg, run, max_net):
 
     jy = cfg["junkyard"]["price"]
     scrap = cfg["scrapPrice"]
-    out.append((scrap < jy < price,
-                "junkyard price is above the scrap price and below a new part, so "
-                "binning never pays (junkyard %d, scrap %d, new %d) "
-                "(partial: the GDD's 'far below 150' margin is not set)"
-                % (jy, scrap, price)))
+    out.append((scrap < jy and jy * 100 <= JUNK_PRICE_PERCENT * price,
+                "junkyard price is above the scrap price and at most %d%% of a new part, "
+                "so binning never pays (junkyard %d, scrap %d, new %d, limit %d)"
+                % (JUNK_PRICE_PERCENT, jy, scrap, price,
+                   JUNK_PRICE_PERCENT * price // 100)))
     return out
 
 
@@ -740,6 +787,20 @@ def summary_row(name, rs):
     )
 
 
+def day_rows(stats):
+    rows = []
+    for d in range(1, DAY_COUNT + 1):
+        s = stats[d]
+        if not s["net"]:
+            rows.append("  day %d: no swapper game reached this day" % d)
+            continue
+        mean_start = statistics.mean(s["start"])
+        rows.append("  day %d   start %6.0f   net %+7.1f   limit %+7.1f"
+                    % (d, mean_start, statistics.mean(s["net"]),
+                       NET_LIMIT_PERCENT / 100.0 * mean_start))
+    return rows
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Buyer, swapper and releaser simulation with balance target checks "
@@ -750,9 +811,6 @@ def main(argv=None):
                         help="seeded games per bot (default: 300)")
     parser.add_argument("--seed", type=int, default=1,
                         help="first seed (default: 1)")
-    parser.add_argument("--max-daily-net", type=int, default=None,
-                        help="upper limit for the swapper's mean net per day; "
-                             "not checked when omitted")
     args = parser.parse_args(argv)
     if args.games < 1:
         parser.error("--games must be at least 1")
@@ -776,7 +834,7 @@ def main(argv=None):
 
     run = run_all(cfg, args.games, args.seed)
     results = run["results"]
-    targets = make_targets(cfg, run, args.max_daily_net)
+    targets = make_targets(cfg, run)
 
     print("Balance file: %s" % args.balance)
     print("Games per bot: %d (seeds %d to %d)"
@@ -789,28 +847,20 @@ def main(argv=None):
         print(summary_row(name, results[name]))
     print()
 
-    nets = daily_nets(results["swapper"])
-    parts = []
-    for d in range(1, DAY_COUNT + 1):
-        if nets[d]:
-            parts.append("d%d %+.0f" % (d, statistics.mean(nets[d])))
-        else:
-            parts.append("d%d n/a" % d)
-    print("Swapper mean net per day: " + ", ".join(parts))
+    print("Swapper per day (mean start, mean net, net limit):")
+    for row in day_rows(day_stats(results["swapper"])):
+        print(row)
     print()
 
-    labels = {True: "PASS", False: "FAIL", None: "SKIP"}
     print("Targets:")
-    for status, text in targets:
-        print("  [%s] %s" % (labels[status], text))
-    failed = sum(1 for status, _ in targets if status is False)
-    skipped = sum(1 for status, _ in targets if status is None)
+    for passed, text in targets:
+        print("  [%s] %s" % ("PASS" if passed else "FAIL", text))
+    failed = sum(1 for passed, _ in targets if not passed)
     print()
     if failed:
         print("RESULT: %d of %d targets failed" % (failed, len(targets)))
         return 1
-    print("RESULT: all %d checked targets pass (%d skipped)"
-          % (len(targets) - skipped, skipped))
+    print("RESULT: all %d targets pass" % len(targets))
     return 0
 
 
