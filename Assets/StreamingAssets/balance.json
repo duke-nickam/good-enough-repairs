@@ -1,6 +1,6 @@
 {
   "startingCredits": 500,
-  "newPartPrice": 250,
+  "newPartPrice": 260,
   "penaltyPercent": 20,
   "scrapPrice": 10,
   "upkeep": 120,
@@ -20,8 +20,8 @@
   },
   "junkyard": {
     "price": 20,
-    "usableConditionMin": 60,
-    "usableConditionMax": 69
+    "usableConditionMin": 70,
+    "usableConditionMax": 100
   },
   "days": [
     {
