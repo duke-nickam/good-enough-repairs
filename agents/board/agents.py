@@ -40,14 +40,20 @@ WORK_FORMAT = """Reply in exactly this format, nothing before it:
 SUMMARY: <what you changed and why, two or three sentences, for the reviewer>
 
 If you cannot do the task without a decision from the designer, write no files and reply only:
-QUESTION: <the question, and why the GDD does not answer it>"""
+QUESTION: <the question, and why the GDD does not answer it>
+
+You cannot run anything yourself, and you don't need to: after you reply, the runner runs the task's checks on
+your files. If they fail, you get their output and can fix your files before the reviewer sees them. Results of
+earlier attempts are in the task's thread. Never write that you could not run a check."""
 
 REVIEW_FORMAT = """Reply with one JSON object only, no other text:
 {"verdict": "approve" or "reject", "summary": "<one sentence>",
  "issues": [{"where": "<file and place>", "problem": "<what is wrong, and the GDD rule or criterion it breaks>",
              "fix": "<concrete fix>"}]}
 Reject only for real problems: a broken acceptance criterion, a GDD contradiction, a failed check, wrong format.
-Taste alone is not a reason to reject; mention it as an issue on an approval. At most 6 issues."""
+Taste alone is not a reason to reject; mention it as an issue on an approval. At most 6 issues.
+The check results above come from the runner, which ran the checks on exactly the files shown: take them as given.
+Never reject because the agent did not run or report a check itself."""
 
 
 class AgentError(RuntimeError):
@@ -57,6 +63,11 @@ class AgentError(RuntimeError):
 def total_tokens(usage):
     return sum(int(usage.get(k) or 0) for k in
                ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens"))
+
+
+def sum_usage(usages):
+    keys = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
+    return {k: sum(int(u.get(k) or 0) for u in usages) for k in keys}
 
 
 def describe_tokens(usage):
@@ -202,12 +213,15 @@ class ClaudeAgents:
         text, usage, model = self._call("director", "Task: plan the request.\n\n" + PLAN_FORMAT, prompt)
         return extract_json(text), usage, model
 
-    def work(self, agent, card_md, thread, files, reads, attempt):
+    def work(self, agent, card_md, thread, files, reads, attempt, check_feedback=None):
         prompt = (f"GDD sections:\n\n{gdd_sections(self.gdd, self.s['reads'][agent])}\n\n---\n\n"
                   f"Your task card:\n\n{card_md}\n\n---\n\n"
                   f"Current content of your files:\n\n{_files_block(files)}\n\n---\n\n"
                   f"Files you need to read:\n\n{_files_block(reads)}\n\n---\n\n"
                   f"Earlier in this task (attempts, reviews, the designer's input):\n\n{thread or 'nothing yet'}")
+        if check_feedback:
+            prompt += ("\n\n---\n\nYour files above are from this attempt, and they failed the checks. Check output:\n"
+                       f"{check_feedback}\n\nFix the files and send every file again in full.")
         text, usage, model = self._call(agent, f"Task: attempt {attempt} of your task.\n\n" + WORK_FORMAT, prompt,
                                         attempt)
         return text, usage, model

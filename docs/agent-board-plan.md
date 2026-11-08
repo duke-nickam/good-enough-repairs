@@ -120,7 +120,7 @@ Only the GDD's seven agents work on the board: Director, Programmer, Economy Bal
 
 - **Roles:** each agent has one role prompt in `agents/board/roles/` and reads only what its task names, as the GDD's "How each agent works" table says.
 - **Reviewer:** every task names its reviewer, chosen by the Director from the GDD's roles. Which role reviews which kind of task is an open decision (below).
-- **Code checks:** checks code can decide (the economy simulation's five targets, text rules such as length, placeholders and no economy numbers) run as tools inside a review. Their pass or fail is computed, so no agent can argue its way past them.
+- **Code checks:** checks code can decide (the economy simulation's five targets, text rules such as length, placeholders and no economy numbers) run right after the agent writes its files. On a failure the agent gets the output and fixes its files within the same attempt, up to `check_retries` times (2 by default); the reviewer then sees the results. Their pass or fail is computed, so no agent can argue its way past them.
 - **Communication:** agents never call each other. They talk through task comments: the agent posts its result, the reviewer posts approval or reasons to reject, and the next attempt reads the whole thread. The designer reads the same thread and answers in it.
 - **Stop rule:** a task rejected on attempt 3/3 goes to Needs designer, matching the GDD's "after 3 failed tuning rounds, the designer decides".
 - **Models:** the settings name a model per agent, from the GDD (large for the Director and Programmer, fast for the rest). The UX Designer moves to the large model on a retry, the GDD's "large model if it makes too many mistakes".

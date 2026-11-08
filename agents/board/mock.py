@@ -28,9 +28,9 @@ class MockAgents:
     def plan(self, thread, board, files, problems=None):
         return PLAN, USAGE, "mock"
 
-    def work(self, agent, card_md, thread, files, reads, attempt):
+    def work(self, agent, card_md, thread, files, reads, attempt, check_feedback=None):
         if agent == "ux_designer":
-            dash = " — " if attempt == 1 else ". "  # attempt 1 trips the built-in long-dash check
+            dash = " \u2014 " if not check_feedback else ". "  # trips the long-dash check, fixed on the self-check
             text = ('=== FILE: Assets/Data/Content/greeting.json ===\n{"line": "Morning' + dash +
                     'Three bays, one genius. Let\'s get greasy."}\n=== END FILE ===\nSUMMARY: Wrote the greeting.')
         else:

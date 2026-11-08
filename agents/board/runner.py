@@ -9,7 +9,7 @@ import shlex
 import subprocess
 import sys
 
-from .agents import AgentError, describe_tokens, parse_work, total_tokens, validate_plan
+from .agents import AgentError, describe_tokens, parse_work, sum_usage, total_tokens, validate_plan
 from .model import AGENTS, Card, crew_comment, slug
 
 ACTIVE = ("In progress", "Waiting for review", "In review")
@@ -291,39 +291,52 @@ class Runner:
                 dc = self.card(d)
                 for p in (dc.files if dc else []):
                     reads.setdefault(p, self.ws.read(p))
-            try:
-                text, usage, model = self.agents.work(agent, card.to_markdown(), self.thread_text(issue), files, reads,
-                                                      attempt)
-                usages.append(usage)
-                written, summary, question = parse_work(text)
-            except (AgentError, ValueError) as e:
-                self.reject(t, attempt, f"The agent's reply was unusable: {e}", usages, who)
-                return
-            if question:
-                total = self.add_tokens(t, usages)
-                self.board.set_status(n, "Needs designer")
-                alert(self.s, "needs_designer")
-                self.board.comment(n, crew_comment(who, f"Question for the designer (attempt {attempt}):\n\n{question}"
-                                                        f"\n\nUsed: {describe_tokens(usage)}. Task total: {total:,}.",
-                                                   "needs_designer", attempt=attempt))
-                log(who, f"#{n}: asked the designer, Needs designer")
-                return
-            stray = [p for p in written if p not in card.files]
-            if stray:
-                self.reject(t, attempt, "Wrote files outside the card: " + ", ".join(stray), usages, who)
-                return
-            for p, c in written.items():
-                self.ws.write(p, c)
+            tries = 1 + max(0, int(self.s.get("check_retries", 0)))
+            feedback, check_log = None, []
+            for k in range(1, tries + 1):  # self-check: the agent sees failed checks and fixes them in this attempt
+                try:
+                    text, usage, model = self.agents.work(agent, card.to_markdown(), self.thread_text(issue), files,
+                                                          reads, attempt, feedback)
+                    usages.append(usage)
+                    written, summary, question = parse_work(text)
+                except (AgentError, ValueError) as e:
+                    self.reject(t, attempt, f"The agent's reply was unusable: {e}", usages, who)
+                    return
+                if question:
+                    total = self.add_tokens(t, usages)
+                    self.board.set_status(n, "Needs designer")
+                    alert(self.s, "needs_designer")
+                    self.board.comment(n, crew_comment(
+                        who, f"Question for the designer (attempt {attempt}):\n\n{question}\n\n"
+                             f"Used: {describe_tokens(sum_usage(usages))}. Task total: {total:,}.",
+                        "needs_designer", attempt=attempt))
+                    log(who, f"#{n}: asked the designer, Needs designer")
+                    return
+                stray = [p for p in written if p not in card.files]
+                if stray:
+                    self.reject(t, attempt, "Wrote files outside the card: " + ", ".join(stray), usages, who)
+                    return
+                for p, c in written.items():
+                    self.ws.write(p, c)
+                checks_ok, checks_text = self.run_checks(card, written)
+                check_log.append(f"try {k} {'pass' if checks_ok else 'FAIL'}")
+                if checks_ok or k == tries:
+                    break
+                log(who, f"#{n}: checks failed, self-check try {k + 1}/{tries}")
+                files = {p: self.ws.read(p) for p in card.files}
+                feedback = checks_text
             sha = self.ws.commit(list(written), f"#{n} {t.title} - {who}, attempt {attempt}")
             link = self.ws.commit_link(sha) if sha else "no change from the last attempt"
             self.board.set_status(n, "Waiting for review")
-            self.board.comment(n, crew_comment(who, f"Attempt {attempt} ({model}): {summary}\n\nCommit: {link}\n"
-                                                    f"Used: {describe_tokens(usage)}.", "result", attempt=attempt,
-                                               summary=summary[:500]))
+            self.board.comment(n, crew_comment(who, f"Attempt {attempt} ({model}): {summary}\n\n"
+                                                    f"Self-check: {', '.join(check_log)}.\nCommit: {link}\n"
+                                                    f"Used: {describe_tokens(sum_usage(usages))}.", "result",
+                                               attempt=attempt, summary=summary[:500]))
         # ------------------------------------------------ review
         reviewer = AGENTS[card.reviewer]
         self.board.set_status(n, "In review")
-        checks_ok, checks_text = self.run_checks(card, written)
+        if resume_review:
+            checks_ok, checks_text = self.run_checks(card, written)
         log(reviewer, f"#{n}: reviewing (checks {'pass' if checks_ok else 'FAIL'})")
         try:
             verdict, usage, _ = self.agents.review(card.reviewer, card.to_markdown(), summary, written, checks_text,
@@ -394,7 +407,7 @@ class Runner:
                 res = subprocess.run([sys.executable, *args[1:]], cwd=self.ws.root, capture_output=True, text=True,
                                      encoding="utf-8", timeout=180)
                 passed = res.returncode == 0
-                detail = (res.stdout + res.stderr).strip()[-1500:]
+                detail = (res.stdout + res.stderr).strip()[-3000:]
             except subprocess.TimeoutExpired:
                 passed, detail = False, "timed out"
             out.append(f"- {'pass' if passed else 'FAIL'} `{cmd}`" + (f"\n```\n{detail}\n```" if detail else ""))
