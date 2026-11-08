@@ -178,24 +178,23 @@ class GitHubBoard:
         if attempt is not None:
             self.set_attempt(number, attempt)
 
-    def _edit(self, number, field_id, **value):
-        flag, val = next(iter(value.items()))
-        gh("project", "item-edit", "--id", self._item(number), "--project-id", self.project_id,
-           "--field-id", field_id, f"--{flag.replace('_', '-')}", str(val))
+    def _edit(self, issue, field_id, flag, value):
+        gh("project", "item-edit", "--id", self._item(issue), "--project-id", self.project_id,
+           "--field-id", field_id, f"--{flag}", str(value))
 
     def set_status(self, number, status):
         fid, oid = self._option("Status", status)
-        self._edit(number, fid, single_select_option_id=oid)
+        self._edit(number, fid, "single-select-option-id", oid)
 
     def set_attempt(self, number, n):
         fid, oid = self._option("Attempt", attempt_label(n, self.s["max_attempts"]))
-        self._edit(number, fid, single_select_option_id=oid)
+        self._edit(number, fid, "single-select-option-id", oid)
 
     def set_tokens(self, number, total):
         f = self.fields().get("Used tokens")
         if not f:
             raise GhError("Board field 'Used tokens' is missing: run  python agents/crew.py setup")
-        self._edit(number, f["id"], number=total)
+        self._edit(number, f["id"], "number", total)
 
     def comment(self, number, body):
         gh("issue", "comment", str(number), "--repo", self.repo, "--body-file", "-", stdin=body)
