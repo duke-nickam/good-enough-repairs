@@ -119,7 +119,7 @@ A sound on the PC tells the designer when a task goes to Needs designer and when
 Only the GDD's seven agents work on the board: Director, Programmer, Economy Balancer, UX Designer, Artist, Sound Designer, QA Playtester. A new agent needs the designer's approval and a GDD update.
 
 - **Roles:** each agent has one role prompt in `agents/board/roles/` and reads only what its task names, as the GDD's "How each agent works" table says.
-- **Reviewer:** every task names its reviewer, chosen by the Director from the GDD's roles. Which role reviews which kind of task is an open decision (below).
+- **Reviewer:** every task names its reviewer, chosen by the Director from the GDD's roles. Content tasks (text the player reads) are reviewed by the Director (designer decision, Nov 8, 2026 (CET); it may change if the Director stops doing work directly).
 - **Code checks:** checks code can decide (the economy simulation's five targets, text rules such as length, placeholders and no economy numbers) run right after the agent writes its files. On a failure the agent gets the output and fixes its files within the same attempt, up to `check_retries` times (2 by default); the reviewer then sees the results. Their pass or fail is computed, so no agent can argue its way past them.
 - **Communication:** agents never call each other. They talk through task comments: the agent posts its result, the reviewer posts approval or reasons to reject, and the next attempt reads the whole thread. The designer reads the same thread and answers in it.
 - **Stop rule:** a task rejected on attempt 3/3 goes to Needs designer, matching the GDD's "after 3 failed tuning rounds, the designer decides".
@@ -141,9 +141,7 @@ One branch per epic and a pull request for the designer's acceptance, as the GDD
 
 ## Open decisions and later items
 
-Open, for the designer:
-
-- [ ] Who reviews content tasks: the Director (reads the whole GDD, rejects out-of-scope work, no GDD change needed) or a new Content Critic agent (needs a GDD update)? Decided last, after the rest of this plan.
+Open, for the designer: none right now.
 
 Later, one line each:
 
