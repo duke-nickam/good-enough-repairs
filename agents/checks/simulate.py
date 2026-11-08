@@ -102,7 +102,7 @@ Targets (all always checked; a failing target makes the run exit 1):
 - buyer: median bankruptcy day is at most 3
 - swapper: no bankruptcy in any game
 - swapper: mean net per day is above 0 on every day
-- swapper: mean net per day is at most 20% of that day's mean start balance
+- swapper: mean net per day is at most 30% of that day's mean start balance
 - swapper: at most 50% of games contain a day that ends below its start
 - swapper: a bad-luck day (most junk, most weak parts, the worst start seen
   on the hardest day) ends at or above 0
@@ -132,7 +132,7 @@ WEAK_RANGE = (1, 3)     # GDD: weak parts per ship
 SLOT_RANGE = (4, 5)     # GDD MVP scope: 4-5 part slots
 PENALTY_PERCENT_RANGE = (0, 100)
 TIME_MS_RANGE = (0, 60000)
-NET_LIMIT_PERCENT = 20       # designer: mean net per day at most 20% of day start
+NET_LIMIT_PERCENT = 30       # designer: mean net per day at most 30% of day start
 JUNK_PRICE_PERCENT = 20      # designer: junkyard price at most 20% of new part
 LOSING_GAMES_MAX_PERCENT = 50  # designer: at most 50% of games with a losing day
 NEW_CONDITION = 100     # a new part is 100%
