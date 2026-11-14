@@ -12,7 +12,7 @@
   "production_plan": "docs/production-plan.md",
   "goal_epic_limit": 3,
   "check_timeout": 900,
-  "unity_path": "",
+  "unity_path": "C:/Program Files/Unity/Hub/Editor/6000.4.0f1/Editor/Unity.exe",
   "models": {
     "director": "sonnet",
     "programmer": "sonnet",
