@@ -158,6 +158,8 @@ def main():
             agents.gdd = (ROOT / settings["gdd"]).read_text(encoding="utf-8")  # always the current GDD
             agents.production_plan = (ROOT / settings["production_plan"]).read_text(encoding="utf-8")
             agents.project_info = project_info(ROOT)
+            agents.crew_docs = "\n\n".join(f"--- {p.relative_to(ROOT).as_posix()}\n{p.read_text(encoding='utf-8')}"
+                                            for p in sorted((ROOT / "docs" / "crew").glob("*.md")))
             try:
                 runner.run_once()
             finally:

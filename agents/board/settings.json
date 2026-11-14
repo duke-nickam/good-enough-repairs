@@ -33,7 +33,7 @@
     "ux_designer": ["Setting & theme", "Game Mechanics", "The secret strategy: part swapping", "UI / screens", "Art & audio direction"],
     "artist": ["Art & audio direction"],
     "sound_designer": ["Art & audio direction"],
-    "qa_playtester": ["Game Mechanics", "Economy & balancing", "Win/lose conditions & progression"]
+    "qa_playtester": ["Game Mechanics", "Economy & balancing", "Win/lose conditions & progression", "Technical Strategy"]
   },
   "token_budget": {
     "director": 1200000,

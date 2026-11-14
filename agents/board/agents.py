@@ -33,7 +33,9 @@ Every check names the files it checks as arguments, and a check script checks on
 A task depends on every task that writes a file its checks or Reads use; a folder counts as every file in it. If a
 check should not need another task's file, give the check only this task's own files. Never list a file
 in docs/ (the designer's) as a file to write, except in docs/crew/ (the crew's own documents, which the designer
-approves), and nothing in agents/board/ or .github/.
+approves), and nothing in agents/board/ or .github/. To move or delete a file, list its old path in
+files too: the agent deletes it. Every task that writes C# lists the check "python agents/checks/editmode.py ."
+(Unity compiles the project and runs its EditMode tests), once that script exists.
 You see the GDD and the repo's file names, not the files' contents: never state what a file holds unless the GDD
 says so. If a task needs a fact the GDD leaves open (a list, a name, a value two tasks must agree on), ask the
 designer instead of choosing it. Formats that the plan's own tasks create are theirs to define. Keep the plan as small as the request
@@ -44,6 +46,8 @@ WORK_FORMAT = """Reply in exactly this format, nothing before it:
 <the complete new content of the file>
 === END FILE ===
 (one block per file; every file in full, never a diff)
+To delete a file from your task's Files (for example the old path of a moved file), write instead:
+=== DELETE: <path> ===
 SUMMARY: <what you changed and why, two or three sentences, for the reviewer>
 
 If you cannot do the task without a decision from the designer, write no files and reply only:
@@ -150,7 +154,7 @@ def parse_design_note(text):
 def parse_work(text):
     """-> (files {path: content}, summary, question)"""
     q = re.search(r"^QUESTION:\s*(.+)", text, re.M | re.S)
-    files = {}
+    files = {path.strip(): None for path in re.findall(r"^=== DELETE: (.+?) ===\s*$", text, re.M)}
     for path, body in re.findall(r"=== FILE: (.+?) ===\n(.*?)\n=== END FILE ===", text, re.S):
         lines = body.split("\n")
         if len(lines) >= 2 and lines[0].startswith("```") and lines[-1].strip() == "```":
@@ -295,6 +299,7 @@ class ClaudeAgents:
         self.gdd = gdd_text
         self.production_plan = ""
         self.project_info = ""  # Unity and package versions, set by the runner each pass
+        self.crew_docs = ""  # docs/crew/*.md, set by the runner each pass
 
     def _call(self, agent, task_kind, prompt, attempt=1):
         exe = shutil.which("claude")
@@ -339,6 +344,9 @@ class ClaudeAgents:
         """The tasks of one epic: the gap the priority function put first."""
         prompt = (f"GDD:\n\n{gdd_sections(self.gdd, ['*'])}\n\n---\n\nThe designer's request thread:\n\n{request_thread}"
                   f"\n\n---\n\nThe board now:\n{board_summary or 'empty'}\n\nFiles in the repo:\n{repo_files}")
+        if self.crew_docs:
+            prompt += ("\n\n---\n\nThe crew's documents (docs/crew/), approved by the designer. Plan by them: "
+                       f"paths, folders and assemblies come from here, not from guesses.\n\n{self.crew_docs}")
         if epic:
             prompt += (f"\n\n---\n\nPlan the tasks of this one epic only: #{epic['number']} {epic['title']}: "
                        f"{epic['goal']}\nReply with a plan whose epics list has exactly this one epic, with this title.")
@@ -377,7 +385,7 @@ def _files_block(files):
     out = []
     for path, content in files.items():
         if content is None:
-            out.append(f"--- {path} (does not exist yet)")
+            out.append(f"--- {path} (does not exist, or deleted)")
         else:
             c = content if len(content) <= MAX_FILE_CHARS else content[:MAX_FILE_CHARS] + "\n... (cut)"
             out.append(f"--- {path}\n{c}")

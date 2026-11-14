@@ -64,6 +64,11 @@ class GitWorkspace:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(content, encoding="utf-8", newline="\n")
 
+    def delete(self, path):
+        for p in (self.root / path, self.root / (path + ".meta")):  # Unity's .meta goes with its file
+            if p.is_file():
+                p.unlink()
+
     def commit(self, paths, message):
         paths = [p for p in paths if (self.root / p).exists() or self.git("ls-files", "--", p)]
         if not paths:
@@ -121,6 +126,11 @@ class MockWorkspace:
         p = self.root / path
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(content, encoding="utf-8", newline="\n")
+
+    def delete(self, path):
+        p = self.root / path
+        if p.is_file():
+            p.unlink()
 
     def commit(self, paths, message):
         self.n += 1

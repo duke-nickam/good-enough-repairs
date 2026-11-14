@@ -18,6 +18,7 @@ from .model import AGENTS, STANDING_GOAL, Card, crew_comment, slug
 from .priority import rank
 
 ACTIVE = ("In progress", "Waiting for review", "In review")
+ASCII_ONLY = (".cs", ".py", ".asmdef", ".asmref", ".json")  # code and data; player text in content/ is exempt
 STANDING_BODY = ("Opened by the Director because `director_autoplan` is on (see Goals in docs/agent-board-plan.md).\n\n"
                  "**Goal:** every GDD feature in the current scope (the production plan's \"Current scope\" line) "
                  "is done.\n**Done when:** every such feature has a Done epic (built, tested and merged).\n\n"
@@ -522,7 +523,10 @@ class Runner:
                     self.reject(t, attempt, "Wrote files outside the card: " + ", ".join(stray), usages, who)
                     return
                 for p, c in written.items():
-                    self.ws.write(p, c)
+                    if c is None:
+                        self.ws.delete(p)  # a moved or removed file
+                    else:
+                        self.ws.write(p, c)
                 last_text = checks_text if k > 1 else None
                 checks_ok, checks_text = self.run_checks(card, written)
                 check_log.append(f"try {k} {'pass' if checks_ok else 'FAIL'}")
@@ -535,7 +539,8 @@ class Runner:
                 log(who, f"#{n}: checks failed, self-check try {k + 1}/{tries}")
                 files = {p: self.ws.read(p) for p in card.files}
                 feedback = checks_text
-            sha = self.ws.commit(list(written), f"#{n} {t.title} - {who}, attempt {attempt}")
+            paths = list(written) + [p + ".meta" for p, c in written.items() if c is None]
+            sha = self.ws.commit(paths, f"#{n} {t.title} - {who}, attempt {attempt}")
             link = self.ws.commit_link(sha) if sha else "no change from the last attempt"
             self.board.set_status(n, "Waiting for review")
             self.board.comment(n, crew_comment(who, f"Attempt {attempt} ({model}): {summary}\n\n"
@@ -640,13 +645,22 @@ class Runner:
         """Code decides these, not an agent: built-in checks on every written file, then the card's scripts."""
         out, ok = [], True
         for p, c in written.items():
-            if c is None or not c.strip():
-                out.append(f"- FAIL {p}: empty or missing")
+            if c is None:
+                out.append(f"- ok {p}: deleted")
+                continue
+            if not c.strip():
+                out.append(f"- FAIL {p}: empty")
                 ok = False
                 continue
             if "—" in c or "–" in c:
                 out.append(f"- FAIL {p}: contains a long dash; use a plain '-'")
                 ok = False
+            if p.endswith(ASCII_ONLY) and "/content/" not in p:
+                bad = [(i, ch) for i, line in enumerate(c.splitlines(), 1) for ch in line if ord(ch) > 127]
+                if bad:
+                    where = ", ".join(f"line {i} '{ch}' (U+{ord(ch):04X})" for i, ch in bad[:5])
+                    out.append(f"- FAIL {p}: code files must be plain ASCII; found {where}")
+                    ok = False
             if p.endswith(".json"):
                 try:
                     json.loads(c)
