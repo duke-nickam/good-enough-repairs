@@ -89,7 +89,7 @@ def main(argv):
     if not os.path.isfile(unity):
         return fail("UNITY_PATH points to nothing: " + unity)
 
-    out_dir = tempfile.mkdtemp(prefix="gер_editmode_".replace("\u0435", "e"))
+    out_dir = tempfile.mkdtemp(prefix="ger_editmode_")
     results_path = os.path.join(out_dir, "editmode-results.xml")
     log_path = os.path.join(out_dir, "editmode-log.txt")
 
