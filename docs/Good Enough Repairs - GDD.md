@@ -286,7 +286,7 @@ The MVP is done when a new player can play 7 days, discover part swapping, and w
 **In the MVP:**
 
 - 3 docking bays with ship arrival
-- 2 ship types (fighter, freighter) with 4-5 part slots, using the same part types
+- 2 ship types (fighter, freighter) with the five part slots, using the same part types
 - Condition bars per part, colored against the required level
 - Move, bin, buy and release, with weak or empty slots filled on release
 - Junkyard that refills each game day
