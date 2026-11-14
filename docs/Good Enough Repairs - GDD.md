@@ -1,6 +1,6 @@
-# Good Enough Repairs - Final GDD (v1.4)
+# Good Enough Repairs - Final GDD (v1.5)
 
-Author: Nikola Bulog · Version 1.4 · November 8, 2026 (CET)
+Author: Nikola Bulog · Version 1.5 · November 14, 2026 (CET)
 
 ## About this document
 
@@ -13,6 +13,7 @@ This is the final GDD: it describes the smallest playable version of the game (t
 | 1.2 | Oct 22, 2026 | Changes from the first agent stress test and own review |
 | 1.3 | Oct 23, 2026 | Final GDD: changes from the second stress test and own review (see Appendix: Revision notes) |
 | 1.4 | Nov 8, 2026 | Part types defined. Designer decisions from the economy epic: weak parts per ship type, starting credits, junkyard price, balance targets, busy days, simulation timing |
+| 1.5 | Nov 14, 2026 | The whole game runs as code alone; the crew's technical design in docs/crew/ |
 
 ## Executive Summary
 
@@ -248,7 +249,7 @@ Every agent's prompt includes the same five rules, so outputs stay consistent fr
 - Art and sound: imported by the Artist and Sound Designer into fixed folders, under the names from the feedback list.
 - Logic and visuals stay separate: the Programmer owns the game's events and the scene files, and the UX Designer's feedback only listens to those events from its own folder and visuals prefabs. Neither edits the other's files.
 - A feature is finished only after the QA Playtester has tested it in the Unity build.
-- Game rules live in plain C# classes, separate from scenes, so the simulation can run them quickly without the Unity editor.
+- The whole game runs as code alone, without scenes, graphics or sound. Scenes, graphics and sound only show the game and react to its events. This lets the QA Playtester's bots, which are code and not AI, play thousands of full runs in seconds, with no tokens and no one playing. How the code is organized is in the crew's technical design, [docs/crew/technical-design.md](crew/technical-design.md), written by the agents and approved by the designer.
 - Version control: a GitHub repo. Agents working on the same feature share one feature branch. Each subtask lists the files it will change, and the Director never runs two subtasks on the same file at once.
 
 ### Token budget

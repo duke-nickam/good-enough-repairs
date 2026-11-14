@@ -49,6 +49,8 @@ Two fields on every task, set by the runner:
 - The runner compares real use with the GDD's token budget per agent and warns the designer when it is exceeded (the GDD's spending rule).
 - Attempt and Used tokens together tell whether a task was big (one attempt, many tokens) or kept failing (many attempts).
 
+One more field on epics planned for a goal: **Priority** (Number), the Director's priority score (see Goals). Higher goes first.
+
 ## Task flow
 
 ```mermaid
@@ -86,6 +88,8 @@ The GDD is the designer's file; agents only read it.
 - Agents always read the current file, so the next attempt uses the change.
 - The Director can suggest the exact GDD wording in the thread; it never edits the file.
 
+The crew's own documents, such as the Programmer's technical design, live in `docs/crew/`. Agents write them through tasks, and the designer approves them: a task that writes in `docs/crew/` goes to Needs designer after its review passes, and the designer moves it to Done or sends it back with input. The rest of `docs/` is the designer's.
+
 ## Runner
 
 One general script, `agents/crew.py`, written once and never per task. It runs on the designer's PC, because it uses the designer's GitHub (`gh` CLI) and Claude logins. Each time it runs it:
@@ -105,7 +109,7 @@ Two toggles in a settings file in the repo. On means "without the designer".
 
 | Toggle | On | Off |
 | --- | --- | --- |
-| `director_autoplan` | The Director also proposes work on its own from the GDD and the board | The Director plans only from requests |
+| `director_autoplan` | The Director also has a standing goal: every GDD feature done (see Goals) | The Director plans only from requests |
 | `autoapprove_tasks` | New tasks skip Backlog and go to Todo; each starts as soon as its dependencies are Done | New tasks wait in Backlog for the designer |
 
 Both toggles are Off by default. Every default in this system keeps the designer in control and uses fewer tokens; manual mode is the default for the same reason.
@@ -114,13 +118,38 @@ Stopping the runner is pausing it: all state is on the board. When it starts aga
 
 A sound on the PC tells the designer when a task goes to Needs designer and when a run stops (`sound` in the settings, on by default).
 
+## Goals
+
+A goal is a state the game should reach, e.g. "every GDD feature is done", "the swap loop is playable" or "the game feels more relaxed". The Director is a goal-oriented agent: it works toward a goal in a loop until the goal is met.
+
+- **Where goals come from:** the designer sets one in a request. With `director_autoplan` on, the Director also has a standing goal when no request gives one: every GDD feature done. Like a lead before AI, it checks the board, not the code: a feature is done when its epic is Done (built, tested and merged).
+- **Done when:** every goal has one, confirmed by the designer in the request thread before planning. A measurable goal is met when the board, the checks or the simulation say so; a taste goal ("funnier") is met when the designer says so, after a playtest.
+
+The loop:
+
+1. **Gaps:** what is still missing for the goal; each gap gets an epic in Backlog.
+2. **Priority:** for each gap the Director judges whether it is part of the swap loop (`production-plan.md`, "Never cut"), its place in the cut order, its size, and which other gaps it needs. Its function `priority_score()` turns that into the epic's Priority:
+
+   | Factor | Points |
+   | --- | --- |
+   | Part of the swap loop | +30 |
+   | Each gap that needs this one | +10 |
+   | Cut order 1 / 2 / 3 / 4 | -20 / -15 / -10 / -5 |
+   | Size S / M / L | 0 / -5 / -10 |
+
+   A gap that needs another gap gets no score yet: it cannot start. Ties go by GDD order. The Director posts the breakdown on the epic, e.g. "30 swap loop + 40 (4 gaps need it) = 70".
+3. **Planning:** only the epic with the highest Priority gets tasks; one epic per goal is open at a time. The others stay in Backlog without tasks; an epic without tasks that leaves Backlog goes back. To set another order the designer opens a request, e.g. "Plan #52 next": requests come before the Director's own choice.
+4. **Loop:** when the planned epic is Done, the next run checks the goal again, updates the Priorities and plans the next one. When the goal is met, the Director says so and its request closes.
+5. **Limit:** after 3 Done epics for one goal, the Director asks the designer before planning more: keep going, change the goal, or stop.
+
 ## Agents, reviewers and communication
 
 Only the GDD's seven agents work on the board: Director, Programmer, Economy Balancer, UX Designer, Artist, Sound Designer, QA Playtester. A new agent needs the designer's approval and a GDD update.
 
 - **Roles:** each agent has one role prompt in `agents/board/roles/` and reads only what its task names, as the GDD's "How each agent works" table says.
 - **Reviewer:** every task names its reviewer, chosen by the Director from the GDD's roles. Content tasks (text the player reads) are reviewed by the Director (designer decision, Nov 8, 2026 (CET); it may change if the Director stops doing work directly).
-- **Code checks:** checks code can decide (the economy simulation's five targets, text rules such as length, placeholders and no economy numbers) run right after the agent writes its files. On a failure the agent gets the output and fixes its files within the same attempt, up to `check_retries` times (2 by default); the reviewer then sees the results. Their pass or fail is computed, so no agent can argue its way past them. A try that fails exactly like the try before ends the self-check, and an attempt that fails its checks exactly like the attempt before goes straight to Needs designer, without a review: the agent cannot fix it by itself.
+- **Code checks:** checks code can decide (the economy simulation's five targets, text rules such as length, placeholders and no economy numbers) run right after the agent writes its files. On a failure the agent gets the output and fixes its files within the same attempt, up to `check_retries` times (2 by default); the reviewer then sees the results. Their pass or fail is computed, so no agent can argue its way past them. A try that fails exactly like the try before ends the self-check, and an attempt that fails its checks exactly like the attempt before goes straight to Needs designer, without a review: the agent cannot fix it by itself. The game's EditMode tests are a check too, run in Unity's batch mode (close Unity while the runner works).
+- **Design note first:** the Programmer's first try on a code task is a design note in the task thread, not code: the classes, its decisions, and questions on what the GDD and `docs/crew/` leave open. The task goes to Needs designer; the designer answers or approves and moves it to Todo (Attempt resets, as for any designer input), and the Programmer writes the code following the note.
 - **Plan rule:** every check names the files it checks as arguments, and a check script checks only the files it is given. A task depends on every task that writes a file its checks or Reads use; a folder counts as every file in it. A plan that breaks this goes back to the Director: add the dependency, or narrow the check to the task's own files. The Director never assumes what a file holds: what the GDD leaves open, it asks the designer.
 - **Communication:** agents never call each other. They talk through task comments: the agent posts its result, the reviewer posts approval or reasons to reject, and the next attempt reads the whole thread. The designer reads the same thread and answers in it.
 - **Stop rule:** a task rejected on attempt 3/3 goes to Needs designer, matching the GDD's "after 3 failed tuning rounds, the designer decides".
@@ -149,3 +178,4 @@ Later, one line each:
 - Large art and sound files: decide before the Artist and Sound Designer start (commit only accepted versions, or Git LFS).
 - Event-driven watch mode through a GitHub Actions runner on the PC, instead of checking every few minutes.
 - Look at Paperclip after the MVP.
+- `agents/checks/simulate.py` repeats the game rules in Python: move the QA bots to the C# game once it runs as code alone.
