@@ -14,7 +14,7 @@ query($id: ID!, $after: String) {
       pageInfo { hasNextPage endCursor }
       nodes {
         id
-        content { ... on Issue { number title state labels(first: 10) { nodes { name } } } }
+        content { ... on Issue { number title state stateReason labels(first: 10) { nodes { name } } } }
         fieldValues(first: 20) { nodes {
           ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { name } } }
           ... on ProjectV2ItemFieldNumberValue { number field { ... on ProjectV2FieldCommon { name } } }
@@ -133,9 +133,11 @@ class GitHubBoard:
                 vals = {v["field"]["name"]: v.get("name", v.get("number"))
                         for v in n["fieldValues"]["nodes"] if v and v.get("field")}
                 self._item_ids[c["number"]] = n["id"]
+                prio = vals.get("Priority")
                 out.append(Item(number=c["number"], title=c["title"], kind=kind, status=vals.get("Status") or "",
                                 attempt=attempt_number(vals.get("Attempt")), tokens=int(vals.get("Used tokens") or 0),
-                                state=c["state"], item_id=n["id"]))
+                                state=c["state"], item_id=n["id"], priority=None if prio is None else int(prio),
+                                reason=c.get("stateReason") or ""))
             if not page["pageInfo"]["hasNextPage"]:
                 return out
             after = page["pageInfo"]["endCursor"]
@@ -146,8 +148,8 @@ class GitHubBoard:
                      labels=[l["name"] for l in d.get("labels", [])], state=d["state"], url=d.get("url", ""),
                      comments=[Comment(c["body"], c.get("createdAt", "")) for c in d.get("comments", [])])
 
-    def requests(self):
-        data = gh_json("issue", "list", "--repo", self.repo, "--label", "request", "--state", "open", "--limit", "100",
+    def requests(self, state="open"):
+        data = gh_json("issue", "list", "--repo", self.repo, "--label", "request", "--state", state, "--limit", "100",
                        "--json", "number,title,body,labels,state,url,comments")
         return sorted((self._issue(d) for d in data), key=lambda i: i.number)
 
@@ -212,6 +214,17 @@ class GitHubBoard:
             raise GhError("Board field 'Used tokens' is missing: run  python agents/crew.py setup")
         self._edit(number, f["id"], "number", total)
 
+    def set_priority(self, number, score):
+        """The Director's priority score; None clears it (the epic cannot start yet)."""
+        f = self.fields().get("Priority")
+        if not f:
+            raise GhError("Board field 'Priority' is missing: run  python agents/crew.py setup")
+        if score is None:
+            gh("project", "item-edit", "--id", self._item(number), "--project-id", self.project_id,
+               "--field-id", f["id"], "--clear")
+        else:
+            self._edit(number, f["id"], "number", score)
+
     def comment(self, number, body):
         gh("issue", "comment", str(number), "--repo", self.repo, "--body-file", "-", stdin=body)
 
@@ -268,6 +281,10 @@ class GitHubBoard:
             gh("project", "field-create", str(self.number), "--owner", self.owner, "--name", "Used tokens",
                "--data-type", "NUMBER")
             print("Field Used tokens created")
+        if "Priority" not in fields:
+            gh("project", "field-create", str(self.number), "--owner", self.owner, "--name", "Priority",
+               "--data-type", "NUMBER")
+            print("Field Priority created")
         try:
             gh("api", "-X", "PATCH", f"repos/{self.repo}", "-F", "delete_branch_on_merge=true")
             print("Repo setting: automatically delete head branches")

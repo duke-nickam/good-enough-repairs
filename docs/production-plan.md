@@ -1,5 +1,7 @@
 # Production plan - MVP (weeks 1-2)
 
+**Current scope:** the MVP (GDD "MVP scope"). The Director's standing goal works toward it; the designer changes this line when the scope is done.
+
 The MVP plan from the GDD, with what to cut if the two weeks get tight. The rule: **the swap loop is the one thing to polish, so it is never cut.** Cut items are not deleted; they move to the top of the After the MVP list (week 3).
 
 ## Never cut (the swap loop)

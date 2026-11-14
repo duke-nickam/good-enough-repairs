@@ -31,8 +31,9 @@ Rules: each task belongs to one agent and writes only its listed files (text fil
 result; a check script (optional) must already exist or be written by an earlier task it depends on.
 Every check names the files it checks as arguments, and a check script checks only the files it is given.
 A task depends on every task that writes a file its checks or Reads use; a folder counts as every file in it. If a
-check should not need another task's file, give the check only this task's own files. Never list
-the GDD (docs/) or anything in agents/board/ or .github/ as a file to write.
+check should not need another task's file, give the check only this task's own files. Never list a file
+in docs/ (the designer's) as a file to write, except in docs/crew/ (the crew's own documents, which the designer
+approves), and nothing in agents/board/ or .github/.
 You see the GDD and the repo's file names, not the files' contents: never state what a file holds unless the GDD
 says so. If a task needs a fact the GDD leaves open (a list, a name, a value two tasks must agree on), ask the
 designer instead of choosing it. Formats that the plan's own tasks create are theirs to define. Keep the plan as small as the request
@@ -52,6 +53,42 @@ You cannot run anything yourself, and you don't need to: after you reply, the ru
 your files. If they fail, you get their output and can fix your files before the reviewer sees them. Results of
 earlier attempts are in the task's thread. Never write that you could not run a check.
 All tasks this one depends on are Done; their files are final."""
+
+GOAL_FORMAT = """Reply with one JSON object only, no other text. One of:
+{"type": "question", "text": "<what you need the designer to decide, and why>"}
+{"type": "note", "text": "<your answer, when nothing needs planning>"}
+{"type": "goal", "goal": "<the state the game should reach>", "done_when": "<how anyone can tell it is met>",
+ "text": "<a short message asking the designer to confirm both>"}
+{"type": "done", "text": "<why the goal is met, by its done-when>"}
+{"type": "gaps", "goal": "<the goal>", "done_when": "<its done-when>", "summary": "<one or two sentences>",
+ "gaps": [{"key": "g1", "title": "<feature name, for the epic>", "goal": "<what the player gets, one sentence>",
+   "epic": <number of an open epic on the board that already is this gap, or null>, "swap_loop": true or false,
+   "cut_order": <0 to 4>, "size": "S" or "M" or "L", "needs": ["<keys of gaps that must be done before this one>"]}]}
+
+How goals work:
+- A goal is a state the game should reach; it is met when its done-when is true. Before your first gaps reply the
+  designer must have confirmed the goal and its done-when in the thread: if not, reply "goal". A request that
+  states both clearly counts as confirmed. The standing goal is confirmed already.
+- You check the board, not the code: a feature is done when its epic is Done (built, tested and merged). An open
+  epic that has tasks is in progress: it is not a gap.
+- Gaps are everything still missing for the goal, in GDD order. When the board already has an open epic without
+  tasks for a gap, give its number in "epic" instead of making a new one; such an epic that is no longer a gap is
+  dropped.
+- For each gap judge: swap_loop - is it part of the swap loop (the production plan's "Never cut")? cut_order - its
+  number in the production plan's cut order, 0 if it is not there. size - S, M or L for the work. needs - the
+  other gaps in your list that must be done before it can start.
+- A taste goal (e.g. "funnier") is met only when the designer says so in the thread; a measurable one when the
+  board, a check or the simulation shows it.
+- When the designer asks to plan a certain epic next, the goal is that epic Done, and that epic is its only gap.
+- Do not plan tasks now: the runner ranks the gaps with your priority function and then asks you for the tasks
+  of the top one."""
+
+DESIGN_FORMAT = """This attempt is your design note, not the code: before writing code, show the designer how you
+will do it. Reply in exactly this format, and write no files:
+DESIGN NOTE:
+<the files and classes you will write and what each does; how they connect to the existing code; the decisions
+you made and why; numbered questions on anything the GDD, docs/crew/ and the task leave open>
+Keep it short: one page at most."""
 
 REVIEW_FORMAT = """Reply with one JSON object only, no other text:
 {"verdict": "approve" or "reject", "summary": "<one sentence>",
@@ -105,6 +142,11 @@ def extract_json(text):
     return json.loads(m.group(0))
 
 
+def parse_design_note(text):
+    m = re.search(r"DESIGN NOTE:\s*(.+)", text, re.S)
+    return (m.group(1) if m else text).strip()
+
+
 def parse_work(text):
     """-> (files {path: content}, summary, question)"""
     q = re.search(r"^QUESTION:\s*(.+)", text, re.M | re.S)
@@ -152,7 +194,8 @@ def validate_plan(plan, repo_files):
             if not files:
                 p.append(f"{k}: needs at least one file to write")
             for f in files:
-                if f.startswith(("/", "docs/", "agents/board/", ".github/")) or ".." in f or "\\" in f:
+                if f.startswith(("/", "agents/board/", ".github/")) or ".." in f or "\\" in f or \
+                        (f.startswith("docs/") and not f.startswith("docs/crew/")):
                     p.append(f"{k}: may not write {f!r}")
             for c in t.get("checks") or []:
                 if not CHECK_RE.match(c):
@@ -176,6 +219,37 @@ def validate_plan(plan, repo_files):
         return bad
     if any(cyclic(k) for k in keys):
         p.append("the dependencies form a loop")
+    return p
+
+
+def validate_gaps(reply, open_epics):
+    """Rules a gaps reply must follow. open_epics: numbers of open epics on the board without tasks."""
+    p, gaps = [], reply.get("gaps")
+    if not reply.get("goal") or not reply.get("done_when"):
+        p.append("a gaps reply needs the goal and its done_when")
+    if not isinstance(gaps, list) or not gaps:
+        return p + ["a gaps reply needs at least one gap; if the goal is met, reply done"]
+    keys = [g.get("key") for g in gaps]
+    if len(set(keys)) != len(keys) or not all(keys):
+        p.append("every gap needs its own key")
+    for g in gaps:
+        k = g.get("key")
+        if not g.get("title") or len(g["title"]) > 80:
+            p.append(f"{k}: title missing or longer than 80 characters")
+        if g.get("epic") is not None and g["epic"] not in open_epics:
+            p.append(f"{k}: epic {g['epic']} is not an open epic without tasks")
+        if not isinstance(g.get("swap_loop"), bool):
+            p.append(f"{k}: swap_loop must be true or false")
+        if g.get("cut_order") not in (0, 1, 2, 3, 4):
+            p.append(f"{k}: cut_order must be 0 to 4")
+        if g.get("size") not in ("S", "M", "L"):
+            p.append(f"{k}: size must be S, M or L")
+        for n in g.get("needs") or []:
+            if n not in keys or n == k:
+                p.append(f"{k}: needs unknown gap {n!r}")
+    epics = [g["epic"] for g in gaps if g.get("epic") is not None]
+    if len(set(epics)) != len(epics):
+        p.append("two gaps name the same epic")
     return p
 
 
@@ -219,6 +293,7 @@ class ClaudeAgents:
     def __init__(self, settings, gdd_text):
         self.s = settings
         self.gdd = gdd_text
+        self.production_plan = ""
 
     def _call(self, agent, task_kind, prompt, attempt=1):
         exe = shutil.which("claude")
@@ -249,15 +324,29 @@ class ClaudeAgents:
 
     # ------------------------------------------------------------ the three kinds of work
 
-    def plan(self, request_thread, board_summary, repo_files, problems=None):
-        prompt = (f"GDD:\n\n{gdd_sections(self.gdd, ['*'])}\n\n---\n\nThe designer's request thread:\n\n{request_thread}"
-                  f"\n\n---\n\nThe board now:\n{board_summary or 'empty'}\n\nFiles in the repo:\n{repo_files}")
+    def goal(self, request_thread, board_summary, problems=None):
+        """The goal step: confirm the goal, find its gaps, or say it is met."""
+        prompt = (f"GDD:\n\n{gdd_sections(self.gdd, ['*'])}\n\n---\n\nProduction plan:\n\n{self.production_plan}"
+                  f"\n\n---\n\nThe goal's request thread:\n\n{request_thread}\n\n---\n\n"
+                  f"The board now:\n{board_summary or 'empty'}")
         if problems:
-            prompt += "\n\nYour last plan broke these rules; send a corrected one:\n" + "\n".join(f"- {x}" for x in problems)
-        text, usage, model = self._call("director", "Task: plan the request.\n\n" + PLAN_FORMAT, prompt)
+            prompt += "\n\nYour last reply broke these rules; send a corrected one:\n" + "\n".join(f"- {x}" for x in problems)
+        text, usage, model = self._call("director", "Task: work toward the goal.\n\n" + GOAL_FORMAT, prompt)
         return extract_json(text), usage, model
 
-    def work(self, agent, card_md, thread, files, reads, attempt, check_feedback=None):
+    def plan(self, request_thread, board_summary, repo_files, problems=None, epic=None):
+        """The tasks of one epic: the gap the priority function put first."""
+        prompt = (f"GDD:\n\n{gdd_sections(self.gdd, ['*'])}\n\n---\n\nThe designer's request thread:\n\n{request_thread}"
+                  f"\n\n---\n\nThe board now:\n{board_summary or 'empty'}\n\nFiles in the repo:\n{repo_files}")
+        if epic:
+            prompt += (f"\n\n---\n\nPlan the tasks of this one epic only: #{epic['number']} {epic['title']}: "
+                       f"{epic['goal']}\nReply with a plan whose epics list has exactly this one epic, with this title.")
+        if problems:
+            prompt += "\n\nYour last plan broke these rules; send a corrected one:\n" + "\n".join(f"- {x}" for x in problems)
+        text, usage, model = self._call("director", "Task: plan the tasks.\n\n" + PLAN_FORMAT, prompt)
+        return extract_json(text), usage, model
+
+    def work(self, agent, card_md, thread, files, reads, attempt, check_feedback=None, design_note=False):
         prompt = (f"GDD sections:\n\n{gdd_sections(self.gdd, self.s['reads'][agent])}\n\n---\n\n"
                   f"Your task card:\n\n{card_md}\n\n---\n\n"
                   f"Current content of your files:\n\n{_files_block(files)}\n\n---\n\n"
@@ -266,8 +355,8 @@ class ClaudeAgents:
         if check_feedback:
             prompt += ("\n\n---\n\nYour files above are from this attempt, and they failed the checks. Check output:\n"
                        f"{check_feedback}\n\nFix the files and send every file again in full.")
-        text, usage, model = self._call(agent, f"Task: attempt {attempt} of your task.\n\n" + WORK_FORMAT, prompt,
-                                        attempt)
+        kind = DESIGN_FORMAT if design_note else WORK_FORMAT
+        text, usage, model = self._call(agent, f"Task: attempt {attempt} of your task.\n\n" + kind, prompt, attempt)
         return text, usage, model
 
     def review(self, reviewer, card_md, summary, files, checks, thread):

@@ -22,6 +22,8 @@ LABELS = {  # name: (color, description)
     "task": ("1D76DB", "One agent's part of an epic"),
 }
 
+STANDING_GOAL = "Standing goal: the current scope done"
+
 CHECK_RE = re.compile(r"^python agents/checks/[A-Za-z0-9_\-]+\.py( [A-Za-z0-9_\-./ ]*)?$")
 MARKER_RE = re.compile(r"<!-- crew:(\{.*?\}) -->")
 
@@ -150,6 +152,8 @@ class Item:
     tokens: int
     state: str
     item_id: str = ""
+    priority: object = None  # epics planned for a goal: the Director's priority score
+    reason: str = ""  # why a closed issue closed: "COMPLETED" or "NOT_PLANNED"
 
 
 def crew_comment(who, text, event, **data):

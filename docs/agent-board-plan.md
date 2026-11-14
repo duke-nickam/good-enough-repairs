@@ -109,7 +109,7 @@ Two toggles in a settings file in the repo. On means "without the designer".
 
 | Toggle | On | Off |
 | --- | --- | --- |
-| `director_autoplan` | The Director also has a standing goal: every GDD feature done (see Goals) | The Director plans only from requests |
+| `director_autoplan` | The Director also has a standing goal: every GDD feature in the current scope done (see Goals) | The Director plans only from requests |
 | `autoapprove_tasks` | New tasks skip Backlog and go to Todo; each starts as soon as its dependencies are Done | New tasks wait in Backlog for the designer |
 
 Both toggles are Off by default. Every default in this system keeps the designer in control and uses fewer tokens; manual mode is the default for the same reason.
@@ -122,7 +122,7 @@ A sound on the PC tells the designer when a task goes to Needs designer and when
 
 A goal is a state the game should reach, e.g. "every GDD feature is done", "the swap loop is playable" or "the game feels more relaxed". The Director is a goal-oriented agent: it works toward a goal in a loop until the goal is met.
 
-- **Where goals come from:** the designer sets one in a request. With `director_autoplan` on, the Director also has a standing goal when no request gives one: every GDD feature done. Like a lead before AI, it checks the board, not the code: a feature is done when its epic is Done (built, tested and merged).
+- **Where goals come from:** the designer sets one in a request. With `director_autoplan` on, the Director also has a standing goal when no request gives one: every GDD feature in the current scope (`production-plan.md`) done. Like a lead before AI, it checks the board, not the code: a feature is done when its epic is Done (built, tested and merged).
 - **Done when:** every goal has one, confirmed by the designer in the request thread before planning. A measurable goal is met when the board, the checks or the simulation say so; a taste goal ("funnier") is met when the designer says so, after a playtest.
 
 The loop:

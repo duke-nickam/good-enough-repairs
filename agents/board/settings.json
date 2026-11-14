@@ -9,6 +9,10 @@
   "poll_minutes": 5,
   "sound": true,
   "gdd": "docs/Good Enough Repairs - GDD.md",
+  "production_plan": "docs/production-plan.md",
+  "goal_epic_limit": 3,
+  "check_timeout": 900,
+  "unity_path": "",
   "models": {
     "director": "sonnet",
     "programmer": "sonnet",

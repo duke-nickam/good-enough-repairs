@@ -6,15 +6,23 @@ continues where it left off."""
 import datetime
 import hashlib
 import json
+import os
 import re
 import shlex
 import subprocess
 import sys
 
-from .agents import AgentError, describe_tokens, parse_work, sum_usage, total_tokens, validate_plan
-from .model import AGENTS, Card, crew_comment, slug
+from .agents import (AgentError, describe_tokens, parse_design_note, parse_work, sum_usage, total_tokens,
+                     validate_gaps, validate_plan)
+from .model import AGENTS, STANDING_GOAL, Card, crew_comment, slug
+from .priority import rank
 
 ACTIVE = ("In progress", "Waiting for review", "In review")
+STANDING_BODY = ("Opened by the Director because `director_autoplan` is on (see Goals in docs/agent-board-plan.md).\n\n"
+                 "**Goal:** every GDD feature in the current scope (the production plan's \"Current scope\" line) "
+                 "is done.\n**Done when:** every such feature has a Done epic (built, tested and merged).\n\n"
+                 "Confirmed by the designer in the agent board plan. When the scope is done, the designer changes the "
+                 "\"Current scope\" line and reopens this. Close it to stop the standing goal.")
 
 
 def log(who, msg):
@@ -67,6 +75,7 @@ class Runner:
 
     def run_once(self):
         self.cards = {}
+        self.sync()
         self.handle_requests()
         self.sync()
         while True:
@@ -81,78 +90,235 @@ class Runner:
     # ------------------------------------------------------------ requests and planning
 
     def handle_requests(self):
-        requests = self.board.requests()
+        """Every open request is a goal. Requests come first; the standing goal (autoplan) waits while one is open."""
         items = {i.number: i for i in self.board.items()}
-        for r in requests:
-            plans = [c.marker for c in r.comments if c.marker and c.marker.get("event") == "plan"]
-            epics = [e for p in plans for e in p.get("epics", [])]
-            if epics and all(items.get(e) and items[e].state == "CLOSED" for e in epics) and not r.designer_spoke_last():
-                self.board.comment(r.number, crew_comment("Director", "All epics of this request are done. Closing it.",
-                                                          "closed"))
-                self.board.close(r.number)
-                log("Director", f"request #{r.number} done, closed")
-                continue
-            if r.designer_spoke_last():
-                self.plan(r, items)
-        if self.s.get("director_autoplan") and not requests and \
-                not any(i.status in ("Backlog", "Todo") + ACTIVE for i in items.values()):
-            n = self.board.create_issue("[Director proposal] Next work from the GDD",
-                                        "Autoplan: the Director proposes the next work from the GDD and the board.",
-                                        ["request"])
-            log("Director", f"autoplan: opened request #{n}")
-            self.plan(self.board.issue(n), items)
+        requests = self.board.requests()
+        standing = [r for r in requests if r.title == STANDING_GOAL]
+        others = [r for r in requests if r.title != STANDING_GOAL]
+        for r in others:
+            self.goal_turn(r, items)
+        if not self.s.get("director_autoplan"):
+            return
+        if not standing and not any(r.title == STANDING_GOAL for r in self.board.requests("all")):
+            n = self.board.create_issue(STANDING_GOAL, STANDING_BODY, ["request"])
+            log("Director", f"autoplan: opened the standing goal #{n}")
+            standing = [self.board.issue(n)]
+        if others:
+            if standing:
+                log("Director", f"standing goal #{standing[0].number} waits: a request is open")
+            return
+        for r in standing:
+            self.goal_turn(r, items)
 
-    def plan(self, r, items):
-        log("Director", f"request #{r.number}: reading")
+    def goal_turn(self, r, items):
+        """Decides whether the goal needs the Director now: the designer spoke, or its planned epic is done."""
+        planned = [e for c in r.comments if c.marker and c.marker.get("event") == "plan"
+                   for e in c.marker.get("epics", [])]
+        open_planned = [e for e in planned if items.get(e) and items[e].state == "OPEN"]
+        if r.designer_spoke_last():
+            return self.goal_step(r, items, open_planned)
+        last = r.last_marker() or {}
+        if last.get("event") != "epic_done" or open_planned:
+            return  # waiting: for the designer's answer, or for the open epic
+        done = 0
+        for c in reversed(r.comments):
+            if not c.marker:
+                break
+            done += c.marker.get("event") == "epic_done"
+        limit = int(self.s.get("goal_epic_limit", 3))
+        if done >= limit:
+            self.board.comment(r.number, crew_comment(
+                "Director", f"{done} epics of this goal are Done and its done-when is not checked yet. Before I plan "
+                            "more: keep going, change the goal, or stop? Answer here.", "limit", done=done))
+            alert(self.s, "needs_designer")
+            log("Director", f"request #{r.number}: {done} epics done, asked the designer before planning more")
+            return
+        self.goal_step(r, items, open_planned)
+
+    def board_summary(self, items):
+        """The board as the Director sees it: epics with their state, open tasks, and the Priority field."""
+        lines = []
+        for i in sorted(items.values(), key=lambda i: i.number):
+            if i.kind != "epic" or i.reason == "NOT_PLANNED":
+                continue
+            if i.state == "CLOSED":
+                lines.append(f"#{i.number} [epic] {i.title} - Done")
+                continue
+            tasks = [t for t in items.values() if t.kind == "task" and self.card(t.number) and
+                     self.card(t.number).epic == i.number]
+            prio = "" if i.priority is None else f", Priority {i.priority}"
+            if not tasks:
+                lines.append(f"#{i.number} [epic] {i.title} - open, no tasks yet{prio}")
+                continue
+            lines.append(f"#{i.number} [epic] {i.title} - in progress ({i.status}){prio}")
+            lines += [f"  #{t.number} [task] {t.title} - {t.status}" for t in tasks if t.state == "OPEN"]
+        return "\n".join(lines)
+
+    def unplanned_epics(self, items):
+        has_tasks = {self.card(t.number).epic for t in items.values() if t.kind == "task" and self.card(t.number)}
+        return [i.number for i in items.values() if i.kind == "epic" and i.state == "OPEN" and i.number not in has_tasks]
+
+    def pending_tokens(self, r):
+        """The Director's tokens on this goal since its last planned epic, charged to the next one."""
+        total = 0
+        for c in reversed(r.comments):
+            m = c.marker
+            if m and m.get("event") == "plan":
+                break
+            if m:
+                total += int(m.get("tokens") or 0)
+        return total
+
+    def goal_step(self, r, items, open_planned):
+        log("Director", f"request #{r.number}: working toward the goal")
         thread = f"# {r.title}\n\n{r.body}\n\n" + self.thread_text(r, limit=30)
-        summary = "\n".join(f"#{i.number} [{i.kind}] {i.title} - {i.status}" for i in items.values()
-                            if i.state == "OPEN")
+        summary = self.board_summary(items)
+        unplanned = self.unplanned_epics(items)
+        usages, problems, reply = [], None, None
+        for _ in range(2):  # one retry if the reply breaks the rules
+            try:
+                reply, usage, _model = self.agents.goal(thread, summary, problems)
+            except (AgentError, ValueError) as e:
+                log("Director", f"request #{r.number}: reply unusable ({e})")
+                problems, reply = [f"reply unusable: {e}"], None
+                continue
+            usages.append(usage)
+            problems = validate_gaps(reply, unplanned) if reply.get("type") == "gaps" else []
+            if not problems:
+                break
+        spent = sum(total_tokens(u) for u in usages)
+        kind = (reply or {}).get("type")
+        if problems or kind not in ("question", "note", "goal", "done", "gaps"):
+            problems = problems or [f"unknown reply type {kind!r}"]
+            self.board.comment(r.number, crew_comment(
+                "Director", "I could not make a valid reply. Problems:\n" + "\n".join(f"- {p}" for p in problems),
+                "question", tokens=spent))
+            log("Director", f"request #{r.number}: no valid reply, told the designer")
+            return
+        if kind in ("question", "note", "goal"):
+            text = reply.get("text", "")
+            if kind == "goal":
+                text = f"**Goal:** {reply.get('goal', '')}\n**Done when:** {reply.get('done_when', '')}\n\n{text}"
+            self.board.comment(r.number, crew_comment("Director", text, "goal" if kind == "goal" else "question",
+                                                      tokens=spent))
+            log("Director", f"request #{r.number}: answered in the thread ({kind})")
+            return
+        if kind == "done":
+            for en in unplanned:
+                if (re.search(r"\*\*Request:\*\* #(\d+)", self.board.issue(en).body) or [0, 0])[1] == str(r.number):
+                    self.drop_epic(en, r.number)
+            self.board.comment(r.number, crew_comment("Director", f"Goal met: {reply.get('text', '')} Closing it.",
+                                                      "closed", tokens=spent))
+            self.board.close(r.number)
+            log("Director", f"request #{r.number}: goal met, closed")
+            return
+        self.apply_gaps(r, reply, items, unplanned, spent, open_planned)
+
+    def drop_epic(self, en, request):
+        self.board.comment(en, crew_comment("Director", f"Dropped: no longer a gap of the goal in #{request}.",
+                                            "dropped"))
+        self.board.close(en, "not planned")
+        log("Director", f"epic #{en}: no longer a gap, closed as not planned")
+
+    def apply_gaps(self, r, reply, items, unplanned, spent, open_planned):
+        """Gaps become epics in Backlog with their Priority; the top one gets its tasks."""
+        gaps = {g["key"]: g for g in reply["gaps"]}
+        reused = {g["epic"] for g in gaps.values() if g.get("epic")}
+        for en in unplanned:
+            if en not in reused and f"**Request:** #{r.number}\n" in self.board.issue(en).body + "\n":
+                self.drop_epic(en, r.number)
+        for g in gaps.values():
+            if not g.get("epic"):
+                g["epic"] = self.board.create_issue(g["title"], f"**Request:** #{r.number}\n\n{g.get('goal', '')}\n",
+                                                    ["epic"])
+                self.board.add_item(g["epic"], "Backlog")
+                log("Director", f"gap: epic #{g['epic']} {g['title']}")
+        ranked = rank(gaps)
+        lines = []
+        for key, score, why in ranked:
+            en = gaps[key]["epic"]
+            self.board.set_priority(en, score)
+            text = f"Priority {score}: {why}" if score is not None else f"No priority yet: {why}"
+            last = self.board.issue(en).last_marker("priority")
+            if not last or last.get("why") != text:
+                self.board.comment(en, crew_comment("Director", text, "priority", why=text))
+            lines.append(f"- #{en} {gaps[key]['title']}: {text}")
+        self.board.comment(r.number, crew_comment(
+            "Director", f"**Goal:** {reply['goal']}\n**Done when:** {reply['done_when']}\n\n{reply.get('summary', '')}"
+                        f"\n\nGaps, best first:\n" + "\n".join(lines), "gaps",
+            epics=[g["epic"] for g in gaps.values()], tokens=spent))
+        log("Director", f"request #{r.number}: {len(gaps)} gap(s) ranked")
+        if open_planned:
+            log("Director", f"request #{r.number}: epic #{open_planned[0]} is still open; one epic per goal at a time")
+            return
+        top = next((k for k, score, _ in ranked if score is not None), None)
+        if not top:
+            self.board.comment(r.number, crew_comment(
+                "Director", "Every gap waits for another gap, so none can start. Please check the gaps above.",
+                "question"))
+            alert(self.s, "needs_designer")
+            return
+        self.plan_epic(r, gaps[top])
+
+    def plan_epic(self, r, gap):
+        """The Director plans the tasks of one epic: the gap the priority function put first."""
+        en = gap["epic"]
+        log("Director", f"request #{r.number}: planning the tasks of #{en} {gap['title']}")
+        thread = f"# {r.title}\n\n{r.body}\n\n" + self.thread_text(r, limit=30)
+        items = {i.number: i for i in self.board.items()}
+        summary = self.board_summary(items)
+        epic = {"number": en, "title": gap["title"], "goal": gap.get("goal", "")}
         usages, problems, plan = [], None, None
         for _ in range(2):  # one retry if the plan breaks the rules
             try:
-                plan, usage, _model = self.agents.plan(thread, summary, self.ws.list_files(), problems)
+                plan, usage, _model = self.agents.plan(thread, summary, self.ws.list_files(), problems, epic=epic)
             except (AgentError, ValueError) as e:
                 log("Director", f"request #{r.number}: reply unusable ({e})")
-                problems = [f"reply unusable: {e}"]
+                problems, plan = [f"reply unusable: {e}"], None
                 continue
             usages.append(usage)
             if plan.get("type") in ("question", "note"):
                 break
             problems = validate_plan(plan, None)
+            if not problems and len(plan.get("epics") or []) != 1:
+                problems = ["the plan must have exactly one epic: the one named above"]
             if not problems:
                 break
-        pending = sum(c.marker.get("tokens", 0) for c in r.comments if c.marker and c.marker.get("event") == "question")
         spent = sum(total_tokens(u) for u in usages)
         if plan and plan.get("type") in ("question", "note"):
             self.board.comment(r.number, crew_comment("Director", plan.get("text", ""), "question", tokens=spent))
-            log("Director", f"request #{r.number}: answered in the thread ({plan['type']})")
+            log("Director", f"request #{r.number}: asked before planning #{en}")
             return
         if not plan or problems:
             self.board.comment(r.number, crew_comment(
-                "Director", "I could not make a valid plan. Problems:\n" + "\n".join(f"- {p}" for p in problems or []),
+                "Director", f"I could not plan the tasks of #{en}. Problems:\n" + "\n".join(f"- {p}" for p in problems or []),
                 "question", tokens=spent))
-            log("Director", f"request #{r.number}: no valid plan, told the designer")
+            log("Director", f"request #{r.number}: no valid plan for #{en}, told the designer")
             return
         self.created = []
         try:
-            created = self.create_plan(r, plan, spent + pending)
+            self.create_plan(r, plan, spent + self.pending_tokens(self.board.issue(r.number)), existing_epic=en)
         except Exception:
             made = ", ".join(f"#{n}" for n in self.created) or "nothing"
             self.board.comment(r.number, crew_comment(
                 "Runner", f"Creating the plan failed halfway; it created {made}. Delete those issues, then comment "
                           "here (for example 'plan again') and run the runner.", "plan_failed"))
             raise
-        log("Director", f"request #{r.number}: planned {len(created)} epic(s)")
+        log("Director", f"request #{r.number}: planned the tasks of #{en}")
 
-    def create_plan(self, r, plan, tokens):
-        """Epics first, then every task issue, then the cards, which can now name any task by its number."""
+    def create_plan(self, r, plan, tokens, existing_epic=None):
+        """Epics first, then every task issue, then the cards, which can now name any task by its number.
+        With existing_epic, the plan's one epic is that epic (a gap already on the board)."""
         status = "Todo" if self.s.get("autoapprove_tasks") else "Backlog"
         share = tokens // len(plan["epics"])
         epic_of, tasks, epics = {}, {}, []
         for e in plan["epics"]:
-            en = self.board.create_issue(e["title"], f"**Request:** #{r.number}\n\n{e.get('goal', '')}\n", ["epic"])
-            self.created.append(en)
-            self.board.add_item(en, "Backlog")
+            if existing_epic:
+                en = existing_epic
+            else:
+                en = self.board.create_issue(e["title"], f"**Request:** #{r.number}\n\n{e.get('goal', '')}\n", ["epic"])
+                self.created.append(en)
+                self.board.add_item(en, "Backlog")
             self.board.set_tokens(en, share)
             self.board.comment(en, crew_comment("Director", f"Planned from request #{r.number}. "
                                                             f"Planning used {share:,} tokens.", "planning", tokens=share))
@@ -208,7 +374,7 @@ class Runner:
                 issue = self.board.issue(t.number)
                 last = issue.last_marker()
                 # Back in Todo from Needs designer, or a Done task the designer reopened: new conditions, fresh attempts
-                if last and last.get("event") in ("needs_designer", "approved", "accepted"):
+                if last and last.get("event") in ("needs_designer", "design_note", "approved", "accepted"):
                     rnd = sum(1 for c in issue.comments if c.marker and c.marker.get("event") == "reset") + 2
                     self.board.set_attempt(t.number, 0)
                     self.board.comment(t.number, crew_comment(
@@ -229,10 +395,17 @@ class Runner:
             if total != e.tokens:
                 self.board.set_tokens(e.number, total)  # the epic shows planning plus all its tasks
             if e.state == "CLOSED":
-                if e.status != "Done":
+                if e.reason != "NOT_PLANNED" and e.status != "Done":
                     self.board.set_status(e.number, "Done")
+                    self.epic_done(e)
                 continue
             if not tasks:
+                if e.status != "Backlog":  # an epic without tasks is not planned, so it cannot go further
+                    self.board.set_status(e.number, "Backlog")
+                    self.board.comment(e.number, crew_comment(
+                        "Director", "Not planned yet, so it stays in Backlog. To have it planned next, open a request, "
+                                    f"e.g. \"Plan #{e.number} next\".", "unplanned"))
+                    log("Runner", f"epic #{e.number}: has no tasks, moved back to Backlog")
                 continue
             if all(t.state == "CLOSED" for t in tasks):
                 branch = self.branch(e.number, e.title)
@@ -247,6 +420,15 @@ class Runner:
                 log("Runner", f"epic #{e.number}: all tasks Done, pull request opened")
             elif any(t.status in ACTIVE or t.state == "CLOSED" for t in tasks) and e.status != "In progress":
                 self.board.set_status(e.number, "In progress")
+
+    def epic_done(self, e):
+        """Tells the goal that planned the epic: its next turn checks the goal again."""
+        for r in self.board.requests():
+            plans = [c.marker for c in r.comments if c.marker and c.marker.get("event") == "plan"]
+            if any(e.number in p.get("epics", []) for p in plans):
+                self.board.comment(r.number, crew_comment("Runner", f"Epic #{e.number} {e.title} is Done.",
+                                                          "epic_done", epic=e.number))
+                log("Runner", f"epic #{e.number}: Done, told request #{r.number}")
 
     # ------------------------------------------------------------ picking and working a task
 
@@ -303,6 +485,9 @@ class Runner:
                 dc = self.card(d)
                 for p in (dc.files if dc else []):
                     reads.setdefault(p, self.ws.read(p))
+            if agent == "programmer" and any(p.endswith(".cs") for p in card.files) and \
+                    not issue.last_marker("design_note"):
+                return self.design_note(t, card, issue, files, reads, attempt, who)
             tries = 1 + max(0, int(self.s.get("check_retries", 0)))
             feedback, check_log, checks_text = None, [], ""
 
@@ -390,7 +575,17 @@ class Runner:
         issues = verdict.get("issues") or []
         lines = "\n".join(f"- {i.get('where', '')}: {i.get('problem', '')} Fix: {i.get('fix', '')}" for i in issues)
         approve = verdict.get("verdict") == "approve" and checks_ok
-        if approve:
+        if approve and any(p.startswith("docs/crew/") for p in card.files):
+            total = self.add_tokens(t, usages)
+            self.board.set_status(n, "Needs designer")
+            alert(self.s, "needs_designer")
+            self.board.comment(n, crew_comment(
+                reviewer, f"Approved: {verdict.get('summary', '')}\n\n{lines}\n\nThis task writes in docs/crew/, so "
+                          "the designer approves it too: move it to Done to accept, or comment and move it to Todo."
+                          f"\n\nChecks:\n{checks_text}\n\nTask total: {total:,} tokens.",
+                "needs_designer", attempt=attempt))
+            log(reviewer, f"#{n}: approved, waits for the designer (docs/crew/)")
+        elif approve:
             total = self.add_tokens(t, usages)
             self.board.set_status(n, "Done")
             self.board.close(n)
@@ -403,6 +598,24 @@ class Runner:
             if not checks_ok and verdict.get("verdict") == "approve":
                 reason = "The reviewer approved, but a check failed, so it is rejected. " + reason
             self.reject(t, attempt, f"{reason}\n\n{lines}\n\nChecks:\n{checks_text}", usages, reviewer, failed=failed)
+
+    def design_note(self, t, card, issue, files, reads, attempt, who):
+        """The Programmer's first try on a code task: a design note for the designer, not code."""
+        n = t.number
+        try:
+            text, usage, model = self.agents.work(card.agent, card.to_markdown(), self.thread_text(issue), files, reads,
+                                                  attempt, design_note=True)
+        except (AgentError, ValueError) as e:
+            self.reject(t, attempt, f"The agent's reply was unusable: {e}", [], who)
+            return
+        total = self.add_tokens(t, [usage])
+        self.board.set_status(n, "Needs designer")
+        alert(self.s, "needs_designer")
+        self.board.comment(n, crew_comment(
+            who, f"Design note ({model}):\n\n{parse_design_note(text)}\n\nDesigner: answer the questions or approve in "
+                 f"a comment, then move this task to Todo; the code follows the note.\n\n"
+                 f"Used: {describe_tokens(usage)}. Task total: {total:,}.", "design_note", attempt=attempt))
+        log(who, f"#{n}: design note posted, Needs designer")
 
     def reject(self, t, attempt, text, usages, who, failed=None):
         n = t.number
@@ -448,8 +661,9 @@ class Runner:
                 ok = False
                 continue
             try:
+                env = {**os.environ, "UNITY_PATH": self.s.get("unity_path", "")}  # for the EditMode test check
                 res = subprocess.run([sys.executable, *args[1:]], cwd=self.ws.root, capture_output=True, text=True,
-                                     encoding="utf-8", timeout=180)
+                                     encoding="utf-8", timeout=int(self.s.get("check_timeout", 900)), env=env)
                 passed = res.returncode == 0
                 detail = (res.stdout + res.stderr).strip()[-3000:]
             except subprocess.TimeoutExpired:

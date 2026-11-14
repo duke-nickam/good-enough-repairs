@@ -20,9 +20,9 @@ class LocalBoard:
         return Issue(number=n, title=i["title"], body=i["body"], labels=i["labels"], state=i["state"],
                      comments=[Comment(c) for c in i["comments"]], url=self.link(n))
 
-    def requests(self):
+    def requests(self, state="open"):
         return [self._issue(int(n)) for n, i in self.d["issues"].items()
-                if "request" in i["labels"] and i["state"] == "OPEN"]
+                if "request" in i["labels"] and (state == "all" or i["state"] == "OPEN")]
 
     def items(self):
         out = []
@@ -30,7 +30,8 @@ class LocalBoard:
             i = self.d["issues"][n]
             out.append(Item(number=int(n), title=i["title"], kind="epic" if "epic" in i["labels"] else "task",
                             status=it["status"], attempt=it.get("attempt", 0), tokens=it.get("tokens", 0),
-                            state=i["state"]))
+                            state=i["state"], priority=it.get("priority"),
+                            reason=i.get("reason", "")))
         return out
 
     def issue(self, number):
@@ -66,12 +67,17 @@ class LocalBoard:
         self.d["items"][str(number)]["tokens"] = total
         self._save()
 
+    def set_priority(self, number, score):
+        self.d["items"][str(number)]["priority"] = score
+        self._save()
+
     def comment(self, number, body):
         self.d["issues"][str(number)]["comments"].append(body)
         self._save()
 
     def close(self, number, reason="completed"):
         self.d["issues"][str(number)]["state"] = "CLOSED"
+        self.d["issues"][str(number)]["reason"] = "NOT_PLANNED" if reason == "not planned" else "COMPLETED"
         self._save()
 
     def pr_for(self, branch):

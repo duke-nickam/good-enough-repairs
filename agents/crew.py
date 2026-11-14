@@ -39,10 +39,12 @@ def load_settings():
 
 def print_board(board):
     rows = sorted(board.items(), key=lambda i: i.number)
-    print(f"\n{'#':>4}  {'Kind':<5} {'Status':<19} {'Attempt':<8} {'Used tokens':>12}  Title")
+    print(f"\n{'#':>4}  {'Kind':<5} {'Status':<19} {'Attempt':<8} {'Priority':>8} {'Used tokens':>12}  Title")
     for i in rows:
         att = f"{i.attempt}/{board.max_attempts}" if i.kind == "task" else ""
-        print(f"{i.number:>4}  {i.kind:<5} {i.status:<19} {att:<8} {i.tokens:>12,}  {i.title}")
+        prio = "" if i.priority is None else str(i.priority)
+        state = " (closed)" if i.state == "CLOSED" else ""
+        print(f"{i.number:>4}  {i.kind:<5} {i.status:<19} {att:<8} {prio:>8} {i.tokens:>12,}  {i.title}{state}")
     print()
 
 
@@ -52,10 +54,8 @@ def run_mock(settings):
     with tempfile.TemporaryDirectory() as tmp:
         board = LocalBoard(pathlib.Path(tmp) / "board.json", settings["max_attempts"])
         ws = MockWorkspace(ROOT, pathlib.Path(tmp) / "repo")
-        runner = Runner(board, ws, MockAgents(), settings)
-        n = board.create_issue("Demo: a greeting line for the day start",
-                               "The mechanic should greet the player when a day starts.", ["request"])
-        log("Designer (mock)", f"opened request #{n}")
+        runner = Runner(board, ws, MockAgents(), {**settings, "director_autoplan": True, "sound": False})
+        log("Designer (mock)", "director_autoplan is on: the Director opens the standing goal")
         step = 0
         while True:
             log("Runner", f"--- pass {step + 1} ---")
@@ -64,8 +64,7 @@ def run_mock(settings):
             if not designer_step(board, step, log):
                 break
             step += 1
-        req = board.issue(n)
-        log("Runner", f"request #{n} is {req.state.lower()}. Mock run finished.")
+        log("Runner", "mock run finished.")
 
 
 def check(settings):
@@ -90,7 +89,7 @@ def check(settings):
     def fields():
         f = board.fields()
         names = [o["name"] for o in f.get("Status", {}).get("options", [])]
-        missing = [x for x in ("Attempt", "Used tokens") if x not in f]
+        missing = [x for x in ("Attempt", "Used tokens", "Priority") if x not in f]
         if names != STATUSES or missing:
             raise GhError(f"columns {names}, missing fields {missing}: run setup")
         return "columns and fields in place"
@@ -105,6 +104,13 @@ def check(settings):
         return f"clean, base branch {ws.base}"
     report("Repo", repo)
     report("GDD", lambda: need((ROOT / settings["gdd"]).is_file() and settings["gdd"], f"not found: {settings['gdd']}"))
+    report("Production plan", lambda: need((ROOT / settings["production_plan"]).is_file() and settings["production_plan"],
+                                           f"not found: {settings['production_plan']}"))
+    unity = settings.get("unity_path") or ""
+    if not unity:
+        print("  note  Unity: unity_path is empty in settings.json; the EditMode test check needs Unity.exe's path")
+    else:
+        report("Unity", lambda: need(pathlib.Path(unity).is_file() and unity, f"not found: {unity}"))
     print("Ready." if ok else "Fix the FAIL lines, then run check again.")
     return ok
 
@@ -135,6 +141,7 @@ def main():
         while True:
             ws.start()
             agents.gdd = (ROOT / settings["gdd"]).read_text(encoding="utf-8")  # always the current GDD
+            agents.production_plan = (ROOT / settings["production_plan"]).read_text(encoding="utf-8")
             try:
                 runner.run_once()
             finally:
