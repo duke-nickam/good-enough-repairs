@@ -294,6 +294,7 @@ class ClaudeAgents:
         self.s = settings
         self.gdd = gdd_text
         self.production_plan = ""
+        self.project_info = ""  # Unity and package versions, set by the runner each pass
 
     def _call(self, agent, task_kind, prompt, attempt=1):
         exe = shutil.which("claude")
@@ -348,6 +349,7 @@ class ClaudeAgents:
 
     def work(self, agent, card_md, thread, files, reads, attempt, check_feedback=None, design_note=False):
         prompt = (f"GDD sections:\n\n{gdd_sections(self.gdd, self.s['reads'][agent])}\n\n---\n\n"
+                  f"The project uses: {self.project_info or 'unknown versions'}\n\n---\n\n"
                   f"Your task card:\n\n{card_md}\n\n---\n\n"
                   f"Current content of your files:\n\n{_files_block(files)}\n\n---\n\n"
                   f"Files you need to read:\n\n{_files_block(reads)}\n\n---\n\n"
@@ -361,6 +363,7 @@ class ClaudeAgents:
 
     def review(self, reviewer, card_md, summary, files, checks, thread):
         prompt = (f"GDD:\n\n{gdd_sections(self.gdd, self.s['reads'][reviewer])}\n\n---\n\n"
+                  f"The project uses: {self.project_info or 'unknown versions'}\n\n---\n\n"
                   f"Task card:\n\n{card_md}\n\n---\n\nThe agent's summary: {summary}\n\n"
                   f"Files it wrote:\n\n{_files_block(files)}\n\n---\n\nCheck results:\n{checks}\n\n---\n\n"
                   f"Earlier in this task:\n\n{thread or 'nothing yet'}")

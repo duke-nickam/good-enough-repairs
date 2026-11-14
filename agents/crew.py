@@ -37,6 +37,21 @@ def load_settings():
     return json.loads(SETTINGS.read_text(encoding="utf-8"))
 
 
+def project_info(root):
+    """The project's Unity and package versions, read fresh each pass, so agents write for the versions in use."""
+    parts = []
+    pv = root / "ProjectSettings" / "ProjectVersion.txt"
+    if pv.is_file():
+        for line in pv.read_text(encoding="utf-8").splitlines():
+            if line.startswith("m_EditorVersion:"):
+                parts.append("Unity " + line.split(":", 1)[1].strip())
+    manifest = root / "Packages" / "manifest.json"
+    if manifest.is_file():
+        deps = json.loads(manifest.read_text(encoding="utf-8")).get("dependencies", {})
+        parts += [f"{k} {v}" for k, v in sorted(deps.items()) if not k.startswith("com.unity.modules.")]
+    return ", ".join(parts)
+
+
 def print_board(board):
     rows = sorted(board.items(), key=lambda i: i.number)
     print(f"\n{'#':>4}  {'Kind':<5} {'Status':<19} {'Attempt':<8} {'Priority':>8} {'Used tokens':>12}  Title")
@@ -142,6 +157,7 @@ def main():
             ws.start()
             agents.gdd = (ROOT / settings["gdd"]).read_text(encoding="utf-8")  # always the current GDD
             agents.production_plan = (ROOT / settings["production_plan"]).read_text(encoding="utf-8")
+            agents.project_info = project_info(ROOT)
             try:
                 runner.run_once()
             finally:
