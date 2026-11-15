@@ -21,6 +21,8 @@ python agents/crew.py check     # is everything ready?
 python agents/crew.py           # one pass: works until nothing is ready
 python agents/crew.py --watch   # keeps running, checks the board every few minutes
 python agents/crew.py --mock    # scripted demo: no GitHub, no Claude
+python agents/crew.py todo 65   # the designer's card move: Backlog or Needs designer -> Todo
+python agents/crew.py done 65   # accept a task waiting in Needs designer
 ```
 
 Settings and toggles: [`agents/board/settings.json`](agents/board/settings.json) (`director_autoplan` and `autoapprove_tasks` off, `sound` on, by default). Close Unity while the runner works: it switches branches.
@@ -35,6 +37,7 @@ agents/
   crew.py                     agent board runner
   board/                      runner code, settings.json, roles/ (one prompt per agent)
 docs/                         GDD, production plan, agent board plan
+docs/crew/                    the crew's documents, e.g. the technical design (agents write, designer approves)
 ```
 
 ## Assignment 4: game content from the GDD
@@ -75,5 +78,51 @@ The day briefs were the weakest part: too long until the polish.
 - the Director asks instead of guessing what a file holds. That's how the part types got defined in GDD v1.4.
 
 The request was planned again from scratch until the plan passed.
+
+## Assignment 5: goal-oriented coding agent
+
+The goal-oriented agent is the **Director** in goal mode, not a separate script: it already plans all work on the board, so it was taught to set and chase goals ([Goals](docs/agent-board-plan.md#goals)). A goal is a state the game should reach, with a "done when" the designer confirms. With `director_autoplan` on, the Director keeps a standing goal: every GDD feature in the current scope (the MVP) done.
+
+| Assignment part | Where it lives |
+|---|---|
+| `priority_score()` | [`agents/board/priority.py`](agents/board/priority.py): +30 swap loop, +10 per gap that needs it, -20 to -5 by the production plan's cut order, 0 / -5 / -10 by size. The Director judges the factors; the function makes the order repeatable. The score is the epic's **Priority** field on the board, with its breakdown as a comment |
+| Gap detection | The Director's goal step ([`agents/board/agents.py`](agents/board/agents.py) `GOAL_FORMAT`, [`runner.py`](agents/board/runner.py) `apply_gaps`). Like a lead before AI it scans the **board**, not the code: a GDD feature without a Done epic is a gap and gets an epic in Backlog. The programmers read the code their tasks list |
+| Code-writing step | The top gap's epic gets tasks for the Programmer, QA Playtester and UX Designer. On a code task the Programmer first posts a **design note** for the designer; every C# task runs the Unity check [`agents/checks/editmode.py`](agents/checks/editmode.py) (Unity compiles the project and runs the EditMode tests in batch mode), and the agent fixes failures within its attempt |
+| Iteration loop | When the epic is merged the runner reports it to the goal, the Director scans the board again, re-scores and plans the next gap. It stops when the goal is met, or asks the designer after 3 epics |
+
+The game runs as code alone (GDD v1.5), so tests and bots play it without scenes. The crew's [technical design](docs/crew/technical-design.md) says how, written by the Programmer and approved by the designer.
+
+### What the agent built
+
+Epic [#55](https://github.com/duke-nickam/good-enough-repairs/issues/55) **Docking bays, ships and parts**, merged as PR [#69](https://github.com/duke-nickam/good-enough-repairs/pull/69):
+
+- `Assets/Scripts/Logic/Parts/` and `Logic/Bays/`: part types and conditions, the required-level check, a seeded ship factory (weak parts from `balance.json`), 3 docking bays that refuse with a reason and raise events. Pure C#, no UnityEngine.
+- 25 EditMode tests, green in Unity's batch run.
+- `Assets/Scripts/UX/`: a placeholder display built in code, no prefabs. Press Play: ships dock into the bays; click a bay to see its five parts against the required level.
+
+![The bays in Play mode](docs/images/assignment-5-station.png)
+
+The fighter's thruster at 69% fails the fighter's 70%, yet a freighter would take it: the swap the game is about.
+
+### Why the agent chose it
+
+The standing goal [#54](https://github.com/duke-nickam/good-enough-repairs/issues/54) ranked 10 gaps. **#55 scored 70** (30 swap loop + 50, five gaps need it - 10 size L); all nine others waited for it. Before that, request [#46](https://github.com/duke-nickam/good-enough-repairs/issues/46) built the base: the technical design (#47) and the Unity test check (#48). Tokens: about 146k for #47, 111k for #48, 411k for #55.
+
+### Manual changes before accepting
+
+No game code was edited by hand. The designer:
+
+- added the `StationView` component to `Main.unity` and committed the `.meta` files Unity made (agents never write Unity scene, prefab, asset or `.meta` files);
+- corrected three task cards the Director planned from file names: #51 (folders from the design and a Logic assembly to test), #52 and #68 (missing reads);
+- answered every design note and the design's open questions, e.g. replacing a deprecated test assembly setup (#51);
+- reopened #52 (two Cyrillic letters in a folder name) and #66 (see below).
+
+### What the loop taught the system
+
+- A self-check retry re-sent only the fixed file, and the runner committed only the last try: three files were never reviewed. The runner now keeps every file of an attempt.
+- Code and data files must be plain ASCII, checked by the runner.
+- The Director reads `docs/crew/`, sees each epic's goal, and requires the Unity check on every C# task.
+- Every agent gets the project's Unity and package versions.
+- Agents can delete files, so they can move them.
 
 Author: Nikola Bulog - ELVTR AI Game Development course.
