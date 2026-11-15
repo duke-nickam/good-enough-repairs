@@ -9,6 +9,8 @@ Usage (from the project root):
   python agents/crew.py           one pass: works until nothing is ready, then stops
   python agents/crew.py --watch   keeps running, checks the board every few minutes (Ctrl+C stops)
   python agents/crew.py --mock    a scripted demo on a local stand-in board: no GitHub, no Claude
+  python agents/crew.py todo 65 66   the designer's move: tasks from Backlog or Needs designer to Todo
+  python agents/crew.py done 65      the designer's move: accept a task waiting in Needs designer
 """
 import argparse
 import json
@@ -130,9 +132,35 @@ def check(settings):
     return ok
 
 
+MOVES = {"todo": ("Todo", ("Backlog", "Needs designer")), "done": ("Done", ("Needs designer",))}
+
+
+def move(board, command, numbers):
+    """The designer's card moves from the command line: no AI, only the GitHub CLI."""
+    to, allowed = MOVES[command]
+    if not numbers:
+        print(f"Name the tasks, e.g.: python agents/crew.py {command} 65 66")
+        return False
+    items = {i.number: i for i in board.items()}
+    ok = True
+    for n in numbers:
+        i = items.get(n)
+        if not i or i.kind != "task" or i.state != "OPEN":
+            print(f"  #{n}: not an open task on the board, skipped")
+            ok = False
+        elif i.status not in allowed:
+            print(f"  #{n}: is in {i.status}; '{command}' moves only from {' or '.join(allowed)}, skipped")
+            ok = False
+        else:
+            board.set_status(n, to)
+            print(f"  #{n} {i.title}: {i.status} -> {to}")
+    return ok
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", nargs="?", choices=["run", "setup", "check"], default="run")
+    ap.add_argument("command", nargs="?", choices=["run", "setup", "check", "todo", "done"], default="run")
+    ap.add_argument("numbers", nargs="*", type=int, help="task numbers, for todo and done")
     ap.add_argument("--watch", action="store_true", help="keep running; check the board every few minutes")
     ap.add_argument("--mock", action="store_true", help="scripted demo, no GitHub and no Claude")
     args = ap.parse_args()
@@ -148,6 +176,8 @@ def main():
         return
     if args.command == "check":
         sys.exit(0 if check(settings) else 1)
+    if args.command in ("todo", "done"):
+        sys.exit(0 if move(board, args.command, args.numbers) else 1)
 
     ws = GitWorkspace(ROOT, settings["repo"])
     agents = ClaudeAgents(settings, "")
