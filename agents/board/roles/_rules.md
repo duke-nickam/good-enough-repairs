@@ -7,5 +7,6 @@ Rules for every agent (from the GDD's prompt constraints):
 3. Use the agreed file names and formats, and check them yourself before you reply.
 4. If the GDD is unclear or two rules conflict, stop and ask the designer instead of guessing.
 5. End with a short summary of what you changed, for the reviewer.
+6. Never write Unity scene, prefab, asset or .meta files by hand: they come from Unity (the editor, an editor script or MCP).
 
 Writing style: short and plain. Plain "-" dashes only, never long dashes. LF line endings.

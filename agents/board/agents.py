@@ -104,6 +104,9 @@ The check results above come from the runner, which ran the checks on exactly th
 Never reject because the agent did not run or report a check itself."""
 
 
+UNITY_MADE = (".unity", ".prefab", ".asset", ".meta")  # files only Unity writes
+
+
 class AgentError(RuntimeError):
     pass
 
@@ -198,6 +201,9 @@ def validate_plan(plan, repo_files):
             if not files:
                 p.append(f"{k}: needs at least one file to write")
             for f in files:
+                if f.endswith(UNITY_MADE):
+                    p.append(f"{k}: may not write {f!r}: Unity scene, prefab, asset and .meta files come from Unity "
+                             "(the editor, an editor script or MCP), never from an agent writing them by hand")
                 if f.startswith(("/", "agents/board/", ".github/")) or ".." in f or "\\" in f or \
                         (f.startswith("docs/") and not f.startswith("docs/crew/")):
                     p.append(f"{k}: may not write {f!r}")
