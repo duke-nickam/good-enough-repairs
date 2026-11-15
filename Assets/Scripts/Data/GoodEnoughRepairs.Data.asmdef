@@ -1,0 +1,16 @@
+{
+    "name": "GoodEnoughRepairs.Data",
+    "rootNamespace": "GoodEnoughRepairs",
+    "references": [
+        "GoodEnoughRepairs.Logic"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
