@@ -502,6 +502,7 @@ class Runner:
                 return self.design_note(t, card, issue, files, reads, attempt, who)
             tries = 1 + max(0, int(self.s.get("check_retries", 0)))
             feedback, check_log, checks_text = None, [], ""
+            attempt_files = {}  # every file this attempt wrote, over all its tries
 
             def keep_tries(why):
                 """Files from earlier failed tries are committed, so an attempt never leaves the repo dirty."""
@@ -538,8 +539,9 @@ class Runner:
                         self.ws.delete(p)  # a moved or removed file
                     else:
                         self.ws.write(p, c)
+                attempt_files.update(written)  # a later try may re-send only the files it fixed
                 last_text = checks_text if k > 1 else None
-                checks_ok, checks_text = self.run_checks(card, written)
+                checks_ok, checks_text = self.run_checks(card, attempt_files)
                 check_log.append(f"try {k} {'pass' if checks_ok else 'FAIL'}")
                 if checks_ok or k == tries:
                     break
@@ -550,7 +552,9 @@ class Runner:
                 log(who, f"#{n}: checks failed, self-check try {k + 1}/{tries}")
                 files = {p: self.ws.read(p) for p in card.files}
                 feedback = checks_text
-            paths = list(written) + [p + ".meta" for p, c in written.items() if c is None]
+            written = attempt_files  # checks, commit and review all see every file of the attempt
+            # every file on the card, so nothing the agent wrote is ever left out of the commit
+            paths = list(card.files) + [p + ".meta" for p, c in written.items() if c is None]
             sha = self.ws.commit(paths, f"#{n} {t.title} - {who}, attempt {attempt}")
             link = self.ws.commit_link(sha) if sha else "no change from the last attempt"
             self.board.set_status(n, "Waiting for review")
