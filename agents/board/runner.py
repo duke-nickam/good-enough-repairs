@@ -46,6 +46,7 @@ class Runner:
         self.board, self.ws, self.agents, self.s = board, ws, agents, settings
         self.max = settings["max_attempts"]
         self.cards = {}
+        self.goals = {}
         self.created = []
 
     # ------------------------------------------------------------ helpers
@@ -136,22 +137,32 @@ class Runner:
             return
         self.goal_step(r, items, open_planned)
 
+    def epic_goal(self, number):
+        """An epic's one-line goal: its body without the request line."""
+        if number not in self.goals:
+            body = re.sub(r"\*\*Request:\*\*.*", "", self.board.issue(number).body or "")
+            line = next((l.strip() for l in body.splitlines() if l.strip()), "")
+            self.goals[number] = line[:240]
+        return self.goals[number]
+
     def board_summary(self, items):
-        """The board as the Director sees it: epics with their state, open tasks, and the Priority field."""
+        """The board as the Director sees it: epics with their goal and state, open tasks, and the Priority field."""
         lines = []
         for i in sorted(items.values(), key=lambda i: i.number):
             if i.kind != "epic" or i.reason == "NOT_PLANNED":
                 continue
+            goal = self.epic_goal(i.number)
+            name = f"#{i.number} [epic] {i.title}" + (f" (goal: {goal})" if goal else "")
             if i.state == "CLOSED":
-                lines.append(f"#{i.number} [epic] {i.title} - Done")
+                lines.append(f"{name} - Done")
                 continue
             tasks = [t for t in items.values() if t.kind == "task" and self.card(t.number) and
                      self.card(t.number).epic == i.number]
             prio = "" if i.priority is None else f", Priority {i.priority}"
             if not tasks:
-                lines.append(f"#{i.number} [epic] {i.title} - open, no tasks yet{prio}")
+                lines.append(f"{name} - open, no tasks yet{prio}")
                 continue
-            lines.append(f"#{i.number} [epic] {i.title} - in progress ({i.status}){prio}")
+            lines.append(f"{name} - in progress ({i.status}){prio}")
             lines += [f"  #{t.number} [task] {t.title} - {t.status}" for t in tasks if t.state == "OPEN"]
         return "\n".join(lines)
 

@@ -49,7 +49,7 @@ class MockAgents:
         if self.goal_calls > 1:  # the first epic is Done: the rest are the gaps, on the epics the board already has
             gaps = gaps[1:]
             for g in gaps:
-                m = re.search(rf"#(\d+) \[epic\] {g['title']} - open, no tasks yet", board)
+                m = re.search(rf"#(\d+) \[epic\] {g['title']}( \(goal: [^)]*\))? - open, no tasks yet", board)
                 g["epic"] = int(m.group(1)) if m else None
             gaps[0]["needs"] = []
         return {"type": "gaps", "goal": "Every GDD feature in the current scope is done.",
