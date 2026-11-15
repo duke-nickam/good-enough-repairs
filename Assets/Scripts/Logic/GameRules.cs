@@ -3,6 +3,7 @@ namespace GoodEnoughRepairs
     /// <summary>
     /// Fixed GDD rules as named constants. Balance numbers (prices, required
     /// levels, scrap value, penalty) are not here; they live in balance.json.
+    /// The five part types are named in PartType.
     /// </summary>
     public static class GameRules
     {
