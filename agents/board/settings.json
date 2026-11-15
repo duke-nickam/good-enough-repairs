@@ -2,7 +2,7 @@
   "repo": "duke-nickam/good-enough-repairs",
   "project_owner": "duke-nickam",
   "project_title": "Good Enough Repairs - agent board",
-  "director_autoplan": false,
+  "director_autoplan": true,
   "autoapprove_tasks": false,
   "max_attempts": 3,
   "check_retries": 2,
