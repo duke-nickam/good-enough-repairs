@@ -1,6 +1,6 @@
-# Good Enough Repairs - Final GDD (v1.5)
+# Good Enough Repairs - Final GDD (v1.6)
 
-Author: Nikola Bulog · Version 1.5 · November 14, 2026 (CET)
+Author: Nikola Bulog · Version 1.6 · November 18, 2026 (CET)
 
 ## About this document
 
@@ -14,6 +14,7 @@ This is the final GDD: it describes the smallest playable version of the game (t
 | 1.3 | Oct 23, 2026 | Final GDD: changes from the second stress test and own review (see Appendix: Revision notes) |
 | 1.4 | Nov 8, 2026 | Part types defined. Designer decisions from the economy epic: weak parts per ship type, starting credits, junkyard price, balance targets, busy days, simulation timing |
 | 1.5 | Nov 14, 2026 | The whole game runs as code alone; the crew's technical design in docs/crew/ |
+| 1.6 | Nov 18, 2026 | The crew copies a studio: ten agents; the Lead Programmer reviews code, the QA Automation Engineer writes the bots and checks, the QA Playtester only plays, the Technical Artist builds scenes and prefabs |
 
 ## Executive Summary
 
@@ -29,8 +30,8 @@ Pitch: You are a space mechanic. Damaged fighters and freighters dock at your re
 | Session length | A few minutes per game day (round); 7 game days per run, plus an optional tutorial day |
 | Target player | Fans of short, clever management games (repair sims, shop sims) |
 | Origin | Game jam prototype, theme "repair" |
-| AI use | Development only: a team of 7 AI agents builds, balances and tests the game. No AI runs inside the game. |
-| Team | One developer (the designer, up to 10 hours per week for decisions, reviews and playtests), working with 7 AI agents |
+| AI use | Development only: a team of 10 AI agents builds, balances and tests the game. No AI runs inside the game. |
+| Team | One developer (the designer, up to 10 hours per week for decisions, reviews and playtests), working with 10 AI agents |
 
 Design principles - every new feature must support at least one of these:
 
@@ -187,43 +188,49 @@ Keep it simple for v1; readability matters more than detail. This section says w
 
 ## AI Architecture
 
-The game has no AI at runtime: every rule runs in normal game code. AI is used to build the game, with a team of seven development agents. Each agent owns one part of the game the player touches, so each one is described below by what the player experiences.
+The game has no AI at runtime: every rule runs in normal game code. AI is used to build the game, with a team of ten development agents. Each agent owns one part of the game the player touches, so each one is described below by what the player experiences.
 
 **What each agent does**
 
 | Agent | Role | Starts when | Effect on gameplay |
 |---|---|---|---|
 | Director | Turns the GDD into feature cards on a feature board, gives each agent its subtasks, rejects anything outside the scope, and takes open questions to the designer. | A work session starts, or QA reports on a feature | The player gets a small, finished game: every feature traces back to the core loop. |
-| Programmer | Writes all the game logic: docking bays, parts, inventory, junkyard, the player actions, and the events other agents connect to. | A feature card has a coding subtask | Moving a part between ships is instant and reliable, and a ship can always be released. |
+| Programmer | Writes all the game logic: docking bays, parts, inventory, junkyard, the player actions, and the events other agents connect to, the view scripts that show them, and its unit tests. | A feature card has a coding subtask | Moving a part between ships is instant and reliable, and a ship can always be released. |
+| Lead Programmer | Reviews all code before it is accepted, like a lead programmer in a studio, and owns the crew's technical design. | Code is ready for review | The game stays stable as features are added: a new feature does not break an old one. |
 | Economy Balancer | Sets prices, payments, scrap value, upkeep and junkyard contents, and decides how damaged each arriving ship is. | A card needs balance numbers, or the simulation fails | A player who only buys new parts goes bankrupt on day 2 to 4, and ships usually arrive with a healthy part worth harvesting. |
-| UX Designer | Decides how the game responds to every player action, then places the art and sound in the scene and connects them to the Programmer's events. When a moment is confusing in screenshots or playtests, it adds or proposes effects, messages and warnings. It also writes the mechanic's lines. | A card needs a layout, or art and sound placed; or a feature is finished and needs a review | The player sees at a glance which parts are spare, moves one in a couple of clicks, and always knows how much of the day is left. |
+| UX Designer | Decides how the game responds to every player action and how each screen is laid out, and reviews the result in screenshots. When a moment is confusing in screenshots or playtests, it adds or proposes effects, messages and warnings. It also writes the mechanic's lines. | A card needs a layout; or a feature is finished and needs a review | The player sees at a glance which parts are spare, moves one in a couple of clicks, and always knows how much of the day is left. |
 | Artist | Makes the 2D art for the ships, parts, station, junkyard and icons, and imports it into Unity. | A card asks for a new image | Condition bars read at a glance, and the station looks rugged but well kept. |
+| Technical Artist | Builds the scenes and prefabs in Unity from the UX Designer's layouts: places the art and sound and connects them to the Programmer's view scripts. | A card needs a scene or prefab built or changed | Everything on screen sits where the layout says, and every object reacts to the game. |
 | Sound Designer | Makes or picks the sound effects and music, and imports them into Unity. | A card asks for a new sound | Every install clunks, every payment rings, and the music tells the player the day is ending. |
-| QA Playtester | Tests each finished feature in the build, and builds and runs the buyer/swapper simulation. | Every subtask of a feature card is done, or balance numbers change | No lost parts or stuck ships, and no exploit that makes the game trivially easy. |
+| QA Automation Engineer | Builds the bots, the buyer/swapper simulation and the automated checks. | A feature card needs a bot or a check, or the rules change | Every run of the simulation and every check proves a feature still works, with no one playing. |
+| QA Playtester | Tests each finished feature as a player, from the build and the bots' reports, and reports bugs, exploits and balance problems. It does not read code. | Every subtask of a feature card is done, or balance numbers change | No lost parts or stuck ships, and no exploit that makes the game trivially easy. |
 
 **How each agent works**
 
 | Agent | Reads | Writes (format) | Model or tool |
 |---|---|---|---|
 | Director | Whole GDD, feature board, QA reports | Feature board: cards with subtasks (Markdown) | Large model |
-| Programmer | Game Mechanics and UI sections, its subtask, UX plan, game code | Logic scripts (C#) and logic objects in scenes and prefabs | Large model |
+| Programmer | Game Mechanics and UI sections, its subtask, UX plan, game code | Logic and view scripts and unit tests (C#) | Large model |
+| Lead Programmer | Technical design, its review task, the code under review | Reviews (Markdown), the technical design (Markdown) | Largest model, different from the Programmer's |
 | Economy Balancer | Economy section, simulation results | One balance data file (JSON): prices, payments, damage, junkyard contents | Fast, cheaper model |
-| UX Designer | Game Mechanics, UI and Art & audio sections, screenshots of the build | Screen layouts and feedback list (Markdown), visual parts of scenes and prefabs | Fast model; large model if it makes too many mistakes |
+| UX Designer | Game Mechanics, UI and Art & audio sections, screenshots of the build | Screen layouts and feedback list (Markdown), screenshot reviews | Fast model; large model if it makes too many mistakes |
 | Artist | Art direction, UX feedback list | Sprites and icons (PNG), imported into Unity | Fast model + image generation tool or asset packs |
+| Technical Artist | UX layouts and feedback list, technical design, art and sound files, view scripts | Builder scripts (C#) that Unity runs to make scenes and prefabs, screenshots | Large model |
 | Sound Designer | Audio direction, UX feedback list | Sound effects and music (WAV, OGG), imported into Unity | Fast model + audio tool or asset packs |
-| QA Playtester | Game build, game rules, balance file | Tests and the buyer/swapper simulation (C#), bug and balance reports (Markdown) | Fast, cheaper model |
+| QA Automation Engineer | Game rules, technical design, game code | Bots, the buyer/swapper simulation and tests (C#), check scripts (Python) | Large model |
+| QA Playtester | Game build, game rules, balance file, bot and simulation reports | Bug and balance reports (Markdown) | Large model |
 
-How they work together: the Director keeps a feature board, like Jira: one card per feature, with a subtask for each agent involved. When every subtask on a card is done, the QA Playtester tests the finished feature in the build. If it passes, the card is finished; if not, the Director reopens only the subtask that broke. The Economy Balancer and QA Playtester share one tool: a simulation that plays 7 days with two bots, a buyer that only buys new parts and a swapper that harvests parts between ships. If the buyer survives or the swapper goes bankrupt, the numbers go back to the Economy Balancer; after 3 failed tuning rounds in a row, the Director takes it to the designer instead of looping. The designer is the final decider on any rule the GDD leaves open: agents escalate through the Director and get an answer within the same work session. The UX Designer's feedback list is the shared plan for the look and sound of every event: the Artist and Sound Designer make what it asks for, and the UX Designer places it in the game.
+How they work together: the Director keeps a feature board, like Jira: one card per feature, with a subtask for each agent involved. Everything made is checked by someone other than its maker, as in a studio: the Lead Programmer reviews code before it is accepted. When every subtask on a card is done, the QA Playtester tests the finished feature in the build. If it passes, the card is finished; if not, the Director reopens only the subtask that broke. The QA Automation Engineer builds a simulation that the Economy Balancer and QA Playtester share: it plays 7 days with two bots, a buyer that only buys new parts and a swapper that harvests parts between ships. If the buyer survives or the swapper goes bankrupt, the numbers go back to the Economy Balancer; after 3 failed tuning rounds in a row, the Director takes it to the designer instead of looping. The designer is the final decider on any rule the GDD leaves open: agents escalate through the Director and get an answer within the same work session. The UX Designer's feedback list is the shared plan for the look and sound of every event: the Artist and Sound Designer make what it asks for, and the Technical Artist places it in the game.
 
-Example: one feature card. Binning a part pays a little scrap money. On the Director's board this is one card with five subtasks. The Economy Balancer sets the value (10 credits) so it never beats a swap. The Programmer adds the bin logic and a "part binned" event. The Artist draws the bin and the coin, and the Sound Designer makes the clink. The UX Designer places them and connects them to the event: the part drops into the bin, a coin pops up, the clink plays and the credit counter ticks up. Then the QA Playtester tests the whole feature and checks that every binned part pays out exactly once and the credit counter adds up.
+Example: one feature card. Binning a part pays a little scrap money. On the Director's board this is one card with six subtasks. The Economy Balancer sets the value (10 credits) so it never beats a swap. The Programmer adds the bin logic, a "part binned" event and the view script that shows it. The Artist draws the bin and the coin, and the Sound Designer makes the clink. The Technical Artist places them and connects them to the view script, and the UX Designer reviews the result: the part drops into the bin, a coin pops up, the clink plays and the credit counter ticks up. Then the QA Playtester tests the whole feature and checks that every binned part pays out exactly once and the credit counter adds up.
 
 ## Technical Strategy
 
 ### AI dev pipeline
 
-The GDD is the only source the agents work from. The Director turns it into feature cards, and the work reaches the game along two paths: logic and data go straight into the Unity build, while art and sound go through the UX Designer, who places them in the game.
+The GDD is the only source the agents work from. The Director turns it into feature cards, and the work reaches the game along two paths: logic and data go straight into the Unity build, while art and sound go through the Technical Artist, who places them in the game.
 
-[Diagram - AI dev pipeline: GDD → Director (feature board) → LOGIC lane: Programmer (logic and events), Economy Balancer (balance JSON) → Unity build. LOOK AND SOUND lane: Artist (sprites), Sound Designer (sounds) → UX Designer (places, connects) → Unity build. The UX Designer reviews the build. Unity build → QA Playtester (tests the feature); rejected: the Director reopens that subtask]
+[Diagram - AI dev pipeline: GDD → Director (feature board) → LOGIC lane: Programmer (logic and events, reviewed by the Lead Programmer), QA Automation Engineer (bots and checks), Economy Balancer (balance JSON) → Unity build. LOOK AND SOUND lane: Artist (sprites), Sound Designer (sounds) → Technical Artist (places, connects) → Unity build. The UX Designer reviews the build. Unity build → QA Playtester (tests the feature); rejected: the Director reopens that subtask]
 
 The Artist and Sound Designer work from the UX Designer's feedback list, and the UX Designer reviews the build to ask for changes. A feature is finished only when the QA Playtester has tested it in the build.
 
@@ -239,36 +246,39 @@ Every agent's prompt includes the same five rules, so outputs stay consistent fr
 2. Take every number from the GDD or the balance file; never invent values. The GDD's numbers are starting values: the Economy Balancer may change them to meet the balance targets, and says so in its task summary.
 3. Use the agreed file names and output format, and check them yourself before submitting: C# for code, JSON for balance data, PNG for images, WAV or OGG for sound, Markdown for plans and reports.
 4. If the GDD is unclear or two rules conflict, stop and report it to the Director instead of guessing.
-5. End every task with a short summary of what changed, for the QA Playtester.
+5. End every task with a short summary of what changed, for the reviewer.
 
 ### Engine integration
 
-- Unity 2D project, PC build. Agents work in the editor through MCP.
+- Unity 2D project, PC build. Agents never write scene or prefab files by hand: the Technical Artist's builder scripts (C#) make them in Unity, later the Unity CLI in the open editor.
 - Code: C# scripts, one folder per system (bays, parts, inventory, economy, screens).
 - Balance data: one JSON file with prices, payments, scrap value, required levels, damage patterns, junkyard contents and the penalty price, loaded when the game starts. Changing the balance never needs a code change.
 - Art and sound: imported by the Artist and Sound Designer into fixed folders, under the names from the feedback list.
-- Logic and visuals stay separate: the Programmer owns the game's events and the scene files, and the UX Designer's feedback only listens to those events from its own folder and visuals prefabs. Neither edits the other's files.
+- Logic and visuals stay separate: the Programmer owns the game's events and view scripts, and the Technical Artist owns the scenes and prefabs, which only listen to those events. Neither edits the other's files.
 - A feature is finished only after the QA Playtester has tested it in the Unity build.
-- The whole game runs as code alone, without scenes, graphics or sound. Scenes, graphics and sound only show the game and react to its events. This lets the QA Playtester's bots, which are code and not AI, play thousands of full runs in seconds, with no tokens and no one playing. How the code is organized is in the crew's technical design, [docs/crew/technical-design.md](crew/technical-design.md), written by the agents and approved by the designer.
+- The whole game runs as code alone, without scenes, graphics or sound. Scenes, graphics and sound only show the game and react to its events. This lets the QA Automation Engineer's bots, which are code and not AI, play thousands of full runs in seconds, with no tokens and no one playing. How the code is organized is in the crew's technical design, [docs/crew/technical-design.md](crew/technical-design.md), written by the agents and approved by the designer.
 - Version control: a GitHub repo. Agents working on the same feature share one feature branch. Each subtask lists the files it will change, and the Director never runs two subtasks on the same file at once.
 
 ### Token budget
 
-The MVP (first 2 weeks) is estimated at about 28 million tokens, including a 25% rework reserve, and weeks 3-7 at about 10 million per week. A session is one task from start to accepted change; each of its steps resends the conversation so far, so it uses many times more tokens than the files it reads. After the first week, real use per session is measured and the budget is updated.
+The MVP (first 2 weeks) is estimated at about 33 million tokens, including a 25% rework reserve, and weeks 3-7 at about 10 million per week. A session is one task from start to accepted change; each of its steps resends the conversation so far, so it uses many times more tokens than the files it reads. After the first week, real use per session is measured and the budget is updated.
 
 | Agent | Sessions | Tokens per session | Total |
 |---|---|---|---|
 | Director | 10 | 120,000 | 1.2M |
 | Programmer | 30 | 400,000 | 12.0M |
+| Lead Programmer | 30 | 80,000 | 2.4M |
 | Economy Balancer | 10 | 160,000 | 1.6M |
 | UX Designer | 15 | 160,000 | 2.4M |
 | Artist | 10 | 80,000 | 0.8M |
+| Technical Artist | 10 | 160,000 | 1.6M |
 | Sound Designer | 5 | 80,000 | 0.4M |
-| QA Playtester (incl. simulation) | 20 | 200,000 | 4.0M |
-| Rework reserve (25%) |  |  | 5.6M |
-| Total (MVP, 2 weeks) | 100 |  | 28.0M |
+| QA Automation Engineer (incl. simulation) | 10 | 200,000 | 2.0M |
+| QA Playtester | 10 | 200,000 | 2.0M |
+| Rework reserve (25%) |  |  | 6.6M |
+| Total (MVP, 2 weeks) | 140 |  | 33.0M |
 
-Cost: the build runs on the course's Claude Team subscription, so tokens cost no money directly; the real limit is the plan's session and weekly usage limits. At API prices (Sonnet 5.5 for the Director and Programmer, Haiku 5.5 for the rest, with prompt caching), the same work would cost roughly $25 for the MVP and $75 for the whole build. Unity Personal is free; art and audio tools or asset packs about $50-100.
+Cost: the build runs on the course's Claude Team subscription, so tokens cost no money directly; the real limit is the plan's session and weekly usage limits. At API prices (Opus 5.5 for the Lead Programmer, Sonnet 5.5 for the Director, Programmer, Technical Artist, QA Automation Engineer and QA Playtester, Haiku 5.5 for the rest, with prompt caching), the same work would cost roughly $40 for the MVP and $110 for the whole build. Unity Personal is free; art and audio tools or asset packs about $50-100.
 
 Why it's plausible: the MVP is a small 2D game with eight screens, and a simple version was built in 2-3 days at a game jam. Spending rule: if a week goes over its budget or a usage limit is hit, the Director warns the designer, who decides what to postpone.
 
@@ -277,11 +287,11 @@ Why it's plausible: the MVP is a small 2D game with eight screens, and a simple 
 1. Context window. An agent can't hold the whole project in memory at once. Handling: each agent gets only its GDD section and the files for its task, and all balance numbers live in one data file instead of being spread through the code.
 2. Rate and usage limits. The API limits how many tokens can be used per minute and per day. Handling: agents work in parallel whenever their subtasks don't depend on each other, for example the Artist drawing while the Programmer writes the logic. If a limit is hit, the Director pauses the remaining subtasks and resumes them when the limit resets, starting with the ones other agents are waiting for.
 3. Agents can't judge fun. The simulation proves the numbers work, but not whether swapping feels clever. Handling: the designer playtests at the end of every week, and those playtests decide the next balance changes.
-4. Engine choice. Agents work best when everything is text they can read and edit. Handling: Unity with MCP. The designer has years of experience with Unity.
+4. Engine choice. Agents work best when everything is text they can read and edit. Handling: Unity, changed by agents only through Unity itself (builder scripts, later the Unity CLI). The designer has years of experience with Unity.
 
 ## MVP scope
 
-The MVP is done when a new player can play 7 days, discover part swapping, and want to play again. It is planned for the first 2 weeks of the 7-week build; the rest of the time goes to the features in After the MVP and to release. Everything is built by one developer (the designer) with the 7 agents.
+The MVP is done when a new player can play 7 days, discover part swapping, and want to play again. It is planned for the first 2 weeks of the 7-week build; the rest of the time goes to the features in After the MVP and to release. Everything is built by one developer (the designer) with the 10 agents.
 
 **In the MVP:**
 
