@@ -14,7 +14,7 @@ This is the final GDD: it describes the smallest playable version of the game (t
 | 1.3 | Oct 23, 2026 | Final GDD: changes from the second stress test and own review (see Appendix: Revision notes) |
 | 1.4 | Nov 8, 2026 | Part types defined. Designer decisions from the economy epic: weak parts per ship type, starting credits, junkyard price, balance targets, busy days, simulation timing |
 | 1.5 | Nov 14, 2026 | The whole game runs as code alone; the crew's technical design in docs/crew/ |
-| 1.6 | Nov 18, 2026 | The crew copies a studio: ten agents; the Lead Programmer reviews code, the QA Automation Engineer writes the bots and checks, the QA Playtester only plays, the Technical Artist builds scenes and prefabs |
+| 1.6 | Nov 18, 2026 | The crew copies a studio: ten agents; the Lead Programmer reviews code, the QA Automation Engineer writes the bots and checks, the QA Playtester only plays, the Technical Artist builds scenes and prefabs with the Programmer's builder tool |
 
 ## Executive Summary
 
@@ -195,12 +195,12 @@ The game has no AI at runtime: every rule runs in normal game code. AI is used t
 | Agent | Role | Starts when | Effect on gameplay |
 |---|---|---|---|
 | Director | Turns the GDD into feature cards on a feature board, gives each agent its subtasks, rejects anything outside the scope, and takes open questions to the designer. | A work session starts, or QA reports on a feature | The player gets a small, finished game: every feature traces back to the core loop. |
-| Programmer | Writes all the game logic: docking bays, parts, inventory, junkyard, the player actions, and the events other agents connect to, the view scripts that show them, and its unit tests. | A feature card has a coding subtask | Moving a part between ships is instant and reliable, and a ship can always be released. |
+| Programmer | Writes all the game logic: docking bays, parts, inventory, junkyard, the player actions, and the events other agents connect to, the view scripts that show them, the editor tools other agents use, and its unit tests. | A feature card has a coding subtask | Moving a part between ships is instant and reliable, and a ship can always be released. |
 | Lead Programmer | Reviews all code before it is accepted, like a lead programmer in a studio, and owns the crew's technical design. | Code is ready for review | The game stays stable as features are added: a new feature does not break an old one. |
 | Economy Balancer | Sets prices, payments, scrap value, upkeep and junkyard contents, and decides how damaged each arriving ship is. | A card needs balance numbers, or the simulation fails | A player who only buys new parts goes bankrupt on day 2 to 4, and ships usually arrive with a healthy part worth harvesting. |
 | UX Designer | Decides how the game responds to every player action and how each screen is laid out, and reviews the result in screenshots. When a moment is confusing in screenshots or playtests, it adds or proposes effects, messages and warnings. It also writes the mechanic's lines. | A card needs a layout; or a feature is finished and needs a review | The player sees at a glance which parts are spare, moves one in a couple of clicks, and always knows how much of the day is left. |
 | Artist | Makes the 2D art for the ships, parts, station, junkyard and icons, and imports it into Unity. | A card asks for a new image | Condition bars read at a glance, and the station looks rugged but well kept. |
-| Technical Artist | Builds the scenes and prefabs in Unity from the UX Designer's layouts: places the art and sound and connects them to the Programmer's view scripts. | A card needs a scene or prefab built or changed | Everything on screen sits where the layout says, and every object reacts to the game. |
+| Technical Artist | Builds the scenes and prefabs in Unity from the UX Designer's layouts: places the art and sound and connects them to the Programmer's view scripts. It does not program: it uses the Programmer's builder tool. | A card needs a scene or prefab built or changed | Everything on screen sits where the layout says, and every object reacts to the game. |
 | Sound Designer | Makes or picks the sound effects and music, and imports them into Unity. | A card asks for a new sound | Every install clunks, every payment rings, and the music tells the player the day is ending. |
 | QA Automation Engineer | Builds the bots, the buyer/swapper simulation and the automated checks. | A feature card needs a bot or a check, or the rules change | Every run of the simulation and every check proves a feature still works, with no one playing. |
 | QA Playtester | Tests each finished feature as a player, from the build and the bots' reports, and reports bugs, exploits and balance problems. It does not read code. | Every subtask of a feature card is done, or balance numbers change | No lost parts or stuck ships, and no exploit that makes the game trivially easy. |
@@ -215,7 +215,7 @@ The game has no AI at runtime: every rule runs in normal game code. AI is used t
 | Economy Balancer | Economy section, simulation results | One balance data file (JSON): prices, payments, damage, junkyard contents | Fast, cheaper model |
 | UX Designer | Game Mechanics, UI and Art & audio sections, screenshots of the build | Screen layouts and feedback list (Markdown), screenshot reviews | Fast model; large model if it makes too many mistakes |
 | Artist | Art direction, UX feedback list | Sprites and icons (PNG), imported into Unity | Fast model + image generation tool or asset packs |
-| Technical Artist | UX layouts and feedback list, technical design, art and sound files, view scripts | Builder scripts (C#) that Unity runs to make scenes and prefabs, screenshots | Large model |
+| Technical Artist | UX layouts and feedback list, technical design, art and sound files, view scripts | Prefab and scene specs (JSON) that the Programmer's builder tool turns into prefabs and scenes in Unity, screenshots | Large model |
 | Sound Designer | Audio direction, UX feedback list | Sound effects and music (WAV, OGG), imported into Unity | Fast model + audio tool or asset packs |
 | QA Automation Engineer | Game rules, technical design, game code | Bots, the buyer/swapper simulation and tests (C#), check scripts (Python) | Large model |
 | QA Playtester | Game build, game rules, balance file, bot and simulation reports | Bug and balance reports (Markdown) | Large model |
@@ -250,7 +250,7 @@ Every agent's prompt includes the same five rules, so outputs stay consistent fr
 
 ### Engine integration
 
-- Unity 2D project, PC build. Agents never write scene or prefab files by hand: the Technical Artist's builder scripts (C#) make them in Unity, later the Unity CLI in the open editor.
+- Unity 2D project, PC build. Agents never write scene or prefab files by hand: the Programmer's builder tool makes them in Unity from the Technical Artist's specs, later the Technical Artist may work in the open editor through the Unity CLI.
 - Code: C# scripts, one folder per system (bays, parts, inventory, economy, screens).
 - Balance data: one JSON file with prices, payments, scrap value, required levels, damage patterns, junkyard contents and the penalty price, loaded when the game starts. Changing the balance never needs a code change.
 - Art and sound: imported by the Artist and Sound Designer into fixed folders, under the names from the feedback list.
@@ -287,7 +287,7 @@ Why it's plausible: the MVP is a small 2D game with eight screens, and a simple 
 1. Context window. An agent can't hold the whole project in memory at once. Handling: each agent gets only its GDD section and the files for its task, and all balance numbers live in one data file instead of being spread through the code.
 2. Rate and usage limits. The API limits how many tokens can be used per minute and per day. Handling: agents work in parallel whenever their subtasks don't depend on each other, for example the Artist drawing while the Programmer writes the logic. If a limit is hit, the Director pauses the remaining subtasks and resumes them when the limit resets, starting with the ones other agents are waiting for.
 3. Agents can't judge fun. The simulation proves the numbers work, but not whether swapping feels clever. Handling: the designer playtests at the end of every week, and those playtests decide the next balance changes.
-4. Engine choice. Agents work best when everything is text they can read and edit. Handling: Unity, changed by agents only through Unity itself (builder scripts, later the Unity CLI). The designer has years of experience with Unity.
+4. Engine choice. Agents work best when everything is text they can read and edit. Handling: Unity, changed by agents only through Unity itself (a builder tool, later the Unity CLI). The designer has years of experience with Unity.
 
 ## MVP scope
 
