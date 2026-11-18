@@ -1,0 +1,20 @@
+{
+    "name": "GoodEnoughRepairs.Editor",
+    "rootNamespace": "GoodEnoughRepairs.EditorTools",
+    "references": [
+        "GoodEnoughRepairs.UX",
+        "GoodEnoughRepairs.Logic",
+        "GoodEnoughRepairs.Data"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
