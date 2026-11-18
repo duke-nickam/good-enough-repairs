@@ -6,6 +6,14 @@ import subprocess
 SKIP_LIST = ("Assets/Settings/", "ProjectSettings/", "Packages/", "UserSettings/")
 
 
+
+def read_text(p):
+    """A file's text; a binary file (an image, a sound) gives a short note instead, as agents read only text."""
+    try:
+        return p.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return f"(binary file, {p.stat().st_size:,} bytes: not shown to agents)"
+
 class WorkspaceError(RuntimeError):
     pass
 
@@ -57,7 +65,7 @@ class GitWorkspace:
 
     def read(self, path):
         p = self.root / path
-        return p.read_text(encoding="utf-8") if p.is_file() else None
+        return read_text(p) if p.is_file() else None
 
     def write(self, path, content):
         p = self.root / path
@@ -119,7 +127,7 @@ class MockWorkspace:
         for base in (self.root, self.repo_root):
             p = base / path
             if p.is_file():
-                return p.read_text(encoding="utf-8")
+                return read_text(p)
         return None
 
     def write(self, path, content):
