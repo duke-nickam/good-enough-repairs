@@ -12,6 +12,13 @@ namespace GoodEnoughRepairs
     {
         [SerializeField] private int seed = 1;
 
+        /// <summary>
+        /// Optional prefab instance for the first bay. When assigned, it shows the
+        /// bay 1 ship every frame and OnGUI no longer draws that bay's ship. When
+        /// null, OnGUI draws it as before.
+        /// </summary>
+        public ShipView bay1View;
+
         private const float Margin = 20f;
         private const float Gap = 16f;
         private const float BayHeight = 150f;
@@ -20,7 +27,7 @@ namespace GoodEnoughRepairs
         private DockingBays bays;
         private System.Random shipRandom;
         private Ship[] shown;
-        private ShipView[] views;
+        private ShipPanel[] views;
         private int surplusMargin;
         private int arrivalIntervalMs;
         private float untilNextShipMs;
@@ -41,7 +48,7 @@ namespace GoodEnoughRepairs
 
             bays = new DockingBays();
             shown = new Ship[bays.BayCount];
-            views = new ShipView[bays.BayCount];
+            views = new ShipPanel[bays.BayCount];
             bays.ShipDocked += OnShipDocked;
             bays.ShipLeft += OnShipLeft;
             untilNextShipMs = 0f;
@@ -49,7 +56,11 @@ namespace GoodEnoughRepairs
 
         private void Update()
         {
-            if (bays == null || bays.IsFull) return;
+            if (bays == null) return;
+
+            if (bay1View != null) bay1View.Show(shown[0], surplusMargin);
+
+            if (bays.IsFull) return;
 
             untilNextShipMs -= Time.deltaTime * 1000f;
             if (untilNextShipMs > 0f) return;
@@ -65,11 +76,11 @@ namespace GoodEnoughRepairs
 
             for (int bay = 0; bay < shown.Length; bay++)
             {
-                DrawBay(bay);
+                if (!(bay == 0 && bay1View != null)) DrawBay(bay);
                 Rect rect = BayRect(bay);
                 if (shown[bay] != null && GUI.Button(rect, GUIContent.none, GUIStyle.none))
                 {
-                    views[bay] = views[bay] == null ? new ShipView(shown[bay], surplusMargin) : null;
+                    views[bay] = views[bay] == null ? new ShipPanel(shown[bay], surplusMargin) : null;
                 }
             }
 
@@ -104,10 +115,10 @@ namespace GoodEnoughRepairs
         private void DrawBay(int bay)
         {
             Rect rect = BayRect(bay);
-            ShipView.DrawPanel(rect);
+            ShipPanel.DrawPanel(rect);
 
-            float x = rect.x + ShipView.Pad;
-            float w = rect.width - 2f * ShipView.Pad;
+            float x = rect.x + ShipPanel.Pad;
+            float w = rect.width - 2f * ShipPanel.Pad;
             Ship ship = shown[bay];
 
             if (ship == null)
@@ -116,8 +127,8 @@ namespace GoodEnoughRepairs
                 return;
             }
 
-            GUI.Label(new Rect(x, rect.y + ShipView.Pad, w, 18f),
-                "Bay " + (bay + 1) + ": " + ShipView.ShipTypeName(ship.Type));
+            GUI.Label(new Rect(x, rect.y + ShipPanel.Pad, w, 18f),
+                "Bay " + (bay + 1) + ": " + ShipPanel.ShipTypeName(ship.Type));
             GUI.Label(new Rect(x, rect.y + 32f, w, 18f), "Payment " + ship.Payment);
             GUI.Label(new Rect(x, rect.y + 52f, w, 18f), "Needs " + ship.RequiredLevel + "%");
 
@@ -125,8 +136,8 @@ namespace GoodEnoughRepairs
             if (weakest != null)
             {
                 GUI.Label(new Rect(x, rect.y + 72f, w, 18f),
-                    "Weakest: " + ShipView.PartName(weakest.Type) + " " + weakest.Condition + "%");
-                ShipView.DrawBar(new Rect(x, rect.y + 96f, w, 12f),
+                    "Weakest: " + ShipPanel.PartName(weakest.Type) + " " + weakest.Condition + "%");
+                ShipPanel.DrawBar(new Rect(x, rect.y + 96f, w, 12f),
                     weakest.Condition,
                     BarColors.ColorFor(weakest, ship.RequiredLevel, surplusMargin),
                     ship.RequiredLevel);
@@ -135,13 +146,13 @@ namespace GoodEnoughRepairs
 
         private static Rect BayRect(int bay)
         {
-            return new Rect(Margin + bay * (ShipView.Width + Gap), Margin, ShipView.Width, BayHeight);
+            return new Rect(Margin + bay * (ShipPanel.Width + Gap), Margin, ShipPanel.Width, BayHeight);
         }
 
         private static Rect ViewRect(int bay)
         {
             Rect bayRect = BayRect(bay);
-            return new Rect(bayRect.x, Margin + BayHeight + Gap, ShipView.Width, ShipView.Height);
+            return new Rect(bayRect.x, Margin + BayHeight + Gap, ShipPanel.Width, ShipPanel.Height);
         }
     }
 }
