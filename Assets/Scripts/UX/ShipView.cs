@@ -4,9 +4,8 @@ namespace GoodEnoughRepairs
 {
     /// <summary>
     /// Colors of the condition bars and panels, in one place so the designer can
-    /// change them. A bar is colored against the required level of the ship the
-    /// part is in: red below it, green when it passes, and the surplus color when
-    /// the part is far enough above it to be worth harvesting.
+    /// change them. It only maps a band from BarBand to a color. The decision
+    /// itself lives in BarBand.
     /// </summary>
     public static class BarColors
     {
@@ -17,22 +16,27 @@ namespace GoodEnoughRepairs
         public static readonly Color Marker = Color.white;
         public static readonly Color Panel = new Color(0.16f, 0.17f, 0.20f, 0.95f);
 
-        /// <summary>
-        /// Bar color of a part in a ship. A missing part counts as below the level.
-        /// surplusMargin is how far above the required level a part must be to
-        /// count as surplus.
-        /// </summary>
-        public static Color ColorFor(Part part, int requiredLevel, int surplusMargin)
+        /// <summary>Color of a band.</summary>
+        public static Color ColorOf(BarBandKind band)
         {
-            return ColorFor(part, requiredLevel, surplusMargin, Surplus);
+            return ColorOf(band, Below, Passes, Surplus);
         }
 
-        /// <summary>Same as above with a chosen surplus color.</summary>
-        public static Color ColorFor(Part part, int requiredLevel, int surplusMargin, Color surplus)
+        /// <summary>Color of a band, with chosen colors.</summary>
+        public static Color ColorOf(BarBandKind band, Color below, Color passes, Color surplus)
         {
-            if (part == null || !part.Passes(requiredLevel)) return Below;
-            if (part.Condition >= requiredLevel + surplusMargin) return surplus;
-            return Passes;
+            switch (band)
+            {
+                case BarBandKind.Red: return below;
+                case BarBandKind.Blue: return surplus;
+                default: return passes;
+            }
+        }
+
+        /// <summary>Bar color of a part in a ship. A missing part is red.</summary>
+        public static Color ColorFor(Part part, int requiredLevel, int surplusMargin)
+        {
+            return ColorOf(BarBand.Of(part, requiredLevel, surplusMargin));
         }
     }
 
@@ -90,15 +94,10 @@ namespace GoodEnoughRepairs
 
                 Vector3 full = fullScales[i];
                 fill.transform.localScale = new Vector3(full.x * fraction, full.y, full.z);
-                fill.color = ColorOf(part, ship.RequiredLevel, surplusMargin);
+                fill.color = BarColors.ColorOf(
+                    BarBand.Of(part, ship.RequiredLevel, surplusMargin),
+                    belowColor, passesColor, surplusColor);
             }
-        }
-
-        private Color ColorOf(Part part, int requiredLevel, int surplusMargin)
-        {
-            if (part == null || !part.Passes(requiredLevel)) return belowColor;
-            if (part.Condition >= requiredLevel + surplusMargin) return surplusColor;
-            return passesColor;
         }
 
         private void CaptureScales()

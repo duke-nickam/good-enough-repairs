@@ -14,8 +14,8 @@ namespace GoodEnoughRepairs
 
         /// <summary>
         /// Optional prefab instance for the first bay. When assigned, it shows the
-        /// bay 1 ship every frame and OnGUI no longer draws that bay's ship. When
-        /// null, OnGUI draws it as before.
+        /// bay 1 ship every frame, centered in the bay, and OnGUI no longer draws
+        /// that bay's ship. When null, OnGUI draws it as before.
         /// </summary>
         public ShipView bay1View;
 
@@ -31,6 +31,7 @@ namespace GoodEnoughRepairs
         private int surplusMargin;
         private int arrivalIntervalMs;
         private float untilNextShipMs;
+        private GUIStyle centeredLabel;
 
         private void Awake()
         {
@@ -43,7 +44,7 @@ namespace GoodEnoughRepairs
             }
 
             arrivalIntervalMs = Mathf.Max(1, balance.days[0].shipEverySeconds) * 1000;
-            surplusMargin = Mathf.Max(0, balance.requiredFighterPercent - balance.requiredFreighterPercent);
+            surplusMargin = BarBand.SurplusMargin(balance.requiredFighterPercent, balance.requiredFreighterPercent);
             shipRandom = new System.Random(seed);
 
             bays = new DockingBays();
@@ -58,7 +59,11 @@ namespace GoodEnoughRepairs
         {
             if (bays == null) return;
 
-            if (bay1View != null) bay1View.Show(shown[0], surplusMargin);
+            if (bay1View != null)
+            {
+                bay1View.Show(shown[0], surplusMargin);
+                if (shown[0] != null) CenterInBay1(bay1View);
+            }
 
             if (bays.IsFull) return;
 
@@ -70,9 +75,37 @@ namespace GoodEnoughRepairs
             bays.TryDock(ship);
         }
 
+        /// <summary>Puts the ship sprite at the center of bay 1's rectangle on screen.</summary>
+        private static void CenterInBay1(ShipView view)
+        {
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            Rect rect = BayRect(0);
+            Transform t = view.transform;
+            float depth = Mathf.Abs(t.position.z - cam.transform.position.z);
+            Vector3 screen = new Vector3(rect.center.x, Screen.height - rect.center.y, depth);
+            Vector3 target = cam.ScreenToWorldPoint(screen);
+            target.z = t.position.z;
+            t.position = target;
+
+            if (view.body != null)
+            {
+                Vector3 offset = target - view.body.bounds.center;
+                offset.z = 0f;
+                t.position += offset;
+            }
+        }
+
         private void OnGUI()
         {
             if (bays == null) return;
+
+            if (centeredLabel == null)
+            {
+                centeredLabel = new GUIStyle(GUI.skin.label);
+                centeredLabel.alignment = TextAnchor.MiddleCenter;
+            }
 
             for (int bay = 0; bay < shown.Length; bay++)
             {
@@ -127,17 +160,26 @@ namespace GoodEnoughRepairs
                 return;
             }
 
-            GUI.Label(new Rect(x, rect.y + ShipPanel.Pad, w, 18f),
-                "Bay " + (bay + 1) + ": " + ShipPanel.ShipTypeName(ship.Type));
-            GUI.Label(new Rect(x, rect.y + 32f, w, 18f), "Payment " + ship.Payment);
-            GUI.Label(new Rect(x, rect.y + 52f, w, 18f), "Needs " + ship.RequiredLevel + "%");
+            // Bay 1 is centered both ways: the content block is moved to the middle
+            // of the bay and its text is centered. Other bays keep their layout.
+            bool center = bay == 0;
+            float contentTop = ShipPanel.Pad;
+            float contentBottom = 96f + 12f;
+            float shift = center ? (BayHeight - (contentBottom - contentTop)) / 2f - contentTop : 0f;
+            GUIStyle style = center ? centeredLabel : GUI.skin.label;
+            float top = rect.y + shift;
+
+            GUI.Label(new Rect(x, top + ShipPanel.Pad, w, 18f),
+                "Bay " + (bay + 1) + ": " + ShipPanel.ShipTypeName(ship.Type), style);
+            GUI.Label(new Rect(x, top + 32f, w, 18f), "Payment " + ship.Payment, style);
+            GUI.Label(new Rect(x, top + 52f, w, 18f), "Needs " + ship.RequiredLevel + "%", style);
 
             Part weakest = ship.WeakestPart;
             if (weakest != null)
             {
-                GUI.Label(new Rect(x, rect.y + 72f, w, 18f),
-                    "Weakest: " + ShipPanel.PartName(weakest.Type) + " " + weakest.Condition + "%");
-                ShipPanel.DrawBar(new Rect(x, rect.y + 96f, w, 12f),
+                GUI.Label(new Rect(x, top + 72f, w, 18f),
+                    "Weakest: " + ShipPanel.PartName(weakest.Type) + " " + weakest.Condition + "%", style);
+                ShipPanel.DrawBar(new Rect(x, top + 96f, w, 12f),
                     weakest.Condition,
                     BarColors.ColorFor(weakest, ship.RequiredLevel, surplusMargin),
                     ship.RequiredLevel);
