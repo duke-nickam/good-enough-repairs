@@ -4,6 +4,8 @@
   "project_title": "Good Enough Repairs - agent board",
   "director_autoplan": true,
   "autoapprove_tasks": false,
+  "design_note_review": true,
+  "note_revise_rounds": 1,
   "max_attempts": 3,
   "check_retries": 2,
   "poll_minutes": 5,
@@ -16,10 +18,13 @@
   "models": {
     "director": "sonnet",
     "programmer": "sonnet",
+    "lead_programmer": "opus",
     "economy_balancer": "haiku",
     "ux_designer": "haiku",
     "artist": "haiku",
+    "technical_artist": "sonnet",
     "sound_designer": "haiku",
+    "qa_automation_engineer": "sonnet",
     "qa_playtester": "sonnet"
   },
   "retry_models": {
@@ -29,19 +34,25 @@
   "reads": {
     "director": ["*"],
     "programmer": ["Game Mechanics", "UI / screens", "Technical Strategy"],
+    "lead_programmer": ["Game Mechanics", "Technical Strategy"],
     "economy_balancer": ["Economy & balancing", "Win/lose conditions & progression"],
     "ux_designer": ["Setting & theme", "Game Mechanics", "The secret strategy: part swapping", "UI / screens", "Art & audio direction"],
     "artist": ["Art & audio direction"],
+    "technical_artist": ["UI / screens", "Art & audio direction", "Technical Strategy"],
     "sound_designer": ["Art & audio direction"],
-    "qa_playtester": ["Game Mechanics", "Economy & balancing", "Win/lose conditions & progression", "Technical Strategy"]
+    "qa_automation_engineer": ["Game Mechanics", "Economy & balancing", "Win/lose conditions & progression", "Technical Strategy"],
+    "qa_playtester": ["Game Mechanics", "Economy & balancing", "Win/lose conditions & progression"]
   },
   "token_budget": {
     "director": 1200000,
     "programmer": 12000000,
+    "lead_programmer": 2400000,
     "economy_balancer": 1600000,
     "ux_designer": 2400000,
     "artist": 800000,
+    "technical_artist": 1600000,
     "sound_designer": 400000,
-    "qa_playtester": 4000000
+    "qa_automation_engineer": 2000000,
+    "qa_playtester": 2000000
   }
 }

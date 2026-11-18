@@ -36,6 +36,13 @@ in docs/ (the designer's) as a file to write, except in docs/crew/ (the crew's o
 approves), and nothing in agents/board/ or .github/. To move or delete a file, list its old path in
 files too: the agent deletes it. Every task that writes C# lists the check "python agents/checks/editmode.py ."
 (Unity compiles the project and runs its EditMode tests), once that script exists.
+Who reviews whom copies a studio: every task that writes code (C#, or a script in agents/checks/) is reviewed by
+lead_programmer, except the technical_artist's tasks, which the ux_designer reviews from screenshots. The programmer
+writes the unit tests (EditMode) with its code; the qa_automation_engineer writes bots, the simulation and check
+scripts; the qa_playtester tests as a player and never reads code. Scenes and prefabs are built by the
+technical_artist with a builder script (a C# editor script), which a check runs in Unity: list the scene or prefab
+in no task's files. Such a check prints "MADE: <path>" for each file Unity made (the runner commits them) and
+"SCREENSHOT: <absolute path>" for each screenshot the reviewer should see.
 You see the GDD and the repo's file names, not the files' contents: never state what a file holds unless the GDD
 says so. If a task needs a fact the GDD leaves open (a list, a name, a value two tasks must agree on), ask the
 designer instead of choosing it. Formats that the plan's own tasks create are theirs to define. Keep the plan as small as the request
@@ -87,12 +94,28 @@ How goals work:
 - Do not plan tasks now: the runner ranks the gaps with your priority function and then asks you for the tasks
   of the top one."""
 
-DESIGN_FORMAT = """This attempt is your design note, not the code: before writing code, show the designer how you
-will do it. Reply in exactly this format, and write no files:
+DESIGN_FORMAT = """This attempt is your design note, not the code: before writing code, explain your plan to the
+Director the way you would to a project manager, in game terms, not code. Reply in exactly this format, and write
+no files:
 DESIGN NOTE:
-<the files and classes you will write and what each does; how they connect to the existing code; the decisions
-you made and why; numbered questions on anything the GDD, docs/crew/ and the task leave open>
-Keep it short: one page at most."""
+What I will build: <what the player or the other agents can do afterwards, and which GDD rules it covers>
+What I will not do: <what is left for other tasks>
+Decisions: <choices that change the game, e.g. an edge case the GDD does not mention; code choices are yours to
+make by docs/crew/ and are not listed>
+Files: <the files you will write>
+Questions: <numbered, only about the game, or "none">
+Keep it short: half a page at most."""
+
+NOTE_REVIEW_FORMAT = """Reply with one JSON object only, no other text:
+{"verdict": "approve" or "revise" or "ask", "summary": "<one sentence>",
+ "answers": ["<an answer to one of the note's questions that the GDD, docs/crew/ or the task already gives,
+   naming where>"],
+ "issues": ["<only for revise: what in the note breaks the task, the GDD, docs/crew/ or the scope, and the fix>"],
+ "questions": ["<only for ask: a question for the designer that the GDD, docs/crew/ and the task leave open>"]}
+approve: the note builds what the task asks, within the GDD and its scope, and you answered all its questions.
+revise: the note is wrong or out of scope; the Programmer writes it again with your issues.
+ask: a question only the designer can decide is still open. Never send the designer a question the GDD,
+docs/crew/ or the task already answers, and never a question about code."""
 
 REVIEW_FORMAT = """Reply with one JSON object only, no other text:
 {"verdict": "approve" or "reject", "summary": "<one sentence>",
@@ -192,7 +215,11 @@ def validate_plan(plan, repo_files):
             if t.get("agent") not in AGENTS:
                 p.append(f"{k}: unknown agent {t.get('agent')!r}")
             if t.get("reviewer") not in AGENTS or t.get("reviewer") == t.get("agent"):
-                p.append(f"{k}: reviewer must be one of the seven agents and not the task's own agent")
+                p.append(f"{k}: reviewer must be one of the agents and not the task's own agent")
+            want = expected_reviewer(t)
+            if want and t.get("reviewer") != want:
+                p.append(f"{k}: reviewer must be {want}, as in a studio: the Lead Programmer reviews code, the UX "
+                         "Designer reviews the Technical Artist's work")
             if not t.get("title") or len(t["title"]) > 80:
                 p.append(f"{k}: title missing or longer than 80 characters")
             if not t.get("acceptance"):
@@ -230,6 +257,15 @@ def validate_plan(plan, repo_files):
     if any(cyclic(k) for k in keys):
         p.append("the dependencies form a loop")
     return p
+
+
+def expected_reviewer(task):
+    """Fixed reviewers that copy a studio; None when the Director chooses."""
+    if task.get("agent") == "technical_artist":
+        return "ux_designer"
+    if any(f.endswith(".cs") or (f.startswith("agents/checks/") and f.endswith(".py")) for f in task.get("files") or []):
+        return "lead_programmer"
+    return None
 
 
 def validate_gaps(reply, open_epics):
@@ -307,7 +343,7 @@ class ClaudeAgents:
         self.project_info = ""  # Unity and package versions, set by the runner each pass
         self.crew_docs = ""  # docs/crew/*.md, set by the runner each pass
 
-    def _call(self, agent, task_kind, prompt, attempt=1):
+    def _call(self, agent, task_kind, prompt, attempt=1, images=None):
         exe = shutil.which("claude")
         if not exe:
             raise AgentError("Claude Code CLI not found. Install it and log in.")
@@ -321,8 +357,18 @@ class ClaudeAgents:
             sp.write_text(system, encoding="utf-8")
             base = [exe, "-p", "--model", model, "--output-format", "json", "--no-session-persistence",
                     "--system-prompt-file", str(sp)]
+            tools = ["--tools", ""]  # no tools
+            if images:  # screenshots to look at: copied next to the call, opened with the Read tool only
+                names = []
+                for i, path in enumerate(images, 1):
+                    name = f"screenshot{i}{pathlib.Path(path).suffix or '.png'}"
+                    shutil.copyfile(path, pathlib.Path(tmp) / name)
+                    names.append(str(pathlib.Path(tmp) / name))
+                tools = ["--tools", "Read", "--allowedTools", "Read"]
+                prompt += ("\n\n---\n\nScreenshots of the result: " + ", ".join(names) +
+                           ". Open each with the Read tool and judge what you see.")
             res = None
-            for extra in (["--tools", ""], []):  # no tools; retry without the flag if this CLI rejects it
+            for extra in (tools, []):  # retry without the flags if this CLI rejects them
                 res = subprocess.run(base + extra, input=prompt, capture_output=True, text=True, encoding="utf-8",
                                      cwd=tmp, timeout=900, env={**os.environ})
                 if res.returncode == 0:
@@ -375,13 +421,26 @@ class ClaudeAgents:
         text, usage, model = self._call(agent, f"Task: attempt {attempt} of your task.\n\n" + kind, prompt, attempt)
         return text, usage, model
 
-    def review(self, reviewer, card_md, summary, files, checks, thread):
+    def review(self, reviewer, card_md, summary, files, checks, thread, reads=None, images=None):
         prompt = (f"GDD:\n\n{gdd_sections(self.gdd, self.s['reads'][reviewer])}\n\n---\n\n"
                   f"The project uses: {self.project_info or 'unknown versions'}\n\n---\n\n"
                   f"Task card:\n\n{card_md}\n\n---\n\nThe agent's summary: {summary}\n\n"
-                  f"Files it wrote:\n\n{_files_block(files)}\n\n---\n\nCheck results:\n{checks}\n\n---\n\n"
-                  f"Earlier in this task:\n\n{thread or 'nothing yet'}")
-        text, usage, model = self._call(reviewer, "Task: review this task's result.\n\n" + REVIEW_FORMAT, prompt)
+                  f"Files it wrote:\n\n{_files_block(files)}\n\n---\n\n"
+                  f"Files the task read (context, not under review):\n\n{_files_block(reads)}\n\n---\n\n"
+                  f"Check results:\n{checks}\n\n---\n\nEarlier in this task:\n\n{thread or 'nothing yet'}")
+        if reviewer == "lead_programmer" and self.crew_docs:
+            prompt += f"\n\n---\n\nThe crew's documents (docs/crew/), approved by the designer:\n\n{self.crew_docs}"
+        text, usage, model = self._call(reviewer, "Task: review this task's result.\n\n" + REVIEW_FORMAT, prompt,
+                                        images=images)
+        return extract_json(text), usage, model
+
+    def review_note(self, card_md, note, thread):
+        """The Director reviews the Programmer's design note, like a producer, before any code is written."""
+        prompt = (f"GDD:\n\n{gdd_sections(self.gdd, ['*'])}\n\n---\n\nTask card:\n\n{card_md}\n\n---\n\n"
+                  f"The Programmer's design note:\n\n{note}\n\n---\n\nEarlier in this task:\n\n{thread or 'nothing yet'}")
+        if self.crew_docs:
+            prompt += f"\n\n---\n\nThe crew's documents (docs/crew/), approved by the designer:\n\n{self.crew_docs}"
+        text, usage, model = self._call("director", "Task: review this design note.\n\n" + NOTE_REVIEW_FORMAT, prompt)
         return extract_json(text), usage, model
 
 

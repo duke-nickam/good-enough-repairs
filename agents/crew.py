@@ -67,10 +67,11 @@ def print_board(board):
 
 def run_mock(settings):
     from board.local import LocalBoard
-    from board.mock import MockAgents, designer_step
+    from board.mock import MOCK_BUILD, MockAgents, designer_step
     with tempfile.TemporaryDirectory() as tmp:
         board = LocalBoard(pathlib.Path(tmp) / "board.json", settings["max_attempts"])
         ws = MockWorkspace(ROOT, pathlib.Path(tmp) / "repo")
+        ws.write("agents/checks/mockbuild.py", MOCK_BUILD)  # the stand-in builder check
         runner = Runner(board, ws, MockAgents(), {**settings, "director_autoplan": True, "sound": False})
         log("Designer (mock)", "director_autoplan is on: the Director opens the standing goal")
         step = 0

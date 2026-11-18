@@ -5,13 +5,16 @@ from dataclasses import dataclass, field
 
 STATUSES = ["Backlog", "Todo", "In progress", "Waiting for review", "In review", "Done", "Needs designer"]
 
-AGENTS = {  # key: display name (the GDD's seven agents)
+AGENTS = {  # key: display name (the GDD's ten agents)
     "director": "Director",
     "programmer": "Programmer",
+    "lead_programmer": "Lead Programmer",
     "economy_balancer": "Economy Balancer",
     "ux_designer": "UX Designer",
     "artist": "Artist",
+    "technical_artist": "Technical Artist",
     "sound_designer": "Sound Designer",
+    "qa_automation_engineer": "QA Automation Engineer",
     "qa_playtester": "QA Playtester",
 }
 AGENT_KEYS = {v.lower(): k for k, v in AGENTS.items()}

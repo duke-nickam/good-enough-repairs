@@ -497,8 +497,7 @@ class Runner:
                 dc = self.card(d)
                 for p in (dc.files if dc else []):
                     reads.setdefault(p, self.ws.read(p))
-            if agent == "programmer" and any(p.endswith(".cs") for p in card.files) and \
-                    not issue.last_marker("design_note"):
+            if agent == "programmer" and any(p.endswith(".cs") for p in card.files) and not self.note_done(issue):
                 return self.design_note(t, card, issue, files, reads, attempt, who)
             tries = 1 + max(0, int(self.s.get("check_retries", 0)))
             feedback, check_log, checks_text = None, [], ""
@@ -541,7 +540,7 @@ class Runner:
                         self.ws.write(p, c)
                 attempt_files.update(written)  # a later try may re-send only the files it fixed
                 last_text = checks_text if k > 1 else None
-                checks_ok, checks_text = self.run_checks(card, attempt_files)
+                checks_ok, checks_text, made, shots = self.run_checks(card, attempt_files)
                 check_log.append(f"try {k} {'pass' if checks_ok else 'FAIL'}")
                 if checks_ok or k == tries:
                     break
@@ -555,17 +554,20 @@ class Runner:
             written = attempt_files  # checks, commit and review all see every file of the attempt
             # every file on the card, so nothing the agent wrote is ever left out of the commit
             paths = list(card.files) + [p + ".meta" for p, c in written.items() if c is None]
+            paths += [x for p in made for x in (p, p + ".meta")]  # scenes and prefabs Unity made in a check
             sha = self.ws.commit(paths, f"#{n} {t.title} - {who}, attempt {attempt}")
             link = self.ws.commit_link(sha) if sha else "no change from the last attempt"
             self.board.set_status(n, "Waiting for review")
+            unity = f"Made by Unity in a check: {', '.join(made)}.\n" if made else ""
             self.board.comment(n, crew_comment(who, f"Attempt {attempt} ({model}): {summary}\n\n"
-                                                    f"Self-check: {', '.join(check_log)}.\nCommit: {link}\n"
+                                                    f"Self-check: {', '.join(check_log)}.\n{unity}Commit: {link}\n"
                                                     f"Used: {describe_tokens(sum_usage(usages))}.", "result",
                                                attempt=attempt, summary=summary[:500]))
         # ------------------------------------------------ review
         reviewer = AGENTS[card.reviewer]
         if resume_review:
-            checks_ok, checks_text = self.run_checks(card, written)
+            checks_ok, checks_text, made, shots = self.run_checks(card, written)
+            reads = {p: self.ws.read(p) for p in card.reads}
         failed = None if checks_ok else hashlib.sha1(checks_text.encode("utf-8")).hexdigest()[:12]
         before = None  # the previous attempt's failed checks, only since the last designer input
         for c in reversed(issue.comments):
@@ -585,10 +587,13 @@ class Runner:
             log("Runner", f"#{n}: same check failure as the last attempt, Needs designer")
             return
         self.board.set_status(n, "In review")
-        log(reviewer, f"#{n}: reviewing (checks {'pass' if checks_ok else 'FAIL'})")
+        log(reviewer, f"#{n}: reviewing (checks {'pass' if checks_ok else 'FAIL'}"
+                      f"{f', {len(shots)} screenshot(s)' if shots else ''})")
         try:
             verdict, usage, _ = self.agents.review(card.reviewer, card.to_markdown(), summary, written, checks_text,
-                                                   self.thread_text(self.board.issue(n)))
+                                                   self.thread_text(self.board.issue(n)),
+                                                   reads={p: c for p, c in reads.items() if p not in written},
+                                                   images=shots)
             usages.append(usage)
         except (AgentError, ValueError) as e:
             verdict = {"verdict": "reject", "summary": f"Review reply unusable ({e}).", "issues": []}
@@ -619,8 +624,19 @@ class Runner:
                 reason = "The reviewer approved, but a check failed, so it is rejected. " + reason
             self.reject(t, attempt, f"{reason}\n\n{lines}\n\nChecks:\n{checks_text}", usages, reviewer, failed=failed)
 
+    def note_done(self, issue):
+        """May the Programmer write code? Yes after the Director approved the note, or after designer input on it."""
+        events = [c.marker.get("event") for c in issue.comments if c.marker]
+        if "design_note" not in events:
+            return False
+        if not self.s.get("design_note_review", True):
+            return True  # the designer answers every note
+        last_note = len(events) - 1 - events[::-1].index("design_note")
+        return "note_approved" in events or "reset" in events[last_note:]
+
     def design_note(self, t, card, issue, files, reads, attempt, who):
-        """The Programmer's first try on a code task: a design note for the designer, not code."""
+        """The Programmer's first try on a code task: a design note in game terms, not code. The Director reviews
+        it like a producer; only questions the GDD and docs/crew/ leave open go to the designer."""
         n = t.number
         try:
             text, usage, model = self.agents.work(card.agent, card.to_markdown(), self.thread_text(issue), files, reads,
@@ -628,14 +644,62 @@ class Runner:
         except (AgentError, ValueError) as e:
             self.reject(t, attempt, f"The agent's reply was unusable: {e}", [], who)
             return
+        note = parse_design_note(text)
         total = self.add_tokens(t, [usage])
-        self.board.set_status(n, "Needs designer")
-        alert(self.s, "needs_designer")
-        self.board.comment(n, crew_comment(
-            who, f"Design note ({model}):\n\n{parse_design_note(text)}\n\nDesigner: answer the questions or approve in "
-                 f"a comment, then move this task to Todo; the code follows the note.\n\n"
-                 f"Used: {describe_tokens(usage)}. Task total: {total:,}.", "design_note", attempt=attempt))
-        log(who, f"#{n}: design note posted, Needs designer")
+        if not self.s.get("design_note_review", True):
+            self.board.set_status(n, "Needs designer")
+            alert(self.s, "needs_designer")
+            self.board.comment(n, crew_comment(
+                who, f"Design note ({model}):\n\n{note}\n\nDesigner: answer the questions or approve in "
+                     f"a comment, then move this task to Todo; the code follows the note.\n\n"
+                     f"Used: {describe_tokens(usage)}. Task total: {total:,}.", "design_note", attempt=attempt))
+            log(who, f"#{n}: design note posted, Needs designer")
+            return
+        self.board.comment(n, crew_comment(who, f"Design note ({model}):\n\n{note}\n\n"
+                                                f"Used: {describe_tokens(usage)}. Task total: {total:,}.",
+                                           "design_note", attempt=attempt))
+        log(who, f"#{n}: design note posted, the Director reviews it")
+        issue = self.board.issue(n)
+        try:
+            verdict, usage, _ = self.agents.review_note(card.to_markdown(), note, self.thread_text(issue))
+            total = self.add_tokens(t, [usage])
+        except (AgentError, ValueError) as e:
+            verdict = {"verdict": "ask", "summary": f"My review reply was unusable ({e}).", "questions": [
+                "Please read the note and approve it or answer it."]}
+        kind = verdict.get("verdict")
+        events = [c.marker.get("event") for c in issue.comments if c.marker]
+        since = events[len(events) - 1 - events[::-1].index("reset"):] if "reset" in events else events
+        if kind == "revise" and since.count("note_revise") >= int(self.s.get("note_revise_rounds", 1)):
+            kind = "ask"  # the revise round is used up: the designer decides
+            verdict["questions"] = (verdict.get("questions") or []) + [
+                "The note still has these issues after a revise round: " + "; ".join(verdict.get("issues") or [])]
+        answers = "\n".join(f"- {a}" for a in verdict.get("answers") or [])
+        answers = f"\n\nAnswers to the note's questions:\n{answers}" if answers else ""
+        if kind == "approve":
+            self.board.set_attempt(n, 0)  # the note is not an attempt: the code gets all its attempts
+            self.board.set_status(n, "Todo")
+            self.board.comment(n, crew_comment("Director", f"Design note approved: {verdict.get('summary', '')}"
+                                                           f"{answers}\n\nThe code follows the note.\n\n"
+                                                           f"Task total: {total:,} tokens.", "note_approved"))
+            log("Director", f"#{n}: design note approved, back to Todo for the code")
+        elif kind == "revise":
+            issues = "\n".join(f"- {x}" for x in verdict.get("issues") or [])
+            self.board.set_attempt(n, 0)
+            self.board.set_status(n, "Todo")
+            self.board.comment(n, crew_comment("Director", f"Design note: revise. {verdict.get('summary', '')}\n\n"
+                                                           f"{issues}{answers}\n\nTask total: {total:,} tokens.",
+                                               "note_revise"))
+            log("Director", f"#{n}: design note sent back for one revise round")
+        else:
+            questions = "\n".join(f"{i}. {q}" for i, q in enumerate(verdict.get("questions") or [], 1))
+            self.board.set_status(n, "Needs designer")
+            alert(self.s, "needs_designer")
+            self.board.comment(n, crew_comment(
+                "Director", f"Design note: questions for the designer. {verdict.get('summary', '')}\n\n{questions}"
+                            f"{answers}\n\nDesigner: answer in a comment, then move this task to Todo; the code "
+                            f"follows the note and your answers.\n\nTask total: {total:,} tokens.",
+                "needs_designer", attempt=attempt))
+            log("Director", f"#{n}: design note has open questions, Needs designer")
 
     def reject(self, t, attempt, text, usages, who, failed=None):
         n = t.number
@@ -657,8 +721,10 @@ class Runner:
     # ------------------------------------------------------------ checks
 
     def run_checks(self, card, written):
-        """Code decides these, not an agent: built-in checks on every written file, then the card's scripts."""
-        out, ok = [], True
+        """Code decides these, not an agent: built-in checks on every written file, then the card's scripts.
+        -> (ok, text, made, shots): files Unity made in a check ("MADE: <path>") and screenshots for the reviewer
+        ("SCREENSHOT: <absolute path>")."""
+        out, ok, made, shots = [], True, [], []
         for p, c in written.items():
             if c is None:
                 out.append(f"- ok {p}: deleted")
@@ -695,11 +761,18 @@ class Runner:
                                      encoding="utf-8", timeout=int(self.s.get("check_timeout", 900)), env=env)
                 passed = res.returncode == 0
                 detail = (res.stdout + res.stderr).strip()[-3000:]
+                for line in res.stdout.splitlines():
+                    key, _, value = line.partition(":")
+                    value = value.strip()
+                    if key == "MADE" and value.startswith("Assets/") and ".." not in value:
+                        made.append(value)
+                    elif key == "SCREENSHOT" and os.path.isfile(value):
+                        shots.append(value)
             except subprocess.TimeoutExpired:
                 passed, detail = False, "timed out"
             out.append(f"- {'pass' if passed else 'FAIL'} `{cmd}`" + (f"\n```\n{detail}\n```" if detail else ""))
             ok = ok and passed
-        return ok, "\n".join(out) or "- no checks"
+        return ok, "\n".join(out) or "- no checks", made, shots
 
     # ------------------------------------------------------------ token budget
 
