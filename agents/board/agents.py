@@ -37,12 +37,13 @@ approves), and nothing in agents/board/ or .github/. To move or delete a file, l
 files too: the agent deletes it. Every task that writes C# lists the check "python agents/checks/editmode.py ."
 (Unity compiles the project and runs its EditMode tests), once that script exists.
 Who reviews whom copies a studio: every task that writes code (C#, or a script in agents/checks/) is reviewed by
-lead_programmer, except the technical_artist's tasks, which the ux_designer reviews from screenshots. The programmer
-writes the unit tests (EditMode) with its code; the qa_automation_engineer writes bots, the simulation and check
-scripts; the qa_playtester tests as a player and never reads code. Scenes and prefabs are built by the
-technical_artist with a builder script (a C# editor script), which a check runs in Unity: list the scene or prefab
-in no task's files. Such a check prints "MADE: <path>" for each file Unity made (the runner commits them) and
-"SCREENSHOT: <absolute path>" for each screenshot the reviewer should see.
+lead_programmer; the technical_artist's tasks are reviewed by the ux_designer from screenshots. The programmer
+writes the unit tests (EditMode) with its code, and the editor tools, such as the builder tool; the
+qa_automation_engineer writes bots, the simulation and check scripts; the qa_playtester tests as a player and never
+reads code. The technical_artist does not program: it writes specs (JSON) that the programmer's builder tool turns
+into scenes and prefabs, and a check runs the tool in Unity; list the scene or prefab in no task's files. Such a
+check prints "MADE: <path>" for each file Unity made (the runner commits them) and "SCREENSHOT: <absolute path>"
+for each screenshot the reviewer should see.
 You see the GDD and the repo's file names, not the files' contents: never state what a file holds unless the GDD
 says so. If a task needs a fact the GDD leaves open (a list, a name, a value two tasks must agree on), ask the
 designer instead of choosing it. Formats that the plan's own tasks create are theirs to define. Keep the plan as small as the request
@@ -216,6 +217,9 @@ def validate_plan(plan, repo_files):
                 p.append(f"{k}: unknown agent {t.get('agent')!r}")
             if t.get("reviewer") not in AGENTS or t.get("reviewer") == t.get("agent"):
                 p.append(f"{k}: reviewer must be one of the agents and not the task's own agent")
+            if t.get("agent") == "technical_artist" and any(not f.endswith(".json") for f in t.get("files") or []):
+                p.append(f"{k}: the technical_artist does not program: it writes only specs (.json); code such as "
+                         "the builder tool is a programmer task")
             want = expected_reviewer(t)
             if want and t.get("reviewer") != want:
                 p.append(f"{k}: reviewer must be {want}, as in a studio: the Lead Programmer reviews code, the UX "

@@ -29,10 +29,10 @@ TASKS = {
          "files": ["Assets/Scripts/Rules/Ship.cs", "Assets/Tests/EditMode/ShipTests.cs"],
          "reads": ["docs/crew/technical-design.md"], "checks": [], "depends_on": ["t1"]},
         {"key": "t3", "title": "Build the ship-in-bay prefab", "agent": "technical_artist", "reviewer": "ux_designer",
-         "what": "A builder script that makes the ship-in-bay prefab with placeholder sprites.",
+         "what": "A spec for the builder tool: the ship-in-bay prefab with placeholder sprites.",
          "acceptance": ["The screenshot shows the ship and its five condition bars"],
-         "files": ["Assets/Scripts/Editor/ShipInBayBuilder.cs"], "reads": ["Assets/Scripts/Rules/Ship.cs"],
-         "checks": ["python agents/checks/mockbuild.py Assets/Scripts/Editor/ShipInBayBuilder.cs"],
+         "files": ["Assets/Specs/ShipInBay.json"], "reads": ["Assets/Scripts/Rules/Ship.cs"],
+         "checks": ["python agents/checks/mockbuild.py Assets/Specs/ShipInBay.json"],
          "depends_on": ["t2"]},
     ],
     "Inventory": [
@@ -83,7 +83,9 @@ class MockAgents:
                     "Questions: 1. Does the bay know its ship, or the ship its bay?"), USAGE, "mock"
         out = []
         for path in re.findall(r"`([^`]+)`", re.search(r"\*\*Files:\*\*(.*)", card_md).group(1)):
-            if path.endswith(".md"):
+            if path.endswith(".json"):
+                body = '{"prefab": "ShipInBay", "objects": []}\n'
+            elif path.endswith(".md"):
                 dash = " — " if not check_feedback else ": "  # trips the long-dash check, fixed on the self-check
                 body = f"# Technical design\n\nThe game runs as code alone{dash}rules in plain C#.\n"
             else:
