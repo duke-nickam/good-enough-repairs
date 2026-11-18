@@ -12,23 +12,23 @@
       "posY": 0.9, "scaleX": 3, "scaleY": 1.4 },
     { "name": "BarTrack_Engine", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
       "posX": -1.2, "posY": -0.1, "scaleX": 2.4, "scaleY": 0.4 },
-    { "name": "BarFill_Engine", "sprite": "barLeft", "color": "passes", "sortingOrder": 2,
+    { "name": "BarFill_Engine", "sprite": "barLeft", "sortingOrder": 2,
       "posX": -1.2, "posY": -0.1, "scaleX": 2.4, "scaleY": 0.24 },
     { "name": "BarTrack_HullPlate", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
       "posX": -1.2, "posY": -0.55, "scaleX": 2.4, "scaleY": 0.4 },
-    { "name": "BarFill_HullPlate", "sprite": "barLeft", "color": "passes", "sortingOrder": 2,
+    { "name": "BarFill_HullPlate", "sprite": "barLeft", "sortingOrder": 2,
       "posX": -1.2, "posY": -0.55, "scaleX": 2.4, "scaleY": 0.24 },
     { "name": "BarTrack_ShieldGenerator", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
       "posX": -1.2, "posY": -1.0, "scaleX": 2.4, "scaleY": 0.4 },
-    { "name": "BarFill_ShieldGenerator", "sprite": "barLeft", "color": "passes", "sortingOrder": 2,
+    { "name": "BarFill_ShieldGenerator", "sprite": "barLeft", "sortingOrder": 2,
       "posX": -1.2, "posY": -1.0, "scaleX": 2.4, "scaleY": 0.24 },
     { "name": "BarTrack_Thruster", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
       "posX": -1.2, "posY": -1.45, "scaleX": 2.4, "scaleY": 0.4 },
-    { "name": "BarFill_Thruster", "sprite": "barLeft", "color": "passes", "sortingOrder": 2,
+    { "name": "BarFill_Thruster", "sprite": "barLeft", "sortingOrder": 2,
       "posX": -1.2, "posY": -1.45, "scaleX": 2.4, "scaleY": 0.24 },
     { "name": "BarTrack_PowerCore", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
       "posX": -1.2, "posY": -1.9, "scaleX": 2.4, "scaleY": 0.4 },
-    { "name": "BarFill_PowerCore", "sprite": "barLeft", "color": "passes", "sortingOrder": 2,
+    { "name": "BarFill_PowerCore", "sprite": "barLeft", "sortingOrder": 2,
       "posX": -1.2, "posY": -1.9, "scaleX": 2.4, "scaleY": 0.24 }
   ],
   "links": [
@@ -48,9 +48,7 @@
   "scene": {
     "path": "Assets/Scenes/Main.unity",
     "stationField": "bay1View",
-    "refWidth": 1280, "refHeight": 720,
-    "rectX": 20, "rectY": 20, "rectW": 260, "rectH": 150,
-    "contentHeight": 3.7, "offsetY": 0.25,
+    "worldX": -6.806, "worldY": 3.822, "worldScale": 0.563,
     "screenshot": "ship_in_bay.png"
   }
 }

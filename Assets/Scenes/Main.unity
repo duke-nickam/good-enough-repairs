@@ -370,7 +370,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: GoodEnoughRepairs.UX::GoodEnoughRepairs.StationView
   seed: 1
-  bay1View: {fileID: 1217416732}
+  bay1View: {fileID: 2007734231}
 --- !u!4 &859815445
 Transform:
   m_ObjectHideFlags: 0
@@ -386,7 +386,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1001 &1217416731
+--- !u!1001 &2007734230
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -396,19 +396,19 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 742454919310847152, guid: f0b3f796e9e0c904495cd222a5c1d222, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.5630631
+      value: 0.563
       objectReference: {fileID: 0}
     - target: {fileID: 742454919310847152, guid: f0b3f796e9e0c904495cd222a5c1d222, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.5630631
+      value: 0.563
       objectReference: {fileID: 0}
     - target: {fileID: 742454919310847152, guid: f0b3f796e9e0c904495cd222a5c1d222, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -5.104167
+      value: -6.806
       objectReference: {fileID: 0}
     - target: {fileID: 742454919310847152, guid: f0b3f796e9e0c904495cd222a5c1d222, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 3.8213215
+      value: 3.822
       objectReference: {fileID: 0}
     - target: {fileID: 742454919310847152, guid: f0b3f796e9e0c904495cd222a5c1d222, type: 3}
       propertyPath: m_LocalPosition.z
@@ -451,10 +451,10 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f0b3f796e9e0c904495cd222a5c1d222, type: 3}
---- !u!114 &1217416732 stripped
+--- !u!114 &2007734231 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 4720861684932939291, guid: f0b3f796e9e0c904495cd222a5c1d222, type: 3}
-  m_PrefabInstance: {fileID: 1217416731}
+  m_PrefabInstance: {fileID: 2007734230}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -469,4 +469,4 @@ SceneRoots:
   - {fileID: 519420032}
   - {fileID: 619394802}
   - {fileID: 859815445}
-  - {fileID: 1217416731}
+  - {fileID: 2007734230}
