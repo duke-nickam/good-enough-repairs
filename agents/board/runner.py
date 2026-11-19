@@ -12,7 +12,7 @@ import shlex
 import subprocess
 import sys
 
-from .agents import (AgentError, describe_tokens, parse_design_note, parse_work, sum_usage, total_tokens,
+from .agents import (AgentError, added_file_problems, describe_tokens, parse_design_note, parse_work, sum_usage, total_tokens,
                      validate_gaps, validate_plan)
 from .model import AGENTS, STANDING_GOAL, Card, crew_comment, slug
 from .priority import rank
@@ -723,6 +723,29 @@ class Runner:
                 "The note still has these issues after a revise round: " + "; ".join(verdict.get("issues") or [])]
         answers = "\n".join(f"- {a}" for a in verdict.get("answers") or [])
         answers = f"\n\nAnswers to the note's questions:\n{answers}" if answers else ""
+        added = []
+        if kind == "approve" and verdict.get("add_files"):
+            wanted = [f.strip().strip("`") for f in verdict["add_files"] if f and f.strip().strip("`") not in card.files]
+            others = {}
+            for i in self.board.items():
+                c = self.card(i.number) if i.kind == "task" and i.state == "OPEN" and i.number != n else None
+                for f in (c.files if c else []):
+                    others[f] = f"#{i.number}"
+            problems = [x for f in wanted for x in added_file_problems(card.agent, card.reviewer, f, others)]
+            if problems:
+                kind = "ask"  # the runner may not add them: the designer decides
+                verdict["questions"] = (verdict.get("questions") or []) + [
+                    "The note needs files the card does not list, and they cannot be added: " + "; ".join(problems)]
+            elif wanted:
+                body = self.board.issue(n).body
+                line = "**Files:** " + ", ".join(f"`{f}`" for f in card.files + wanted)
+                self.board.set_body(n, re.sub(r"^\*\*Files:\*\*.*$", lambda _: line, body, count=1, flags=re.M))
+                card.files += wanted
+                self.cards[n] = card
+                added = wanted
+                log("Director", f"#{n}: added to the card: {', '.join(wanted)}")
+        if added:
+            answers += "\n\nAdded to the card's Files: " + ", ".join(f"`{f}`" for f in added) + "."
         if kind == "approve":
             self.board.set_attempt(n, 0)  # the note is not an attempt: the code gets all its attempts
             self.board.set_status(n, "Todo")

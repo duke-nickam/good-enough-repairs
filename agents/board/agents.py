@@ -111,7 +111,8 @@ What I will build: <what the player or the other agents can do afterwards, and w
 What I will not do: <what is left for other tasks>
 Decisions: <choices that change the game, e.g. an edge case the GDD does not mention; code choices are yours to
 make by docs/crew/ and are not listed>
-Files: <the files you will write>
+Files: <the files you will write; if the task cannot be done without a file the card does not list, name it
+and say why in one line, e.g. "also StationView.cs: it creates the shared inventory">
 Questions: <numbered, only about the game, or "none">
 Keep it short: half a page at most."""
 
@@ -120,8 +121,11 @@ NOTE_REVIEW_FORMAT = """Reply with one JSON object only, no other text:
  "answers": ["<an answer to one of the note's questions that the GDD, docs/crew/ or the task already gives,
    naming where>"],
  "issues": ["<only for revise: what in the note breaks the task, the GDD, docs/crew/ or the scope, and the fix>"],
- "questions": ["<only for ask: a question for the designer that the GDD, docs/crew/ and the task leave open>"]}
+ "questions": ["<only for ask: a question for the designer that the GDD, docs/crew/ and the task leave open>"],
+ "add_files": ["<only with approve: a file the note must also write that the card does not list>"]}
 approve: the note builds what the task asks, within the GDD and its scope, and you answered all its questions.
+add_files: approve a file the card lacks only when the task cannot be done without it and it stays in the task's
+scope; the runner adds it to the card. A file outside the task's scope is a reason to revise, not to add.
 revise: the note is wrong or out of scope; the Programmer writes it again with your issues.
 ask: a question only the designer can decide is still open. Never send the designer a question the GDD,
 docs/crew/ or the task already answers, and never a question about code."""
@@ -247,12 +251,7 @@ def validate_plan(plan, repo_files):
             if not files:
                 p.append(f"{k}: needs at least one file to write")
             for f in files:
-                if f.endswith(UNITY_MADE):
-                    p.append(f"{k}: may not write {f!r}: Unity scene, prefab, asset and .meta files come from Unity "
-                             "(the editor, an editor script or MCP), never from an agent writing them by hand")
-                if f.startswith(("/", "agents/board/", ".github/")) or ".." in f or "\\" in f or \
-                        (f.startswith("docs/") and not f.startswith("docs/crew/")):
-                    p.append(f"{k}: may not write {f!r}")
+                p += [f"{k}: {x}" for x in file_rule_problems(f)]
             for c in t.get("checks") or []:
                 if not CHECK_RE.match(c):
                     p.append(f"{k}: check {c!r} must look like: python agents/checks/<name>.py <args>")
@@ -279,6 +278,29 @@ def validate_plan(plan, repo_files):
 
 
 CODE_WRITERS = ("programmer", "qa_automation_engineer")
+
+
+def file_rule_problems(f):
+    """Files no agent may write."""
+    if f.endswith(UNITY_MADE):
+        return [f"may not write {f!r}: Unity scene, prefab, asset and .meta files come from Unity (the editor, an "
+                "editor script or MCP), never from an agent writing them by hand"]
+    if f.startswith(("/", "agents/board/", ".github/")) or ".." in f or "\\" in f or \
+            (f.startswith("docs/") and not f.startswith("docs/crew/")):
+        return [f"may not write {f!r}"]
+    return []
+
+
+def added_file_problems(agent, reviewer, path, other_open_files):
+    """Why a file from an approved design note may not join the task's card (empty = it may)."""
+    p = file_rule_problems(path)
+    if is_code(path) and agent not in CODE_WRITERS:
+        p.append(f"{path}: only the programmer or the qa_automation_engineer writes code")
+    if is_code(path) and reviewer != "lead_programmer":
+        p.append(f"{path}: code needs the Lead Programmer as reviewer")
+    if path in other_open_files:
+        p.append(f"{path}: another open task ({other_open_files[path]}) writes it")
+    return p
 
 
 def is_code(path):
