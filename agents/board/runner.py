@@ -130,10 +130,13 @@ class Runner:
         """Decides whether the goal needs the Director now: the designer spoke, or its planned epic is done."""
         planned = [e for c in r.comments if c.marker and c.marker.get("event") == "plan"
                    for e in c.marker.get("epics", [])]
-        open_planned = [e for e in planned if items.get(e) and items[e].state == "OPEN"]
+        unplanned = set(self.unplanned_epics(items))  # e.g. its tasks were closed as not planned, to plan it again
+        open_planned = [e for e in planned if items.get(e) and items[e].state == "OPEN" and e not in unplanned]
         if r.designer_spoke_last():
             return self.goal_step(r, items, open_planned)
         last = r.last_marker() or {}
+        if last.get("event") == "gaps" and not open_planned:
+            return self.goal_step(r, items, open_planned)  # gaps were ranked but no epic got its tasks: plan now
         if last.get("event") != "epic_done" or open_planned:
             return  # waiting: for the designer's answer, or for the open epic
         done = 0
