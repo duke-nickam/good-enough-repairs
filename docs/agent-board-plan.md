@@ -18,7 +18,7 @@ The board is GitHub Issues plus a GitHub Projects board in the game's repo: free
 | Epic | A feature, like a Jira epic. Groups the tasks of all agents involved, with a progress bar | Director (through the runner) | Yes |
 | Task | One agent's part of an epic, named for what that agent does, e.g. "Write mechanic lines" (UX Designer). A sub-issue of its epic | Director (through the runner) | Yes |
 
-- An epic links to its request; the request gets a comment listing the epic and tasks it produced, and closes when its epic is done.
+- An epic links to its request; the request gets a comment listing the epic and tasks it produced, and closes when its goal is met.
 - Each task carries: the assigned agent, acceptance criteria, the files it may change, and the tasks it depends on.
 - The board shows epics and tasks in columns. Requests stay off the board: the repo's issue list, filtered by the `request` label, lists them.
 - Paperclip, a dedicated tool for running agent teams, is worth a look after the MVP.
@@ -139,7 +139,7 @@ The loop:
 
    A gap that needs another gap gets no score yet: it cannot start. Ties go by GDD order. The Director posts the breakdown on the epic, e.g. "30 swap loop + 40 (4 gaps need it) = 70".
 3. **Planning:** only the epic with the highest Priority gets tasks; one epic per goal is open at a time. The others stay in Backlog without tasks; an epic without tasks that leaves Backlog goes back. To set another order the designer opens a request, e.g. "Plan #52 next": requests come before the Director's own choice.
-4. **Loop:** when the planned epic is Done, the next run checks the goal again, updates the Priorities and plans the next one. When the goal is met, the Director says so and its request closes.
+4. **Loop:** when the planned epic is Done, the next run checks the goal again, updates the Priorities and plans the next one. When the goal is met, the Director says so and its request closes: the merge is the designer's acceptance. If the designer commented after the epic was planned, the Director asks them to confirm and they close it. A designer's "not done" comment is a gap to plan, never overruled by a Done epic.
 5. **Limit:** after 3 Done epics for one goal, the Director asks the designer before planning more: keep going, change the goal, or stop.
 
 ## Agents, reviewers and communication

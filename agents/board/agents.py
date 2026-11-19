@@ -91,6 +91,9 @@ How goals work:
   other gaps in your list that must be done before it can start.
 - A taste goal (e.g. "funnier") is met only when the designer says so in the thread; a measurable one when the
   board, a check or the simulation shows it.
+- When the designer's newest comment says the goal is not done or lists what is missing, those items are gaps (or
+  ask a question): a Done epic never overrules the designer, so never reply "done" while such a comment stands
+  unanswered.
 - When the designer asks to plan a certain epic next, the goal is that epic Done, and that epic is its only gap.
 - Do not plan tasks now: the runner ranks the gaps with your priority function and then asks you for the tasks
   of the top one."""

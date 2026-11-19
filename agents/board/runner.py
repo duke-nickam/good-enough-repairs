@@ -216,7 +216,14 @@ class Runner:
             log("Director", f"request #{r.number}: answered in the thread ({kind})")
             return
         if kind == "done":
-            for en in unplanned:
+            if self.designer_spoke_since_plan(r):  # the designer commented after the epic was planned: they confirm
+                self.board.comment(r.number, crew_comment(
+                    "Director", f"I think the goal is met: {reply.get('text', '')}\n\nDesigner: close this request "
+                                "to confirm, or comment what is still missing.", "met_asked", tokens=spent))
+                alert(self.s, "needs_designer")
+                log("Director", f"request #{r.number}: goal looks met, asked the designer to confirm")
+                return
+            for en in unplanned:  # otherwise the merge was the designer's acceptance
                 if (re.search(r"\*\*Request:\*\* #(\d+)", self.board.issue(en).body) or [0, 0])[1] == str(r.number):
                     self.drop_epic(en, r.number)
             self.board.comment(r.number, crew_comment("Director", f"Goal met: {reply.get('text', '')} Closing it.",
@@ -225,6 +232,15 @@ class Runner:
             log("Director", f"request #{r.number}: goal met, closed")
             return
         self.apply_gaps(r, reply, items, unplanned, spent, open_planned)
+
+    def designer_spoke_since_plan(self, r):
+        """True when a designer comment comes after the goal's latest planned epic."""
+        for c in reversed(r.comments):
+            if c.marker is None:
+                return True
+            if c.marker.get("event") == "plan":
+                return False
+        return False
 
     def drop_epic(self, en, request):
         self.board.comment(en, crew_comment("Director", f"Dropped: no longer a gap of the goal in #{request}.",
