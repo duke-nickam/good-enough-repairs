@@ -26,6 +26,20 @@ STANDING_BODY = ("Opened by the Director because `director_autoplan` is on (see 
                  "\"Current scope\" line and reopens this. Close it to stop the standing goal.")
 
 
+def unity_metas(files):
+    """The .meta of every written file under Assets/ and of its folders: Unity writes them when a check imports
+    the files, so the designer never has to open Unity to make them. Missing ones are skipped at commit."""
+    out = set()
+    for path in files:
+        if not path.startswith("Assets/"):
+            continue
+        out.add(path + ".meta")
+        parts = path.split("/")
+        for k in range(2, len(parts)):  # Assets/X, Assets/X/Y, ... (Assets itself has no .meta)
+            out.add("/".join(parts[:k]) + ".meta")
+    return sorted(out)
+
+
 def log(who, msg):
     print(f"[{datetime.datetime.now():%H:%M:%S}] {who:<17} {msg}", flush=True)
 
@@ -571,6 +585,7 @@ class Runner:
             # every file on the card, so nothing the agent wrote is ever left out of the commit
             paths = list(card.files) + [p + ".meta" for p, c in written.items() if c is None]
             paths += [x for p in made for x in (p, p + ".meta")]  # scenes and prefabs Unity made in a check
+            paths += unity_metas(written)  # the .meta files Unity made when a check imported the new files
             sha = self.ws.commit(paths, f"#{n} {t.title} - {who}, attempt {attempt}")
             link = self.ws.commit_link(sha) if sha else "no change from the last attempt"
             self.board.set_status(n, "Waiting for review")
