@@ -9,31 +9,12 @@ Exit 0 when all tests pass (and at least one ran), exit 1 otherwise.
 """
 
 import os
-import re
-import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
-TIMEOUT_SECONDS = 1800
-COMPILE_ERROR = re.compile(r"error CS\d+")
-
-
-def ascii_text(text):
-    return text.encode("ascii", "replace").decode("ascii")
-
-
-def fail(message):
-    print("FAIL: " + ascii_text(message))
-    return 1
-
-
-def read_log(path):
-    try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read().splitlines()
-    except OSError:
-        return []
+from unity_common import (ascii_text, fail, find_unity, project_error, read_log,
+                          report_compile_errors, run_unity)
 
 
 def read_counts(results_path):
@@ -80,45 +61,30 @@ def main(argv):
         return fail("usage: python agents/checks/editmode.py <unity project path>")
 
     project = os.path.abspath(argv[1])
-    if not os.path.isdir(os.path.join(project, "Assets")):
-        return fail("not a Unity project (no Assets folder): " + project)
+    error = project_error(project)
+    if error:
+        return fail(error)
 
-    unity = os.environ.get("UNITY_PATH", "").strip()
-    if not unity:
-        return fail("UNITY_PATH is not set. Set it to the Unity editor executable.")
-    if not os.path.isfile(unity):
-        return fail("UNITY_PATH points to nothing: " + unity)
+    unity, error = find_unity()
+    if error:
+        return fail(error)
 
     out_dir = tempfile.mkdtemp(prefix="ger_editmode_")
     results_path = os.path.join(out_dir, "editmode-results.xml")
     log_path = os.path.join(out_dir, "editmode-log.txt")
 
-    command = [
+    exit_code, error = run_unity(
         unity,
-        "-batchmode",
-        "-nographics",
-        "-projectPath", project,
-        "-runTests",
-        "-testPlatform", "EditMode",
-        "-testResults", results_path,
-        "-logFile", log_path,
-    ]
-
-    try:
-        proc = subprocess.run(command, timeout=TIMEOUT_SECONDS)
-        exit_code = proc.returncode
-    except subprocess.TimeoutExpired:
-        return fail("Unity timed out after %d seconds. Log: %s" % (TIMEOUT_SECONDS, log_path))
-    except OSError as e:
-        return fail("could not start Unity: %s" % e)
+        ["-nographics"],
+        project,
+        ["-runTests", "-testPlatform", "EditMode", "-testResults", results_path],
+        log_path)
+    if error:
+        return fail(error)
 
     log_lines = read_log(log_path)
 
-    compile_errors = [l for l in log_lines if COMPILE_ERROR.search(l)]
-    if compile_errors:
-        print("FAIL: compile errors (%d). Log: %s" % (len(compile_errors), ascii_text(log_path)))
-        for line in compile_errors[:10]:
-            print("  " + ascii_text(line.strip()))
+    if report_compile_errors(log_lines, log_path):
         return 1
 
     counts = read_counts(results_path)

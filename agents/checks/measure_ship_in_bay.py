@@ -20,14 +20,14 @@ or a Unity start error.
 import json
 import os
 import re
-import subprocess
 import sys
 import tempfile
 
-TIMEOUT_SECONDS = 1800
+from unity_common import (ascii_text, fail, find_project, find_unity, read_log,
+                          report_compile_errors, run_unity)
+
 METHOD = "GoodEnoughRepairs.EditorTools.ShipInBayMeasure.Run"
 TOOL_SPEC_PATH = "Assets/Prefabs/UX/ship_in_bay.spec.json"
-COMPILE_ERROR = re.compile(r"error CS\d+")
 MEASURE_LINE = re.compile(r"^MEASURE .*\s(PASS|FAIL)\s*$")
 RESULT_LINE = re.compile(r"^RESULT: (PASS|FAIL)\s*$")
 REQUIRED = [
@@ -36,35 +36,6 @@ REQUIRED = [
     ("green bar", "green bar"),
     ("blue bar", "blue bar"),
 ]
-
-
-def ascii_text(text):
-    return text.encode("ascii", "replace").decode("ascii")
-
-
-def fail(message):
-    print("FAIL: " + ascii_text(message))
-    return 1
-
-
-def read_log(path):
-    try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read().splitlines()
-    except OSError:
-        return []
-
-
-def find_project(start):
-    current = os.path.dirname(os.path.abspath(start))
-    while True:
-        if (os.path.isdir(os.path.join(current, "Assets"))
-                and os.path.isdir(os.path.join(current, "ProjectSettings"))):
-            return current
-        parent = os.path.dirname(current)
-        if parent == current:
-            return None
-        current = parent
 
 
 def main(argv):
@@ -91,41 +62,22 @@ def main(argv):
     if os.path.normcase(rel) != os.path.normcase(TOOL_SPEC_PATH):
         return fail("the Unity tool measures only %s, but got %s" % (TOOL_SPEC_PATH, rel))
 
-    unity = os.environ.get("UNITY_PATH", "").strip()
-    if not unity:
-        return fail("UNITY_PATH is not set. Set it to the Unity editor executable.")
-    if not os.path.isfile(unity):
-        return fail("UNITY_PATH points to nothing: " + unity)
+    unity, error = find_unity()
+    if error:
+        return fail(error)
 
     out_dir = tempfile.mkdtemp(prefix="ger_measure_")
     log_path = os.path.join(out_dir, "measure-log.txt")
 
-    command = [
-        unity,
-        "-batchmode",
-        "-quit",
-        "-projectPath", project,
-        "-executeMethod", METHOD,
-        "-logFile", log_path,
-    ]
-
-    try:
-        proc = subprocess.run(command, timeout=TIMEOUT_SECONDS)
-        exit_code = proc.returncode
-    except subprocess.TimeoutExpired:
-        return fail("Unity timed out after %d seconds. Log: %s" % (TIMEOUT_SECONDS, log_path))
-    except OSError as e:
-        return fail("could not start Unity: %s" % e)
+    exit_code, error = run_unity(unity, ["-quit"], project, ["-executeMethod", METHOD], log_path)
+    if error:
+        return fail(error)
 
     log_lines = read_log(log_path)
     if not log_lines:
         return fail("Unity wrote no log (exit code %d). Log: %s" % (exit_code, log_path))
 
-    compile_errors = [l for l in log_lines if COMPILE_ERROR.search(l)]
-    if compile_errors:
-        print("FAIL: compile errors (%d). Log: %s" % (len(compile_errors), ascii_text(log_path)))
-        for line in compile_errors[:10]:
-            print("  " + ascii_text(line.strip()))
+    if report_compile_errors(log_lines, log_path):
         return 1
 
     tolerance = [l.rstrip() for l in log_lines if l.startswith("TOLERANCE: ")]

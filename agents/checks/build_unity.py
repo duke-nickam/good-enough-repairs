@@ -22,12 +22,12 @@ Exit 0 when all is fine, exit 1 otherwise.
 
 import os
 import re
-import subprocess
 import sys
 import tempfile
 
-TIMEOUT_SECONDS = 1800
-COMPILE_ERROR = re.compile(r"error CS\d+")
+from unity_common import (ascii_text, fail, find_project, find_unity, project_error,
+                          read_log, report_compile_errors, run_unity)
+
 METHOD_NAME = re.compile(r"^[A-Za-z_][\w]*(\.[A-Za-z_][\w]*)+$")
 EXCEPTION_PATTERNS = [
     re.compile(r"^\s*[\w.]*Exception\b"),
@@ -36,36 +36,6 @@ EXCEPTION_PATTERNS = [
     re.compile(r"executeMethod method .* could not be found", re.IGNORECASE),
     re.compile(r"Exception:"),
 ]
-
-
-def ascii_text(text):
-    return text.encode("ascii", "replace").decode("ascii")
-
-
-def fail(message):
-    print("FAIL: " + ascii_text(message))
-    return 1
-
-
-def read_log(path):
-    try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read().splitlines()
-    except OSError:
-        return []
-
-
-def find_project(start):
-    """Walk up from a file path to the folder holding Assets and ProjectSettings."""
-    current = os.path.dirname(os.path.abspath(start))
-    while True:
-        if (os.path.isdir(os.path.join(current, "Assets"))
-                and os.path.isdir(os.path.join(current, "ProjectSettings"))):
-            return current
-        parent = os.path.dirname(current)
-        if parent == current:
-            return None
-        current = parent
 
 
 def main(argv):
@@ -97,34 +67,20 @@ def main(argv):
         project = find_project(source)
         if project is None:
             return fail("no Unity project above the builder source: " + source)
-    if not os.path.isdir(os.path.join(project, "Assets")):
-        return fail("not a Unity project (no Assets folder): " + project)
+    error = project_error(project)
+    if error:
+        return fail(error)
 
-    unity = os.environ.get("UNITY_PATH", "").strip()
-    if not unity:
-        return fail("UNITY_PATH is not set. Set it to the Unity editor executable.")
-    if not os.path.isfile(unity):
-        return fail("UNITY_PATH points to nothing: " + unity)
+    unity, error = find_unity()
+    if error:
+        return fail(error)
 
     out_dir = tempfile.mkdtemp(prefix="ger_build_")
     log_path = os.path.join(out_dir, "build-log.txt")
 
-    command = [
-        unity,
-        "-batchmode",
-        "-quit",
-        "-projectPath", project,
-        "-executeMethod", method,
-        "-logFile", log_path,
-    ]
-
-    try:
-        proc = subprocess.run(command, timeout=TIMEOUT_SECONDS)
-        exit_code = proc.returncode
-    except subprocess.TimeoutExpired:
-        return fail("Unity timed out after %d seconds. Log: %s" % (TIMEOUT_SECONDS, log_path))
-    except OSError as e:
-        return fail("could not start Unity: %s" % e)
+    exit_code, error = run_unity(unity, ["-quit"], project, ["-executeMethod", method], log_path)
+    if error:
+        return fail(error)
 
     log_lines = read_log(log_path)
     if not log_lines:
@@ -133,11 +89,7 @@ def main(argv):
     made = [l.rstrip() for l in log_lines if l.startswith("MADE: ")]
     shots = [l.rstrip() for l in log_lines if l.startswith("SCREENSHOT: ")]
 
-    compile_errors = [l for l in log_lines if COMPILE_ERROR.search(l)]
-    if compile_errors:
-        print("FAIL: compile errors (%d). Log: %s" % (len(compile_errors), ascii_text(log_path)))
-        for line in compile_errors[:10]:
-            print("  " + ascii_text(line.strip()))
+    if report_compile_errors(log_lines, log_path):
         return 1
 
     exceptions = []
