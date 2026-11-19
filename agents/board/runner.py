@@ -325,7 +325,7 @@ class Runner:
             usages.append(usage)
             if plan.get("type") in ("question", "note"):
                 break
-            problems = validate_plan(plan, None)
+            problems = validate_plan(plan, set(self.ws.list_files().splitlines()))
             if not problems and len(plan.get("epics") or []) != 1:
                 problems = ["the plan must have exactly one epic: the one named above"]
             if not problems:

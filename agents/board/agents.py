@@ -252,6 +252,12 @@ def validate_plan(plan, repo_files):
                 p.append(f"{k}: needs at least one file to write")
             for f in files:
                 p += [f"{k}: {x}" for x in file_rule_problems(f)]
+            for f in files:  # a spec with its own measure check must run it, so a change cannot shift the look
+                m = re.search(r"([^/]+)\.spec\.json$", f)
+                script = f"agents/checks/measure_{m.group(1)}.py" if m else None
+                if script and script in (repo_files or ()) and \
+                        not any(c.split()[1:2] == [script] for c in t.get("checks") or []):
+                    p.append(f"{k}: it writes {f}, so it must also run `python {script} {f}`")
             for c in t.get("checks") or []:
                 if not CHECK_RE.match(c):
                     p.append(f"{k}: check {c!r} must look like: python agents/checks/<name>.py <args>")
