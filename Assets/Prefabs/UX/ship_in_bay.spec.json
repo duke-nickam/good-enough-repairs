@@ -1,0 +1,54 @@
+{
+  "prefabPath": "Assets/Prefabs/UX/ShipInBay.prefab",
+  "sprites": [
+    { "key": "box", "path": "Assets/Prefabs/UX/ShipInBayArt/PlaceholderBox.png",
+      "pivotX": 0.5, "pivotY": 0.5, "pixelsPerUnit": 4 },
+    { "key": "barLeft", "path": "Assets/Prefabs/UX/ShipInBayArt/PlaceholderBarLeft.png",
+      "pivotX": 0, "pivotY": 0.5, "pixelsPerUnit": 4 }
+  ],
+  "root": { "name": "ShipInBay", "components": [ "ShipView" ] },
+  "objects": [
+    { "name": "Body", "sprite": "box", "color": "#73849A", "sortingOrder": 0,
+      "posY": 0.9, "scaleX": 3, "scaleY": 1.4 },
+    { "name": "BarTrack_Engine", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
+      "posX": -1.2, "posY": -0.1, "scaleX": 2.4, "scaleY": 0.4 },
+    { "name": "BarFill_Engine", "sprite": "barLeft", "sortingOrder": 2,
+      "posX": -1.2, "posY": -0.1, "scaleX": 2.4, "scaleY": 0.24 },
+    { "name": "BarTrack_HullPlate", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
+      "posX": -1.2, "posY": -0.55, "scaleX": 2.4, "scaleY": 0.4 },
+    { "name": "BarFill_HullPlate", "sprite": "barLeft", "sortingOrder": 2,
+      "posX": -1.2, "posY": -0.55, "scaleX": 2.4, "scaleY": 0.24 },
+    { "name": "BarTrack_ShieldGenerator", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
+      "posX": -1.2, "posY": -1.0, "scaleX": 2.4, "scaleY": 0.4 },
+    { "name": "BarFill_ShieldGenerator", "sprite": "barLeft", "sortingOrder": 2,
+      "posX": -1.2, "posY": -1.0, "scaleX": 2.4, "scaleY": 0.24 },
+    { "name": "BarTrack_Thruster", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
+      "posX": -1.2, "posY": -1.45, "scaleX": 2.4, "scaleY": 0.4 },
+    { "name": "BarFill_Thruster", "sprite": "barLeft", "sortingOrder": 2,
+      "posX": -1.2, "posY": -1.45, "scaleX": 2.4, "scaleY": 0.24 },
+    { "name": "BarTrack_PowerCore", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
+      "posX": -1.2, "posY": -1.9, "scaleX": 2.4, "scaleY": 0.4 },
+    { "name": "BarFill_PowerCore", "sprite": "barLeft", "sortingOrder": 2,
+      "posX": -1.2, "posY": -1.9, "scaleX": 2.4, "scaleY": 0.24 }
+  ],
+  "links": [
+    { "owner": "ShipInBay", "component": "ShipView", "field": "body", "index": -1,
+      "target": "Body", "targetType": "SpriteRenderer" },
+    { "owner": "ShipInBay", "component": "ShipView", "field": "barFills", "index": 0,
+      "target": "BarFill_Engine", "targetType": "SpriteRenderer" },
+    { "owner": "ShipInBay", "component": "ShipView", "field": "barFills", "index": 1,
+      "target": "BarFill_HullPlate", "targetType": "SpriteRenderer" },
+    { "owner": "ShipInBay", "component": "ShipView", "field": "barFills", "index": 2,
+      "target": "BarFill_ShieldGenerator", "targetType": "SpriteRenderer" },
+    { "owner": "ShipInBay", "component": "ShipView", "field": "barFills", "index": 3,
+      "target": "BarFill_Thruster", "targetType": "SpriteRenderer" },
+    { "owner": "ShipInBay", "component": "ShipView", "field": "barFills", "index": 4,
+      "target": "BarFill_PowerCore", "targetType": "SpriteRenderer" }
+  ],
+  "scene": {
+    "path": "Assets/Scenes/Main.unity",
+    "stationField": "bay1View",
+    "worldX": -6.806, "worldY": 3.822, "worldScale": 0.563,
+    "screenshot": "ship_in_bay.png"
+  }
+}
