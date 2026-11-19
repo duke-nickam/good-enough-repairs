@@ -1,0 +1,40 @@
+{
+  "prefabPath": "Assets/Prefabs/UX/WarningDialog.prefab",
+  "sprites": [
+    { "key": "box", "path": "Assets/Prefabs/UX/ShipInBayArt/PlaceholderBox.png",
+      "pivotX": 0.5, "pivotY": 0.5, "pixelsPerUnit": 4 }
+  ],
+  "root": { "name": "WarningDialog", "components": [ "WarningView" ] },
+  "objects": [
+    { "name": "DialogRoot" },
+    { "name": "Backdrop", "parent": "DialogRoot", "sprite": "box", "color": "#00000080",
+      "sortingOrder": 100, "scaleX": 30, "scaleY": 20 },
+    { "name": "Panel", "parent": "DialogRoot", "sprite": "box", "color": "panel",
+      "sortingOrder": 101, "posX": 0, "posY": 0, "scaleX": 7, "scaleY": 4 },
+    { "name": "TextArea", "parent": "DialogRoot", "sprite": "box", "color": "#FFFFFF14",
+      "sortingOrder": 102, "posX": 0, "posY": 0.6, "scaleX": 6.6, "scaleY": 2.6 },
+    { "name": "ConfirmButton", "parent": "DialogRoot", "sprite": "box", "color": "passes",
+      "sortingOrder": 103, "posX": -1.6, "posY": -1.35, "scaleX": 2.2, "scaleY": 0.7 },
+    { "name": "CancelButton", "parent": "DialogRoot", "sprite": "box", "color": "#8A8F99",
+      "sortingOrder": 103, "posX": 1.6, "posY": -1.35, "scaleX": 2.2, "scaleY": 0.7 }
+  ],
+  "links": [
+    { "owner": "WarningDialog", "component": "WarningView", "field": "dialogRoot", "index": -1,
+      "target": "DialogRoot", "targetType": "GameObject" },
+    { "owner": "WarningDialog", "component": "WarningView", "field": "panel", "index": -1,
+      "target": "Panel", "targetType": "SpriteRenderer" },
+    { "owner": "WarningDialog", "component": "WarningView", "field": "textArea", "index": -1,
+      "target": "TextArea", "targetType": "SpriteRenderer" },
+    { "owner": "WarningDialog", "component": "WarningView", "field": "confirmButton", "index": -1,
+      "target": "ConfirmButton", "targetType": "SpriteRenderer" },
+    { "owner": "WarningDialog", "component": "WarningView", "field": "cancelButton", "index": -1,
+      "target": "CancelButton", "targetType": "SpriteRenderer" }
+  ],
+  "scene": {
+    "path": "Assets/Scenes/Main.unity",
+    "stationField": "warningView",
+    "worldX": 0, "worldY": 0, "worldScale": 1,
+    "screenshot": "warning_dialog.png",
+    "sampleDialog": "release"
+  }
+}
