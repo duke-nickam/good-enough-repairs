@@ -170,8 +170,8 @@ class Runner:
             if i.state == "CLOSED":
                 lines.append(f"{name} - Done")
                 continue
-            tasks = [t for t in items.values() if t.kind == "task" and self.card(t.number) and
-                     self.card(t.number).epic == i.number]
+            tasks = [t for t in items.values() if t.kind == "task" and t.reason != "NOT_PLANNED" and
+                     self.card(t.number) and self.card(t.number).epic == i.number]
             prio = "" if i.priority is None else f", Priority {i.priority}"
             if not tasks:
                 lines.append(f"{name} - open, no tasks yet{prio}")
@@ -181,7 +181,8 @@ class Runner:
         return "\n".join(lines)
 
     def unplanned_epics(self, items):
-        has_tasks = {self.card(t.number).epic for t in items.values() if t.kind == "task" and self.card(t.number)}
+        has_tasks = {self.card(t.number).epic for t in items.values()  # a task closed as not planned does not count
+                     if t.kind == "task" and t.reason != "NOT_PLANNED" and self.card(t.number)}
         return [i.number for i in items.values() if i.kind == "epic" and i.state == "OPEN" and i.number not in has_tasks]
 
     def pending_tokens(self, r):
@@ -431,7 +432,8 @@ class Runner:
                 log("Runner", f"#{t.number}: Done, closed")
         items = self.board.items()
         for e in (i for i in items if i.kind == "epic"):
-            tasks = [i for i in items if i.kind == "task" and self.card(i.number) and self.card(i.number).epic == e.number]
+            tasks = [i for i in items if i.kind == "task" and i.reason != "NOT_PLANNED" and self.card(i.number)
+                     and self.card(i.number).epic == e.number]
             planning = (self.board.issue(e.number).last_marker("planning") or {}).get("tokens", 0)
             total = planning + sum(t.tokens for t in tasks)
             if total != e.tokens:

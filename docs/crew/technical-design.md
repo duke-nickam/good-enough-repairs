@@ -16,7 +16,7 @@ All code is under `Assets/Scripts`, one subfolder per assembly. Each assembly ha
 |---|---|---|---|
 | `Logic/` | `GoodEnoughRepairs.Logic` (`noEngineReferences` on) | all rules, one subfolder per system (below) | nothing |
 | `Data/` | `GoodEnoughRepairs.Data` | the loaders: `BalanceLoader`, `ContentLoader` | Logic, UnityEngine |
-| `UX/` | `GoodEnoughRepairs.UX` | the UX Designer's scripts (show layer) | Logic, Data |
+| `UX/` | `GoodEnoughRepairs.UX` | the show layer's view scripts (Programmer) | Logic, Data |
 | `Bots/` | `GoodEnoughRepairs.Bots` | the QA Playtester's buyer and swapper bots | Logic, Data |
 | `Tests/EditMode/` | `GoodEnoughRepairs.Tests.EditMode` | EditMode tests (not in the build) | Logic, Data |
 
@@ -37,7 +37,7 @@ The namespace stays `GoodEnoughRepairs` in every folder. `UX/` is outside `Logic
 
 The loaders `BalanceLoader.cs` and `ContentLoader.cs` live in `Data/`. They are the only code that uses `JsonUtility`, `Application`, `File` and `Debug`. `BalanceData` and `ContentData` are plain `[Serializable]` classes (System only), so they stay in Logic.
 
-Scenes, prefabs, sprites and sound are not code. They are the show layer.
+Scenes, prefabs, sprites and sound are not code. They are the show layer. Editor tools, such as the builder tool `Assets/Editor/PrefabSpecBuilder.cs`, are in `Assets/Editor` (Editor assembly, references UX).
 
 ## 3. Logic and show layer
 
@@ -90,5 +90,7 @@ A bot loop: create the run, then repeat read state, call commands, `Advance`, un
 
 1. **Scenes and prefabs folder.** The GDD says the Programmer owns the scene files and the UX Designer owns visual prefabs, but not where they live. Should they sit outside `Assets/Scripts` (for example `Assets/Scenes` and `Assets/Prefabs`, with the UX Designer's prefabs in a `UX` subfolder)?
 
-   **Answer (designer):** Scenes stay in `Assets/Scenes` (`Main.unity`). There are no prefabs for now: the show layer in `Assets/Scripts/UX/` builds placeholder visuals in code at runtime. Agents do not edit scene or prefab files. The designer adds the show layer's entry component to `Main.unity` by hand. When real art comes, prefabs go in `Assets/Prefabs/UX`.
+   **Answer (designer):** Scenes stay in `Assets/Scenes` (`Main.unity`). Prefabs go in `Assets/Prefabs/UX`.
+
+   **Update (designer, after the pilot, #70):** everything the player sees is a prefab built from a spec, never built in code at runtime. The Programmer writes the view scripts in `UX/` and the builder tool, and extends the tool when a spec needs something new. The Technical Artist writes the spec (`Assets/Prefabs/UX/<name>.spec.json`); a check runs the builder in Unity, which makes the prefab, places it in `Main.unity` and takes a screenshot for the UX Designer's review. Agents never write scene or prefab files by hand.
 2. **How bots run.** The bots live in the Unity project in `Scripts/Bots/`. Should they run as EditMode tests, or from a batch-mode menu command? Either works without a scene.

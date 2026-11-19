@@ -42,7 +42,11 @@ lead_programmer; the technical_artist's tasks are reviewed by the ux_designer fr
 writes the unit tests (EditMode) with its code, and the editor tools, such as the builder tool; the
 qa_automation_engineer writes bots, the simulation and check scripts; the qa_playtester tests as a player and never
 reads code. The technical_artist does not program: it writes specs (JSON) that the programmer's builder tool turns
-into scenes and prefabs, and a check runs the tool in Unity; list the scene or prefab in no task's files. Such a
+into scenes and prefabs, and a check runs the tool in Unity; list the scene or prefab in no task's files.
+Everything the player sees (panels, screens, ships, parts, bars) is a prefab from a spec, never built in code at
+runtime: the programmer writes the view script and extends the builder tool if the spec needs something new, then a
+technical_artist task writes the spec, depending on it. Only the programmer and the qa_automation_engineer write code
+(C#, or a script in agents/checks/); the ux_designer designs and reviews, it never writes code. Such a
 check prints "MADE: <path>" for each file Unity made (the runner commits them) and "SCREENSHOT: <absolute path>"
 for each screenshot the reviewer should see.
 You see the GDD and the repo's file names, not the files' contents: never state what a file holds unless the GDD
@@ -228,6 +232,9 @@ def validate_plan(plan, repo_files):
             if t.get("agent") == "technical_artist" and any(not f.endswith(".json") for f in t.get("files") or []):
                 p.append(f"{k}: the technical_artist does not program: it writes only specs (.json); code such as "
                          "the builder tool is a programmer task")
+            if t.get("agent") not in CODE_WRITERS and any(is_code(f) for f in t.get("files") or []):
+                p.append(f"{k}: only the programmer or the qa_automation_engineer writes code (C#, or a script in "
+                         "agents/checks/), as in a studio; the ux_designer designs and reviews")
             want = expected_reviewer(t)
             if want and t.get("reviewer") != want:
                 p.append(f"{k}: reviewer must be {want}, as in a studio: the Lead Programmer reviews code, the UX "
@@ -271,11 +278,18 @@ def validate_plan(plan, repo_files):
     return p
 
 
+CODE_WRITERS = ("programmer", "qa_automation_engineer")
+
+
+def is_code(path):
+    return path.endswith(".cs") or (path.startswith("agents/checks/") and path.endswith(".py"))
+
+
 def expected_reviewer(task):
     """Fixed reviewers that copy a studio; None when the Director chooses."""
     if task.get("agent") == "technical_artist":
         return "ux_designer"
-    if any(f.endswith(".cs") or (f.startswith("agents/checks/") and f.endswith(".py")) for f in task.get("files") or []):
+    if any(is_code(f) for f in task.get("files") or []):
         return "lead_programmer"
     return None
 
