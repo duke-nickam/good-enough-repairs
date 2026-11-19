@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GoodEnoughRepairs
@@ -41,6 +42,65 @@ namespace GoodEnoughRepairs
     }
 
     /// <summary>
+    /// Shared drag helper for sprites. A drag lifts a sprite (and its children)
+    /// above the others and moves it with the pointer. End puts it back exactly
+    /// where it was, which is the snap back of a refused move. No rules here.
+    /// </summary>
+    public sealed class DragVisual
+    {
+        private const int RaisedBy = 100;
+
+        private readonly Transform target;
+        private readonly Vector3 homeLocal;
+        private readonly Vector3 grabOffset;
+        private readonly SpriteRenderer[] renderers;
+        private readonly int[] orders;
+
+        public DragVisual(Transform target, Vector3 pointerWorld)
+        {
+            this.target = target;
+            homeLocal = target.localPosition;
+            grabOffset = target.position - pointerWorld;
+            grabOffset.z = 0f;
+            renderers = target.GetComponentsInChildren<SpriteRenderer>(true);
+            orders = new int[renderers.Length];
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                orders[i] = renderers[i].sortingOrder;
+                renderers[i].sortingOrder = orders[i] + RaisedBy;
+            }
+        }
+
+        /// <summary>Moves the dragged sprite so it keeps its offset from the pointer.</summary>
+        public void MoveTo(Vector3 pointerWorld)
+        {
+            if (target == null) return;
+            Vector3 p = pointerWorld + grabOffset;
+            p.z = target.position.z;
+            target.position = p;
+        }
+
+        /// <summary>Puts the sprite back at its home position and sorting order.</summary>
+        public void End()
+        {
+            if (target == null) return;
+            target.localPosition = homeLocal;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null) renderers[i].sortingOrder = orders[i];
+            }
+        }
+
+        /// <summary>True when the world point is inside the sprite's bounds (X and Y).</summary>
+        public static bool Hits(SpriteRenderer area, Vector3 world)
+        {
+            if (area == null || area.sprite == null || !area.gameObject.activeInHierarchy) return false;
+            Bounds b = area.bounds;
+            return world.x >= b.min.x && world.x <= b.max.x && world.y >= b.min.y && world.y <= b.max.y;
+        }
+    }
+
+    /// <summary>
     /// A ship shown with sprites. Put it on a prefab. It shows a ship body and five
     /// part condition bars (in PartTypes.All order: engine, hull plate, shield
     /// generator, thruster, power core). It only displays what it is given and
@@ -49,14 +109,29 @@ namespace GoodEnoughRepairs
     /// Each bar fill is a SpriteRenderer whose sprite pivot is on the left edge.
     /// Its X scale at start is the full bar (100%); Show scales it to the part's
     /// condition and colors it.
+    ///
+    /// slotAreas are the five part slots as drag handles and drop targets, in the
+    /// same order. The drag itself is run by InventoryView.
     /// </summary>
     public sealed class ShipView : MonoBehaviour
     {
+        private static readonly List<ShipView> active = new List<ShipView>();
+
+        /// <summary>The ship views that are on screen now (active).</summary>
+        public static IReadOnlyList<ShipView> Active
+        {
+            get { return active; }
+        }
+
         [Header("Sprites")]
         public SpriteRenderer body;
 
         [Tooltip("Five bar fills, in order: engine, hull plate, shield generator, thruster, power core.")]
         public SpriteRenderer[] barFills = new SpriteRenderer[GameRules.PartSlotsPerShip];
+
+        [Header("Drag and drop")]
+        [Tooltip("Five part slot sprites, same order. Each is a drag handle (its bounds are the hit area) and a drop target.")]
+        public SpriteRenderer[] slotAreas = new SpriteRenderer[GameRules.PartSlotsPerShip];
 
         [Header("Colors")]
         public Color belowColor = BarColors.Below;
@@ -65,6 +140,30 @@ namespace GoodEnoughRepairs
         public Color surplusColor = BarColors.Surplus;
 
         private Vector3[] fullScales;
+
+        /// <summary>The ship shown now, or null for an empty bay.</summary>
+        public Ship CurrentShip { get; private set; }
+
+        private void OnEnable()
+        {
+            if (!active.Contains(this)) active.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            active.Remove(this);
+        }
+
+        /// <summary>Index (PartTypes.All order) of the slot under a world point, or -1.</summary>
+        public int SlotAt(Vector3 world)
+        {
+            int count = slotAreas == null ? 0 : slotAreas.Length;
+            for (int i = 0; i < count && i < GameRules.PartSlotsPerShip; i++)
+            {
+                if (DragVisual.Hits(slotAreas[i], world)) return i;
+            }
+            return -1;
+        }
 
         /// <summary>
         /// Shows the ship. Pass null to hide the view (empty bay). surplusMargin is
@@ -83,6 +182,7 @@ namespace GoodEnoughRepairs
         /// </summary>
         public void Show(Ship ship, int surplusMargin, int[] conditionOverrides)
         {
+            CurrentShip = ship;
             if (ship == null)
             {
                 if (gameObject.activeSelf) gameObject.SetActive(false);
