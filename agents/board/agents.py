@@ -1,5 +1,6 @@
 """Waking the agents: builds each prompt, runs `claude -p` with the agent's role as its system prompt,
 and reads the reply. Agents use the designer's Claude login; they get no tools, only text in and out."""
+import base64
 import json
 import os
 import pathlib
@@ -370,7 +371,12 @@ class ClaudeAgents:
             base = [exe, "-p", "--model", model, "--output-format", "json", "--no-session-persistence",
                     "--system-prompt-file", str(sp)]
             tools = ["--tools", ""]  # no tools
-            if images:  # screenshots to look at: copied next to the call, opened with the Read tool only
+            if images:  # screenshots go into the first message, so the review takes one turn
+                try:
+                    return (*self._call_with_images(base, prompt, images, tmp, agent), model)
+                except AgentError as e:
+                    print(f"  ({AGENTS[agent]}: images in the message failed, opening them with Read instead: {e})")
+            if images:  # fallback: screenshots copied next to the call, opened with the Read tool only
                 names = []
                 for i, path in enumerate(images, 1):
                     name = f"screenshot{i}{pathlib.Path(path).suffix or '.png'}"
@@ -393,6 +399,36 @@ class ClaudeAgents:
         usage = dict(data.get("usage") or {})
         usage["turns"] = int(data.get("num_turns") or 0)  # a screenshot review needs extra turns to open the image
         return data.get("result", ""), usage, model
+
+    def _call_with_images(self, base, prompt, images, tmp, agent):
+        """One user message with the text and every screenshot (stream-json input), no tools: one turn."""
+        types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+        content = [{"type": "text", "text": prompt + "\n\n---\n\nThe screenshots of the result follow. Judge what "
+                                                  "you see in them."}]
+        for path in images:
+            data = base64.b64encode(pathlib.Path(path).read_bytes()).decode("ascii")
+            content.append({"type": "image", "source": {"type": "base64",
+                            "media_type": types.get(pathlib.Path(path).suffix.lower(), "image/png"), "data": data}})
+        line = json.dumps({"type": "user", "message": {"role": "user", "content": content}}) + "\n"
+        cmd = [a for a in base if a not in ("--output-format", "json")]
+        cmd += ["--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--tools", ""]
+        res = subprocess.run(cmd, input=line, capture_output=True, text=True, encoding="utf-8", cwd=tmp, timeout=900,
+                             env={**os.environ})
+        data = None
+        for out in (res.stdout or "").splitlines():
+            try:
+                msg = json.loads(out)
+            except ValueError:
+                continue
+            if msg.get("type") == "result":
+                data = msg
+        if res.returncode != 0 or not data:
+            raise AgentError(f"call failed: {(res.stderr or res.stdout).strip()[-500:]}")
+        if data.get("is_error"):
+            raise AgentError(f"{AGENTS[agent]}: {str(data.get('result', ''))[:500]}")
+        usage = dict(data.get("usage") or {})
+        usage["turns"] = int(data.get("num_turns") or 0)
+        return data.get("result", ""), usage
 
     # ------------------------------------------------------------ the three kinds of work
 

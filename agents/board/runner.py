@@ -607,16 +607,22 @@ class Runner:
         self.board.set_status(n, "In review")
         log(reviewer, f"#{n}: reviewing (checks {'pass' if checks_ok else 'FAIL'}"
                       f"{f', {len(shots)} screenshot(s)' if shots else ''})")
-        review_used = ""
-        try:
-            verdict, usage, _ = self.agents.review(card.reviewer, card.to_markdown(), summary, written, checks_text,
-                                                   self.thread_text(self.board.issue(n)),
-                                                   reads={p: c for p, c in reads.items() if p not in written},
-                                                   images=shots)
-            usages.append(usage)
-            review_used = f"Review used: {describe_tokens(usage)}. "
-        except (AgentError, ValueError) as e:
-            verdict = {"verdict": "reject", "summary": f"Review reply unusable ({e}).", "issues": []}
+        review_used, review_usages = "", []
+        for k in (1, 2):  # one retry if the review reply is unusable: the agent's work is not at fault
+            try:
+                verdict, usage, _ = self.agents.review(card.reviewer, card.to_markdown(), summary, written,
+                                                       checks_text, self.thread_text(self.board.issue(n)),
+                                                       reads={p: c for p, c in reads.items() if p not in written},
+                                                       images=shots)
+                review_usages.append(usage)
+                break
+            except (AgentError, ValueError) as e:
+                verdict = {"verdict": "reject", "summary": f"Review reply unusable twice ({e}).", "issues": []}
+                if k == 1:
+                    log(reviewer, f"#{n}: review reply unusable ({e}), asking again")
+        usages += review_usages
+        if review_usages:
+            review_used = f"Review used: {describe_tokens(sum_usage(review_usages))}. "
         issues = verdict.get("issues") or []
         lines = "\n".join(f"- {i.get('where', '')}: {i.get('problem', '')} Fix: {i.get('fix', '')}" for i in issues)
         approve = verdict.get("verdict") == "approve" and checks_ok
