@@ -1,0 +1,163 @@
+{
+  "prefabPath": "Assets/Prefabs/UX/InventoryPanel.prefab",
+  "sprites": [
+    { "key": "box", "path": "Assets/Prefabs/UX/InventoryPanelArt/PlaceholderBox.png",
+      "pivotX": 0.5, "pivotY": 0.5, "pixelsPerUnit": 4 },
+    { "key": "barLeft", "path": "Assets/Prefabs/UX/InventoryPanelArt/PlaceholderBarLeft.png",
+      "pivotX": 0, "pivotY": 0.5, "pixelsPerUnit": 4 }
+  ],
+  "root": { "name": "InventoryPanel", "components": [ "InventoryView" ] },
+  "objects": [
+    { "name": "PanelBack", "sprite": "box", "color": "panel", "sortingOrder": 0,
+      "posY": -0.4, "scaleX": 7.6, "scaleY": 5.6 },
+    { "name": "Bin", "sprite": "box", "color": "#7A3B33", "sortingOrder": 1,
+      "posY": -2.7, "scaleX": 7.0, "scaleY": 0.7 },
+
+    { "name": "Slot1", "posX": -1.9, "posY": 1.6 },
+    { "name": "Slot1_Area", "parent": "Slot1", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
+    { "name": "Slot1_Track", "parent": "Slot1", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },
+    { "name": "Slot1_Fill", "parent": "Slot1", "sprite": "barLeft", "color": "#00000000", "sortingOrder": 3, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.18 },
+    { "name": "Slot1_MarkFreighter", "parent": "Slot1", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.3, "scaleX": 0.06, "scaleY": 0.46 },
+    { "name": "Slot1_MarkFighter", "parent": "Slot1", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.6, "scaleX": 0.06, "scaleY": 0.46 },
+
+    { "name": "Slot2", "posX": -1.9, "posY": 0.8 },
+    { "name": "Slot2_Area", "parent": "Slot2", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
+    { "name": "Slot2_Track", "parent": "Slot2", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },
+    { "name": "Slot2_Fill", "parent": "Slot2", "sprite": "barLeft", "color": "#00000000", "sortingOrder": 3, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.18 },
+    { "name": "Slot2_MarkFreighter", "parent": "Slot2", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.3, "scaleX": 0.06, "scaleY": 0.46 },
+    { "name": "Slot2_MarkFighter", "parent": "Slot2", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.6, "scaleX": 0.06, "scaleY": 0.46 },
+
+    { "name": "Slot3", "posX": -1.9, "posY": 0 },
+    { "name": "Slot3_Area", "parent": "Slot3", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
+    { "name": "Slot3_Track", "parent": "Slot3", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },
+    { "name": "Slot3_Fill", "parent": "Slot3", "sprite": "barLeft", "color": "#00000000", "sortingOrder": 3, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.18 },
+    { "name": "Slot3_MarkFreighter", "parent": "Slot3", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.3, "scaleX": 0.06, "scaleY": 0.46 },
+    { "name": "Slot3_MarkFighter", "parent": "Slot3", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.6, "scaleX": 0.06, "scaleY": 0.46 },
+
+    { "name": "Slot4", "posX": -1.9, "posY": -0.8 },
+    { "name": "Slot4_Area", "parent": "Slot4", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
+    { "name": "Slot4_Track", "parent": "Slot4", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },
+    { "name": "Slot4_Fill", "parent": "Slot4", "sprite": "barLeft", "color": "#00000000", "sortingOrder": 3, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.18 },
+    { "name": "Slot4_MarkFreighter", "parent": "Slot4", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.3, "scaleX": 0.06, "scaleY": 0.46 },
+    { "name": "Slot4_MarkFighter", "parent": "Slot4", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.6, "scaleX": 0.06, "scaleY": 0.46 },
+
+    { "name": "Slot5", "posX": -1.9, "posY": -1.6 },
+    { "name": "Slot5_Area", "parent": "Slot5", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
+    { "name": "Slot5_Track", "parent": "Slot5", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },
+    { "name": "Slot5_Fill", "parent": "Slot5", "sprite": "barLeft", "color": "#00000000", "sortingOrder": 3, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.18 },
+    { "name": "Slot5_MarkFreighter", "parent": "Slot5", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.3, "scaleX": 0.06, "scaleY": 0.46 },
+    { "name": "Slot5_MarkFighter", "parent": "Slot5", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.6, "scaleX": 0.06, "scaleY": 0.46 },
+
+    { "name": "Slot6", "posX": 1.9, "posY": 1.6 },
+    { "name": "Slot6_Area", "parent": "Slot6", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
+    { "name": "Slot6_Track", "parent": "Slot6", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },
+    { "name": "Slot6_Fill", "parent": "Slot6", "sprite": "barLeft", "color": "#00000000", "sortingOrder": 3, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.18 },
+    { "name": "Slot6_MarkFreighter", "parent": "Slot6", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.3, "scaleX": 0.06, "scaleY": 0.46 },
+    { "name": "Slot6_MarkFighter", "parent": "Slot6", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.6, "scaleX": 0.06, "scaleY": 0.46 },
+
+    { "name": "Slot7", "posX": 1.9, "posY": 0.8 },
+    { "name": "Slot7_Area", "parent": "Slot7", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
+    { "name": "Slot7_Track", "parent": "Slot7", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },
+    { "name": "Slot7_Fill", "parent": "Slot7", "sprite": "barLeft", "color": "#00000000", "sortingOrder": 3, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.18 },
+    { "name": "Slot7_MarkFreighter", "parent": "Slot7", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.3, "scaleX": 0.06, "scaleY": 0.46 },
+    { "name": "Slot7_MarkFighter", "parent": "Slot7", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.6, "scaleX": 0.06, "scaleY": 0.46 },
+
+    { "name": "Slot8", "posX": 1.9, "posY": 0 },
+    { "name": "Slot8_Area", "parent": "Slot8", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
+    { "name": "Slot8_Track", "parent": "Slot8", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },
+    { "name": "Slot8_Fill", "parent": "Slot8", "sprite": "barLeft", "color": "#00000000", "sortingOrder": 3, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.18 },
+    { "name": "Slot8_MarkFreighter", "parent": "Slot8", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.3, "scaleX": 0.06, "scaleY": 0.46 },
+    { "name": "Slot8_MarkFighter", "parent": "Slot8", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.6, "scaleX": 0.06, "scaleY": 0.46 },
+
+    { "name": "Slot9", "posX": 1.9, "posY": -0.8 },
+    { "name": "Slot9_Area", "parent": "Slot9", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
+    { "name": "Slot9_Track", "parent": "Slot9", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },
+    { "name": "Slot9_Fill", "parent": "Slot9", "sprite": "barLeft", "color": "#00000000", "sortingOrder": 3, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.18 },
+    { "name": "Slot9_MarkFreighter", "parent": "Slot9", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.3, "scaleX": 0.06, "scaleY": 0.46 },
+    { "name": "Slot9_MarkFighter", "parent": "Slot9", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.6, "scaleX": 0.06, "scaleY": 0.46 },
+
+    { "name": "Slot10", "posX": 1.9, "posY": -1.6 },
+    { "name": "Slot10_Area", "parent": "Slot10", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
+    { "name": "Slot10_Track", "parent": "Slot10", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },
+    { "name": "Slot10_Fill", "parent": "Slot10", "sprite": "barLeft", "color": "#00000000", "sortingOrder": 3, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.18 },
+    { "name": "Slot10_MarkFreighter", "parent": "Slot10", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.3, "scaleX": 0.06, "scaleY": 0.46 },
+    { "name": "Slot10_MarkFighter", "parent": "Slot10", "sprite": "box", "color": "marker", "sortingOrder": 4, "posX": 0.6, "scaleX": 0.06, "scaleY": 0.46 }
+  ],
+  "links": [
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "binArea", "index": -1, "target": "Bin", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "panelArea", "index": -1, "target": "PanelBack", "targetType": "SpriteRenderer" },
+
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 0, "subField": "area", "target": "Slot1_Area", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 0, "subField": "dragRoot", "target": "Slot1", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 0, "subField": "fill", "target": "Slot1_Fill", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 0, "subField": "freighterMark", "target": "Slot1_MarkFreighter", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 0, "subField": "fighterMark", "target": "Slot1_MarkFighter", "targetType": "Transform" },
+
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 1, "subField": "area", "target": "Slot2_Area", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 1, "subField": "dragRoot", "target": "Slot2", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 1, "subField": "fill", "target": "Slot2_Fill", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 1, "subField": "freighterMark", "target": "Slot2_MarkFreighter", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 1, "subField": "fighterMark", "target": "Slot2_MarkFighter", "targetType": "Transform" },
+
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 2, "subField": "area", "target": "Slot3_Area", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 2, "subField": "dragRoot", "target": "Slot3", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 2, "subField": "fill", "target": "Slot3_Fill", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 2, "subField": "freighterMark", "target": "Slot3_MarkFreighter", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 2, "subField": "fighterMark", "target": "Slot3_MarkFighter", "targetType": "Transform" },
+
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 3, "subField": "area", "target": "Slot4_Area", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 3, "subField": "dragRoot", "target": "Slot4", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 3, "subField": "fill", "target": "Slot4_Fill", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 3, "subField": "freighterMark", "target": "Slot4_MarkFreighter", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 3, "subField": "fighterMark", "target": "Slot4_MarkFighter", "targetType": "Transform" },
+
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 4, "subField": "area", "target": "Slot5_Area", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 4, "subField": "dragRoot", "target": "Slot5", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 4, "subField": "fill", "target": "Slot5_Fill", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 4, "subField": "freighterMark", "target": "Slot5_MarkFreighter", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 4, "subField": "fighterMark", "target": "Slot5_MarkFighter", "targetType": "Transform" },
+
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 5, "subField": "area", "target": "Slot6_Area", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 5, "subField": "dragRoot", "target": "Slot6", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 5, "subField": "fill", "target": "Slot6_Fill", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 5, "subField": "freighterMark", "target": "Slot6_MarkFreighter", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 5, "subField": "fighterMark", "target": "Slot6_MarkFighter", "targetType": "Transform" },
+
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 6, "subField": "area", "target": "Slot7_Area", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 6, "subField": "dragRoot", "target": "Slot7", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 6, "subField": "fill", "target": "Slot7_Fill", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 6, "subField": "freighterMark", "target": "Slot7_MarkFreighter", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 6, "subField": "fighterMark", "target": "Slot7_MarkFighter", "targetType": "Transform" },
+
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 7, "subField": "area", "target": "Slot8_Area", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 7, "subField": "dragRoot", "target": "Slot8", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 7, "subField": "fill", "target": "Slot8_Fill", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 7, "subField": "freighterMark", "target": "Slot8_MarkFreighter", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 7, "subField": "fighterMark", "target": "Slot8_MarkFighter", "targetType": "Transform" },
+
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 8, "subField": "area", "target": "Slot9_Area", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 8, "subField": "dragRoot", "target": "Slot9", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 8, "subField": "fill", "target": "Slot9_Fill", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 8, "subField": "freighterMark", "target": "Slot9_MarkFreighter", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 8, "subField": "fighterMark", "target": "Slot9_MarkFighter", "targetType": "Transform" },
+
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 9, "subField": "area", "target": "Slot10_Area", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 9, "subField": "dragRoot", "target": "Slot10", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 9, "subField": "fill", "target": "Slot10_Fill", "targetType": "SpriteRenderer" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 9, "subField": "freighterMark", "target": "Slot10_MarkFreighter", "targetType": "Transform" },
+    { "owner": "InventoryPanel", "component": "InventoryView", "field": "slots", "index": 9, "subField": "fighterMark", "target": "Slot10_MarkFighter", "targetType": "Transform" }
+  ],
+  "scene": {
+    "path": "Assets/Scenes/Main.unity",
+    "stationField": "inventoryView",
+    "worldX": 5, "worldY": -0.5, "worldScale": 0.8,
+    "screenshot": "inventory_panel.png",
+    "sampleConditions": [
+      { "part": "Engine", "condition": 35 },
+      { "part": "HullPlate", "condition": 65 },
+      { "part": "ShieldGenerator", "condition": 95 },
+      { "part": "Thruster", "condition": 55 },
+      { "part": "PowerCore", "condition": 70 }
+    ]
+  }
+}

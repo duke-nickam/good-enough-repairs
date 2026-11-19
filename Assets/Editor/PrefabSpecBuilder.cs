@@ -2,8 +2,8 @@
  * PREFAB SPEC BUILDER
  *
  * Turns a prefab spec (a JSON file) into a prefab. It can also place an instance
- * in a scene, connect it to a StationView field, show a docked sample ship in edit
- * mode and save a screenshot outside the project.
+ * in a scene, connect it to a StationView field, show a docked sample ship (or a
+ * sample inventory) in edit mode and save a screenshot outside the project.
  *
  * HOW TO RUN
  *   PrefabSpecBuilder.BuildAll()          builds every *.spec.json under Assets/
@@ -50,16 +50,21 @@
  *       scaleX, scaleY, scaleZ   local scale; 0 or left out means 1
  *       components[]   extra components to attach, from this fixed list:
  *                        "ShipView"        the ship view (UX assembly)
+ *                        "InventoryView"   the inventory panel with drag and drop
  *                        "SpriteRenderer"  an empty SpriteRenderer (not needed
  *                                          when "sprite" is set)
  *                      An unknown name stops the build. A new type needs one line
  *                      in the builder's code.
  *   links[]       sets a reference field on a component to another object:
  *       owner          name of the object that holds the component
- *       component      "ShipView", "SpriteRenderer" or "Transform"
+ *       component      "ShipView", "InventoryView", "SpriteRenderer" or "Transform"
  *       field          the serialized field name, for example "body" or "barFills"
  *       index          -1 for a single field (default is 0, so write -1); 0 or more
  *                      for an element of an array field (the array grows if needed)
+ *       subField       optional. Only with index 0 or more, when the array holds
+ *                      small records (InventoryView.slots): the name of the field
+ *                      inside that record, for example "fill". Leave it out for
+ *                      arrays of plain references (barFills, slotAreas).
  *       target         name of the object to point at
  *       targetType     what to point at on the target: "GameObject",
  *                      "SpriteRenderer" or "Transform"
@@ -67,8 +72,10 @@
  *       path           scene file, for example "Assets/Scenes/Main.unity". It must
  *                      exist (the builder never creates scenes).
  *       stationField   name of the StationView field that gets the instance's
- *                      ShipView, for example "bay1View". Empty means do not connect.
- *       Placement, option A: fit into a screen rectangle
+ *                      component, for example "bay1View" (gets the ShipView) or
+ *                      "inventoryView" (gets the InventoryView). Empty means do not
+ *                      connect.
+ *       Placement, option A: fit into a screen rectangle (ship prefabs)
  *         refWidth, refHeight   reference screen size in pixels, for example 1280, 720.
  *                      Before placing, the builder sets the camera aspect to
  *                      refWidth / refHeight, so the position matches a game view of
@@ -79,34 +86,74 @@
  *                      center of its content bounds (the body and all five bar fills
  *                      at full length, ShipView.TryGetContentBounds) is at the
  *                      rectangle's center. StationView centers the bay 1 ship on
- *                      the same bounds, through the same ShipView code.
+ *                      the same bounds, through the same ShipView code. For a
+ *                      prefab without a ShipView, the prefab origin goes to the
+ *                      rectangle's center.
  *         contentHeight   height of the prefab's content in prefab units
  *         offsetY         vertical shift in prefab units, applied after scaling and
  *                         centering (for example -0.65)
  *       Placement, option B (used when rectW is 0): worldX, worldY, worldScale
  *                      (worldScale 0 means 1). The prefab origin is placed there.
+ *                      Use this for the inventory panel.
  *       screenshot     file name of the screenshot, for example "ship_in_bay.png".
  *                      Empty means no screenshot. It is saved in the system temp
  *                      folder under ger_shots, outside the project. Before the shot
  *                      the builder shows a docked sample ship (day 1, seed 1) on the
- *                      instance. This is done after the scene is saved, so the
- *                      shown bar sizes and colors do not end up in the scene file.
- *                      With option A the shot has the reference width and height.
- *       sampleConditions[]   optional. Sets the condition of sample ship parts for
- *                      the screenshot, so it can show red, green and blue bars.
+ *                      instance, or, for an InventoryView, the sample ship's five
+ *                      parts in inventory slots 1-5. This is done after the scene
+ *                      is saved, so the shown bar sizes and colors do not end up in
+ *                      the scene file. With option A the shot has the reference
+ *                      width and height.
+ *       sampleConditions[]   optional. Sets the condition of sample ship parts
+ *                      for the screenshot, so it can show red, green and blue bars.
  *                      Parts not listed keep the generated sample ship's condition.
  *                      Each entry:
  *           part           "Engine", "HullPlate", "ShieldGenerator", "Thruster" or
  *                          "PowerCore"
  *           condition      whole number from 0 to 100
  *                      A bad part name, a repeated part or a condition outside
- *                      0-100 stops the build. The bar color is judged against the
- *                      sample ship's own required level (fighter 70%, freighter 60%;
- *                      the type comes from the generated ship and cannot be set).
+ *                      0-100 stops the build. On a ship the bar color is judged
+ *                      against the sample ship's own required level (fighter 70%,
+ *                      freighter 60%; the type comes from the generated ship and
+ *                      cannot be set). In the inventory panel the colors are:
+ *                      below 60% red, 60-69% green, 70% and more blue.
  *                      Example: "sampleConditions": [
  *                        { "part": "Engine", "condition": 35 },
  *                        { "part": "HullPlate", "condition": 65 },
  *                        { "part": "ShieldGenerator", "condition": 95 } ]
+ *
+ * DRAG HANDLES ON A SHIP (ShipView)
+ *   ShipView.slotAreas is an array of five SpriteRenderers, in part order (engine,
+ *   hull plate, shield generator, thruster, power core). Each one is the drag
+ *   handle of that part slot and also a drop target. Its sprite bounds are the hit
+ *   area, and it is the sprite that moves with the pointer. Link them like the
+ *   bar fills: { "owner": "ShipInBay", "component": "ShipView", "field": "slotAreas",
+ *   "index": 0, "target": "SlotArea_Engine", "targetType": "SpriteRenderer" }.
+ *   A ship view with no slotAreas still works, it just has no drag.
+ *
+ * INVENTORY PANEL (InventoryView)
+ *   Put "InventoryView" on the root. Fields to link:
+ *     slots   array of 10 records, slot 1 is index 0. Link each field with
+ *             "field": "slots", "index": <slot>, "subField": <name below>:
+ *               area          SpriteRenderer: drag handle and drop target of the slot
+ *               dragRoot      Transform, optional: what moves when the part is
+ *                             dragged (for example the slot group with its bar).
+ *                             Empty means the area sprite.
+ *               fill          SpriteRenderer: condition bar fill. Sprite pivot on the
+ *                             left edge, 1 world unit wide at scale 1. Its start
+ *                             X scale is the full bar (100%).
+ *               freighterMark Transform, optional: mark at the freighter level (60%)
+ *               fighterMark   Transform, optional: mark at the fighter level (70%)
+ *                             Marks are put in the same parent as the fill, at the
+ *                             right X. Their Y and Z stay as placed. The levels come
+ *                             from balance.json.
+ *     binArea    SpriteRenderer, "index": -1: dropping a part here bins it at once
+ *     panelArea  SpriteRenderer, "index": -1, optional: dropping a part on it (not on
+ *                a slot) puts the part in the first free slot
+ *   Example link: { "owner": "InventoryPanel", "component": "InventoryView",
+ *     "field": "slots", "index": 0, "subField": "fill",
+ *     "target": "Slot1_Fill", "targetType": "SpriteRenderer" }
+ *   A refused drop (wrong part type, full inventory, same slot) puts the part back.
  *
  * FULL EXAMPLE (the ship in a bay: body, five condition bars, ShipView, bay 1)
  *
@@ -219,6 +266,7 @@ namespace GoodEnoughRepairs.EditorTools
         public string component;
         public string field;
         public int index;
+        public string subField;
         public string target;
         public string targetType;
     }
@@ -508,6 +556,9 @@ namespace GoodEnoughRepairs.EditorTools
                 case "ShipView":
                     go.AddComponent<ShipView>();
                     return;
+                case "InventoryView":
+                    go.AddComponent<InventoryView>();
+                    return;
                 case "SpriteRenderer":
                     if (go.GetComponent<SpriteRenderer>() == null) go.AddComponent<SpriteRenderer>();
                     return;
@@ -523,6 +574,9 @@ namespace GoodEnoughRepairs.EditorTools
             {
                 case "ShipView":
                     c = go.GetComponent<ShipView>();
+                    break;
+                case "InventoryView":
+                    c = go.GetComponent<InventoryView>();
                     break;
                 case "SpriteRenderer":
                     c = go.GetComponent<SpriteRenderer>();
@@ -626,10 +680,23 @@ namespace GoodEnoughRepairs.EditorTools
             {
                 if (!prop.isArray) throw Fail(specPath, link.field + " is not an array");
                 if (prop.arraySize < link.index + 1) prop.arraySize = link.index + 1;
-                prop.GetArrayElementAtIndex(link.index).objectReferenceValue = value;
+                SerializedProperty element = prop.GetArrayElementAtIndex(link.index);
+                if (!string.IsNullOrEmpty(link.subField))
+                {
+                    element = element.FindPropertyRelative(link.subField);
+                    if (element == null)
+                    {
+                        throw Fail(specPath, link.field + " elements have no field " + link.subField);
+                    }
+                }
+                element.objectReferenceValue = value;
             }
             else
             {
+                if (!string.IsNullOrEmpty(link.subField))
+                {
+                    throw Fail(specPath, "subField needs an array element (index 0 or more) on " + link.field);
+                }
                 prop.objectReferenceValue = value;
             }
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -687,6 +754,7 @@ namespace GoodEnoughRepairs.EditorTools
             if (prefab == null) throw Fail(specPath, "prefab could not be loaded: " + spec.prefabPath);
             GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
             ShipView view = instance.GetComponent<ShipView>();
+            InventoryView invView = instance.GetComponent<InventoryView>();
 
             Vector3 pos;
             float scale;
@@ -714,7 +782,6 @@ namespace GoodEnoughRepairs.EditorTools
 
             if (!string.IsNullOrEmpty(sc.stationField))
             {
-                if (view == null) throw Fail(specPath, "the prefab has no ShipView to connect to " + sc.stationField);
                 StationView station = UnityEngine.Object.FindFirstObjectByType<StationView>();
                 if (station == null)
                 {
@@ -724,7 +791,15 @@ namespace GoodEnoughRepairs.EditorTools
                 SerializedObject so = new SerializedObject(station);
                 SerializedProperty prop = so.FindProperty(sc.stationField);
                 if (prop == null) throw Fail(specPath, "StationView has no field " + sc.stationField);
-                prop.objectReferenceValue = view;
+
+                bool wantsInventory = prop.type != null && prop.type.Contains("InventoryView");
+                UnityEngine.Object component = wantsInventory ? (UnityEngine.Object)invView : view;
+                if (component == null)
+                {
+                    throw Fail(specPath, "the prefab root has no " + (wantsInventory ? "InventoryView" : "ShipView") +
+                        " to connect to " + sc.stationField);
+                }
+                prop.objectReferenceValue = component;
                 so.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(station);
             }
@@ -735,19 +810,22 @@ namespace GoodEnoughRepairs.EditorTools
 
             if (!string.IsNullOrEmpty(sc.screenshot))
             {
-                if (view == null) throw Fail(specPath, "a screenshot needs a ShipView on the prefab root");
+                if (view == null && invView == null)
+                {
+                    throw Fail(specPath, "a screenshot needs a ShipView or an InventoryView on the prefab root");
+                }
                 int w = screenPlacement ? Mathf.RoundToInt(sc.refWidth) : 1280;
                 int h = screenPlacement ? Mathf.RoundToInt(sc.refHeight) : 720;
-                TakeScreenshot(view, cam, sc.screenshot, SampleOverrides(sc, specPath), w, h, specPath);
+                TakeScreenshot(view, invView, cam, sc.screenshot, SampleOverrides(sc, specPath), w, h, specPath);
             }
 
             if (screenPlacement) cam.ResetAspect();
         }
 
-        // Done after the scene is saved: Show changes bar scales and colors, and
-        // that must not end up in the scene file.
-        private static void TakeScreenshot(ShipView view, Camera cam, string fileName, int[] conditions,
-            int w, int h, string specPath)
+        // Done after the scene is saved: showing the sample changes bar scales and
+        // colors, and that must not end up in the scene file.
+        private static void TakeScreenshot(ShipView view, InventoryView invView, Camera cam, string fileName,
+            int[] conditions, int w, int h, string specPath)
         {
             BalanceData balance = BalanceLoader.Load();
             if (balance == null) throw Fail(specPath, "the balance could not be loaded for the sample ship");
@@ -756,7 +834,25 @@ namespace GoodEnoughRepairs.EditorTools
             Ship ship = ShipFactory.Create(balance, balance.days[0], new System.Random(1));
             DockingBays bays = new DockingBays();
             bays.TryDock(ship);
-            view.Show(ship, surplusMargin, conditions);
+
+            if (view != null)
+            {
+                view.Show(ship, surplusMargin, conditions);
+            }
+            else
+            {
+                // The sample ship's five parts go into inventory slots 1-5.
+                Inventory inventory = new Inventory();
+                PartType[] types = PartTypes.All;
+                for (int i = 0; i < types.Length; i++)
+                {
+                    Part real = ship.GetPart(types[i]);
+                    int condition = conditions[i] >= 0 ? conditions[i] : (real == null ? 0 : real.Condition);
+                    int slot;
+                    inventory.TryAdd(new Part(types[i], condition), out slot);
+                }
+                invView.Bind(new PartMoves(inventory, balance), balance);
+            }
 
             RenderTexture rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32);
             RenderTexture oldTarget = cam.targetTexture;
