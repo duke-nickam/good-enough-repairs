@@ -586,10 +586,12 @@ class Runner:
             reads = {p: self.ws.read(p) for p in card.reads}
         failed = None if checks_ok else hashlib.sha1(checks_text.encode("utf-8")).hexdigest()[:12]
         before = None  # the previous attempt's failed checks, only since the last designer input
+        rejected_before = False  # the previous attempt was rejected, since the last designer input
         for c in reversed(issue.comments):
             m = c.marker
             if m and m.get("event") in ("rejected", "reset", "needs_designer", "approved", "accepted"):
-                before = m.get("failed") if m.get("event") == "rejected" else None
+                rejected_before = m.get("event") == "rejected"
+                before = m.get("failed") if rejected_before else None
                 break
         if failed and failed == before:  # no progress across attempts: the agent cannot fix this itself
             total = self.add_tokens(t, usages)
@@ -605,12 +607,14 @@ class Runner:
         self.board.set_status(n, "In review")
         log(reviewer, f"#{n}: reviewing (checks {'pass' if checks_ok else 'FAIL'}"
                       f"{f', {len(shots)} screenshot(s)' if shots else ''})")
+        review_used = ""
         try:
             verdict, usage, _ = self.agents.review(card.reviewer, card.to_markdown(), summary, written, checks_text,
                                                    self.thread_text(self.board.issue(n)),
                                                    reads={p: c for p, c in reads.items() if p not in written},
                                                    images=shots)
             usages.append(usage)
+            review_used = f"Review used: {describe_tokens(usage)}. "
         except (AgentError, ValueError) as e:
             verdict = {"verdict": "reject", "summary": f"Review reply unusable ({e}).", "issues": []}
         issues = verdict.get("issues") or []
@@ -623,7 +627,7 @@ class Runner:
             self.board.comment(n, crew_comment(
                 reviewer, f"Approved: {verdict.get('summary', '')}\n\n{lines}\n\nThis task writes in docs/crew/, so "
                           "the designer approves it too: move it to Done to accept, or comment and move it to Todo."
-                          f"\n\nChecks:\n{checks_text}\n\nTask total: {total:,} tokens.",
+                          f"\n\nChecks:\n{checks_text}\n\n{review_used}Task total: {total:,} tokens.",
                 "needs_designer", attempt=attempt))
             log(reviewer, f"#{n}: approved, waits for the designer (docs/crew/)")
         elif approve:
@@ -631,14 +635,16 @@ class Runner:
             self.board.set_status(n, "Done")
             self.board.close(n)
             self.board.comment(n, crew_comment(reviewer, f"Approved: {verdict.get('summary', '')}\n\n{lines}\n\n"
-                                                         f"Checks:\n{checks_text}\n\nTask total: {total:,} tokens.",
-                                               "approved", attempt=attempt))
+                                                         f"Checks:\n{checks_text}\n\n{review_used}Task total: "
+                                                         f"{total:,} tokens.", "approved", attempt=attempt))
             log(reviewer, f"#{n}: approved, Done ({total:,} tokens)")
         else:
             reason = verdict.get("summary", "")
             if not checks_ok and verdict.get("verdict") == "approve":
                 reason = "The reviewer approved, but a check failed, so it is rejected. " + reason
-            self.reject(t, attempt, f"{reason}\n\n{lines}\n\nChecks:\n{checks_text}", usages, reviewer, failed=failed)
+            stuck = bool(verdict.get("repeat")) and rejected_before  # same problem twice: the agent cannot fix it
+            self.reject(t, attempt, f"{reason}\n\n{lines}\n\nChecks:\n{checks_text}\n\n{review_used}".rstrip(),
+                        usages, reviewer, failed=failed, stuck=stuck)
 
     def note_done(self, issue):
         """May the Programmer write code? Yes after the Director approved the note, or after designer input on it."""
@@ -717,10 +723,19 @@ class Runner:
                 "needs_designer", attempt=attempt))
             log("Director", f"#{n}: design note has open questions, Needs designer")
 
-    def reject(self, t, attempt, text, usages, who, failed=None):
+    def reject(self, t, attempt, text, usages, who, failed=None, stuck=False):
         n = t.number
         total = self.add_tokens(t, usages)
-        if attempt >= self.max:
+        if stuck and attempt < self.max:
+            self.board.set_status(n, "Needs designer")
+            alert(self.s, "needs_designer")
+            self.board.comment(n, crew_comment(who, f"Rejected on attempt {attempt}/{self.max}: {text}\n\nThis is the "
+                                                    "same problem as the last rejection, so the agent cannot fix it by "
+                                                    "itself: Needs designer. Answer or change the task, then move it to "
+                                                    f"Todo. Task total: {total:,} tokens.", "needs_designer",
+                                               attempt=attempt))
+            log(who, f"#{n}: rejected twice for the same problem, Needs designer")
+        elif attempt >= self.max:
             self.board.set_status(n, "Needs designer")
             alert(self.s, "needs_designer")
             self.board.comment(n, crew_comment(who, f"Rejected on attempt {attempt}/{self.max}: {text}\n\n"

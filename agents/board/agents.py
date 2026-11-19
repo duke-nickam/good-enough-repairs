@@ -124,7 +124,9 @@ docs/crew/ or the task already answers, and never a question about code."""
 REVIEW_FORMAT = """Reply with one JSON object only, no other text:
 {"verdict": "approve" or "reject", "summary": "<one sentence>",
  "issues": [{"where": "<file and place>", "problem": "<what is wrong, and the GDD rule or criterion it breaks>",
-             "fix": "<concrete fix>"}]}
+             "fix": "<concrete fix>"}],
+ "repeat": true or false}
+repeat: true when you reject for the same main problem as the last rejection in "Earlier in this task".
 Reject only for real problems: a broken acceptance criterion, a GDD contradiction, a failed check, wrong format.
 Taste alone is not a reason to reject; mention it as an issue on an approval. At most 6 issues.
 The check results above come from the runner, which ran the checks on exactly the files shown: take them as given.
@@ -144,14 +146,16 @@ def total_tokens(usage):
 
 
 def sum_usage(usages):
-    keys = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
+    keys = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens", "turns")
     return {k: sum(int(u.get(k) or 0) for u in usages) for k in keys}
 
 
 def describe_tokens(usage):
-    cached = int(usage.get("cache_creation_input_tokens") or 0) + int(usage.get("cache_read_input_tokens") or 0)
-    return (f"{total_tokens(usage):,} tokens (in {int(usage.get('input_tokens') or 0):,}, cached {cached:,}, "
-            f"out {int(usage.get('output_tokens') or 0):,})")
+    turns = int(usage.get("turns") or 0)
+    return (f"{total_tokens(usage):,} tokens (in {int(usage.get('input_tokens') or 0):,}, "
+            f"cache write {int(usage.get('cache_creation_input_tokens') or 0):,}, "
+            f"cache read {int(usage.get('cache_read_input_tokens') or 0):,}, "
+            f"out {int(usage.get('output_tokens') or 0):,}" + (f", {turns} turns" if turns else "") + ")")
 
 
 def gdd_sections(text, names):
@@ -385,7 +389,9 @@ class ClaudeAgents:
         data = json.loads(res.stdout)
         if data.get("is_error"):
             raise AgentError(f"{AGENTS[agent]}: {data.get('result', '')[:500]}")
-        return data.get("result", ""), data.get("usage", {}), model
+        usage = dict(data.get("usage") or {})
+        usage["turns"] = int(data.get("num_turns") or 0)  # a screenshot review needs extra turns to open the image
+        return data.get("result", ""), usage, model
 
     # ------------------------------------------------------------ the three kinds of work
 
