@@ -42,6 +42,42 @@ namespace GoodEnoughRepairs
     }
 
     /// <summary>
+    /// Helpers that connect sprites on screen with IMGUI: the pointer in world
+    /// space, and a sprite's rectangle in IMGUI space (for text drawn over it).
+    /// </summary>
+    public static class SpriteScreen
+    {
+        /// <summary>World point under an IMGUI mouse position. False without a camera.</summary>
+        public static bool TryWorld(Vector2 guiPoint, out Vector3 world)
+        {
+            world = Vector3.zero;
+            Camera cam = Camera.main;
+            if (cam == null) return false;
+            float depth = Mathf.Abs(cam.transform.position.z);
+            world = cam.ScreenToWorldPoint(new Vector3(guiPoint.x, Screen.height - guiPoint.y, depth));
+            world.z = 0f;
+            return true;
+        }
+
+        /// <summary>The sprite's bounds as an IMGUI rectangle. False when it cannot be shown.</summary>
+        public static bool TryRect(SpriteRenderer sr, out Rect rect)
+        {
+            rect = new Rect();
+            Camera cam = Camera.main;
+            if (cam == null || sr == null || sr.sprite == null || !sr.gameObject.activeInHierarchy) return false;
+            Bounds b = sr.bounds;
+            Vector3 a = cam.WorldToScreenPoint(b.min);
+            Vector3 c = cam.WorldToScreenPoint(b.max);
+            float xMin = Mathf.Min(a.x, c.x);
+            float xMax = Mathf.Max(a.x, c.x);
+            float yMin = Mathf.Min(a.y, c.y);
+            float yMax = Mathf.Max(a.y, c.y);
+            rect = new Rect(xMin, Screen.height - yMax, xMax - xMin, yMax - yMin);
+            return true;
+        }
+    }
+
+    /// <summary>
     /// Shared drag helper for sprites. A drag lifts a sprite (and its children)
     /// above the others and moves it with the pointer. End puts it back exactly
     /// where it was, which is the snap back of a refused move. No rules here.
@@ -103,8 +139,10 @@ namespace GoodEnoughRepairs
     /// <summary>
     /// A ship shown with sprites. Put it on a prefab. It shows a ship body and five
     /// part condition bars (in PartTypes.All order: engine, hull plate, shield
-    /// generator, thruster, power core). It only displays what it is given and
-    /// holds no rules.
+    /// generator, thruster, power core), a buy button next to each slot and a
+    /// release button. It only displays what it is given and holds no rules: the
+    /// buy buttons are active when the #101 buy preview says CanBuy, and a click
+    /// asks the WarningView to show the warning.
     ///
     /// Each bar fill is a SpriteRenderer whose sprite pivot is on the left edge.
     /// Its X scale at start is the full bar (100%); Show scales it to the part's
@@ -113,6 +151,7 @@ namespace GoodEnoughRepairs
     /// slotAreas are the five part slots as drag handles and drop targets, in the
     /// same order. The drag itself is run by InventoryView.
     /// </summary>
+    [DefaultExecutionOrder(-100)]
     public sealed class ShipView : MonoBehaviour
     {
         private static readonly List<ShipView> active = new List<ShipView>();
@@ -133,6 +172,22 @@ namespace GoodEnoughRepairs
         [Tooltip("Five part slot sprites, same order. Each is a drag handle (its bounds are the hit area) and a drop target.")]
         public SpriteRenderer[] slotAreas = new SpriteRenderer[GameRules.PartSlotsPerShip];
 
+        [Header("Buy and release")]
+        [Tooltip("Five buy button sprites, same order. Each is a click area. Active only for an empty or weak slot.")]
+        public SpriteRenderer[] buyButtons = new SpriteRenderer[GameRules.PartSlotsPerShip];
+
+        [Tooltip("The release button sprite. Click area of the release button.")]
+        public SpriteRenderer releaseButton;
+
+        public Color buyActiveColor = Color.white;
+        public Color buyInactiveColor = new Color(0.45f, 0.45f, 0.45f, 0.6f);
+
+        [Tooltip("Text on a buy button. {0} is the price.")]
+        public string buyLabel = "Buy {0}";
+
+        [Tooltip("Text on the release button.")]
+        public string releaseLabel = "Release";
+
         [Header("Colors")]
         public Color belowColor = BarColors.Below;
         public Color passesColor = BarColors.Passes;
@@ -140,6 +195,9 @@ namespace GoodEnoughRepairs
         public Color surplusColor = BarColors.Surplus;
 
         private Vector3[] fullScales;
+        private BuyRelease buyRelease;
+        private WarningView warning;
+        private GUIStyle labelStyle;
 
         /// <summary>The ship shown now, or null for an empty bay.</summary>
         public Ship CurrentShip { get; private set; }
@@ -152,6 +210,99 @@ namespace GoodEnoughRepairs
         private void OnDisable()
         {
             active.Remove(this);
+        }
+
+        /// <summary>
+        /// Connects the buy and release buttons to the commands and the shared
+        /// warning dialog. Call again to connect to others.
+        /// </summary>
+        public void Bind(BuyRelease commands, WarningView warningView)
+        {
+            buyRelease = commands;
+            warning = warningView;
+            RefreshButtons();
+        }
+
+        private void Update()
+        {
+            RefreshButtons();
+        }
+
+        /// <summary>True when the buy button of slot i (PartTypes.All order) is active.</summary>
+        public bool IsBuyActive(int i)
+        {
+            if (buyRelease == null || CurrentShip == null) return false;
+            if (i < 0 || i >= GameRules.PartSlotsPerShip) return false;
+            return buyRelease.PreviewBuy(CurrentShip, PartTypes.All[i]).CanBuy;
+        }
+
+        private void RefreshButtons()
+        {
+            if (buyRelease == null || CurrentShip == null || buyButtons == null) return;
+            for (int i = 0; i < buyButtons.Length && i < GameRules.PartSlotsPerShip; i++)
+            {
+                SpriteRenderer b = buyButtons[i];
+                if (b == null) continue;
+                b.color = IsBuyActive(i) ? buyActiveColor : buyInactiveColor;
+            }
+        }
+
+        // Clicks come from IMGUI like the drag and drop. This runs early (execution
+        // order), and a used event is not seen by StationView's bay click.
+        private void OnGUI()
+        {
+            Event e = Event.current;
+            if (e == null || buyRelease == null || CurrentShip == null) return;
+
+            if (e.type == EventType.Repaint)
+            {
+                DrawLabels();
+            }
+            else if (e.type == EventType.MouseDown && e.button == 0)
+            {
+                if (warning == null || warning.IsOpen) return;
+                Vector3 world;
+                if (SpriteScreen.TryWorld(e.mousePosition, out world)) HandleClick(world, e);
+            }
+        }
+
+        private void HandleClick(Vector3 world, Event e)
+        {
+            int count = buyButtons == null ? 0 : buyButtons.Length;
+            for (int i = 0; i < count && i < GameRules.PartSlotsPerShip; i++)
+            {
+                if (!DragVisual.Hits(buyButtons[i], world)) continue;
+                e.Use();
+                if (IsBuyActive(i)) warning.RequestBuy(CurrentShip, PartTypes.All[i]);
+                return;
+            }
+
+            if (DragVisual.Hits(releaseButton, world))
+            {
+                e.Use();
+                warning.RequestRelease(CurrentShip);
+            }
+        }
+
+        private void DrawLabels()
+        {
+            if (labelStyle == null)
+            {
+                labelStyle = new GUIStyle(GUI.skin.label);
+                labelStyle.alignment = TextAnchor.MiddleCenter;
+            }
+
+            int count = buyButtons == null ? 0 : buyButtons.Length;
+            for (int i = 0; i < count && i < GameRules.PartSlotsPerShip; i++)
+            {
+                Rect r;
+                if (!SpriteScreen.TryRect(buyButtons[i], out r)) continue;
+                BuyPreview p = buyRelease.PreviewBuy(CurrentShip, PartTypes.All[i]);
+                GUI.Label(r, string.Format(buyLabel, p.Price), labelStyle);
+            }
+
+            Rect rr;
+            if (SpriteScreen.TryRect(releaseButton, out rr)) GUI.Label(rr, releaseLabel, labelStyle);
         }
 
         /// <summary>Index (PartTypes.All order) of the slot under a world point, or -1.</summary>
@@ -221,6 +372,8 @@ namespace GoodEnoughRepairs
                 fill.transform.localScale = new Vector3(full.x * fraction, full.y, full.z);
                 fill.color = BarColors.ColorOf(band, belowColor, passesColor, surplusColor);
             }
+
+            RefreshButtons();
         }
 
         /// <summary>

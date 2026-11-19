@@ -25,12 +25,20 @@ namespace GoodEnoughRepairs
         /// </summary>
         public InventoryView inventoryView;
 
+        /// <summary>
+        /// Optional warning dialog prefab instance. When assigned, it gets the buy
+        /// and release commands and the mechanic's lines, and the ship view buy and
+        /// release buttons use it.
+        /// </summary>
+        public WarningView warningView;
+
         private const float Margin = 20f;
         private const float Gap = 16f;
         private const float BayHeight = 150f;
 
         private BalanceData balance;
         private DockingBays bays;
+        private BuyRelease buyRelease;
         private System.Random shipRandom;
         private Ship[] shown;
         private ShipPanel[] views;
@@ -60,7 +68,14 @@ namespace GoodEnoughRepairs
             bays.ShipLeft += OnShipLeft;
             untilNextShipMs = 0f;
 
-            if (inventoryView != null) inventoryView.Bind(new PartMoves(new Inventory(), balance), balance);
+            // One shared inventory for the move, bin, buy and release commands.
+            Inventory inventory = new Inventory();
+            buyRelease = new BuyRelease(bays, inventory, balance);
+            buyRelease.PartBought += OnPartBought;
+
+            if (inventoryView != null) inventoryView.Bind(new PartMoves(inventory, balance), balance);
+            if (warningView != null) warningView.Bind(buyRelease, ContentLoader.Load());
+            if (bay1View != null) bay1View.Bind(buyRelease, warningView);
         }
 
         private void Update()
@@ -138,6 +153,7 @@ namespace GoodEnoughRepairs
             if (bays == null) return;
             bays.ShipDocked -= OnShipDocked;
             bays.ShipLeft -= OnShipLeft;
+            if (buyRelease != null) buyRelease.PartBought -= OnPartBought;
         }
 
         private void OnShipDocked(Ship ship, int bay)
@@ -149,6 +165,12 @@ namespace GoodEnoughRepairs
         {
             shown[bay] = null;
             views[bay] = null;
+        }
+
+        // A bought part can send the old part to the inventory: redraw the panel.
+        private void OnPartBought(BuyResult result)
+        {
+            if (inventoryView != null) inventoryView.Refresh();
         }
 
         private void DrawBay(int bay)

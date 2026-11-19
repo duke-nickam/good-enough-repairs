@@ -3,7 +3,8 @@
  *
  * Turns a prefab spec (a JSON file) into a prefab. It can also place an instance
  * in a scene, connect it to a StationView field, show a docked sample ship (or a
- * sample inventory) in edit mode and save a screenshot outside the project.
+ * sample inventory, or a sample warning dialog) in edit mode and save a
+ * screenshot outside the project.
  *
  * HOW TO RUN
  *   PrefabSpecBuilder.BuildAll()          builds every *.spec.json under Assets/
@@ -51,20 +52,22 @@
  *       components[]   extra components to attach, from this fixed list:
  *                        "ShipView"        the ship view (UX assembly)
  *                        "InventoryView"   the inventory panel with drag and drop
+ *                        "WarningView"     the buy and release warning dialog
  *                        "SpriteRenderer"  an empty SpriteRenderer (not needed
  *                                          when "sprite" is set)
  *                      An unknown name stops the build. A new type needs one line
  *                      in the builder's code.
  *   links[]       sets a reference field on a component to another object:
  *       owner          name of the object that holds the component
- *       component      "ShipView", "InventoryView", "SpriteRenderer" or "Transform"
+ *       component      "ShipView", "InventoryView", "WarningView", "SpriteRenderer"
+ *                      or "Transform"
  *       field          the serialized field name, for example "body" or "barFills"
  *       index          -1 for a single field (default is 0, so write -1); 0 or more
  *                      for an element of an array field (the array grows if needed)
  *       subField       optional. Only with index 0 or more, when the array holds
  *                      small records (InventoryView.slots): the name of the field
  *                      inside that record, for example "fill". Leave it out for
- *                      arrays of plain references (barFills, slotAreas).
+ *                      arrays of plain references (barFills, slotAreas, buyButtons).
  *       target         name of the object to point at
  *       targetType     what to point at on the target: "GameObject",
  *                      "SpriteRenderer" or "Transform"
@@ -72,9 +75,9 @@
  *       path           scene file, for example "Assets/Scenes/Main.unity". It must
  *                      exist (the builder never creates scenes).
  *       stationField   name of the StationView field that gets the instance's
- *                      component, for example "bay1View" (gets the ShipView) or
- *                      "inventoryView" (gets the InventoryView). Empty means do not
- *                      connect.
+ *                      component, for example "bay1View" (gets the ShipView),
+ *                      "inventoryView" (gets the InventoryView) or "warningView"
+ *                      (gets the WarningView). Empty means do not connect.
  *       Placement, option A: fit into a screen rectangle (ship prefabs)
  *         refWidth, refHeight   reference screen size in pixels, for example 1280, 720.
  *                      Before placing, the builder sets the camera aspect to
@@ -94,16 +97,20 @@
  *                         centering (for example -0.65)
  *       Placement, option B (used when rectW is 0): worldX, worldY, worldScale
  *                      (worldScale 0 means 1). The prefab origin is placed there.
- *                      Use this for the inventory panel.
+ *                      Use this for the inventory panel and the warning dialog.
  *       screenshot     file name of the screenshot, for example "ship_in_bay.png".
  *                      Empty means no screenshot. It is saved in the system temp
  *                      folder under ger_shots, outside the project. Before the shot
  *                      the builder shows a docked sample ship (day 1, seed 1) on the
  *                      instance, or, for an InventoryView, the sample ship's five
- *                      parts in inventory slots 1-5. This is done after the scene
- *                      is saved, so the shown bar sizes and colors do not end up in
- *                      the scene file. With option A the shot has the reference
- *                      width and height.
+ *                      parts in inventory slots 1-5, or, for a WarningView, the
+ *                      warning dialog open on the sample ship. This is done after
+ *                      the scene is saved, so the shown bar sizes and colors do not
+ *                      end up in the scene file. With option A the shot has the
+ *                      reference width and height. Text drawn with OnGUI (button
+ *                      labels, the dialog message) is not in the screenshot.
+ *       sampleDialog   only for a WarningView prefab: "release" (default) or "buy".
+ *                      Which warning the screenshot shows.
  *       sampleConditions[]   optional. Sets the condition of sample ship parts
  *                      for the screenshot, so it can show red, green and blue bars.
  *                      Parts not listed keep the generated sample ship's condition.
@@ -130,6 +137,36 @@
  *   bar fills: { "owner": "ShipInBay", "component": "ShipView", "field": "slotAreas",
  *   "index": 0, "target": "SlotArea_Engine", "targetType": "SpriteRenderer" }.
  *   A ship view with no slotAreas still works, it just has no drag.
+ *
+ * BUY AND RELEASE BUTTONS ON A SHIP (ShipView)
+ *   ShipView.buyButtons is an array of five SpriteRenderers in part order, one buy
+ *   button next to each slot. The sprite bounds are the click area. The view tints
+ *   the sprite with buyActiveColor when the slot is empty or weak (the buy preview
+ *   says it can be bought) and with buyInactiveColor otherwise, and writes the price
+ *   on it. ShipView.releaseButton is one SpriteRenderer, the release button.
+ *   Link them like the bar fills:
+ *   { "owner": "ShipInBay", "component": "ShipView", "field": "buyButtons",
+ *     "index": 0, "target": "BuyButton_Engine", "targetType": "SpriteRenderer" }
+ *   { "owner": "ShipInBay", "component": "ShipView", "field": "releaseButton",
+ *     "index": -1, "target": "ReleaseButton", "targetType": "SpriteRenderer" }
+ *   Without these links the ship view still works, it just has no buttons.
+ *
+ * WARNING DIALOG (WarningView)
+ *   Put "WarningView" on the root of its own prefab. One dialog serves all bays.
+ *   Fields to link, all with "index": -1:
+ *     dialogRoot      GameObject: a child that holds all the dialog sprites. It is
+ *                     hidden when the game starts and shown while a warning is open.
+ *                     The WarningView must not be on this object.
+ *     panel           SpriteRenderer: dialog background
+ *     textArea        SpriteRenderer, optional: where the message is written (the
+ *                     panel is used when empty)
+ *     confirmButton   SpriteRenderer: click area of Confirm
+ *     cancelButton    SpriteRenderer: click area of Cancel
+ *   Example link: { "owner": "WarningDialog", "component": "WarningView",
+ *     "field": "dialogRoot", "index": -1, "target": "DialogRoot",
+ *     "targetType": "GameObject" }
+ *   Connect it to the station with "stationField": "warningView".
+ *   Give the sprites a high sortingOrder so the dialog is above the ships.
  *
  * INVENTORY PANEL (InventoryView)
  *   Put "InventoryView" on the root. Fields to link:
@@ -295,6 +332,7 @@ namespace GoodEnoughRepairs.EditorTools
         public float worldY;
         public float worldScale;
         public string screenshot;
+        public string sampleDialog;
         public SpecPartCondition[] sampleConditions;
     }
 
@@ -389,7 +427,15 @@ namespace GoodEnoughRepairs.EditorTools
                 }
             }
 
-            if (spec.scene != null) SampleOverrides(spec.scene, specPath);
+            if (spec.scene != null)
+            {
+                SampleOverrides(spec.scene, specPath);
+                string d = spec.scene.sampleDialog;
+                if (!string.IsNullOrEmpty(d) && d != "buy" && d != "release")
+                {
+                    throw Fail(specPath, "scene.sampleDialog must be \"buy\" or \"release\"");
+                }
+            }
         }
 
         // Index of a part name in the game's part order (PartTypes.All), or -1.
@@ -559,6 +605,9 @@ namespace GoodEnoughRepairs.EditorTools
                 case "InventoryView":
                     go.AddComponent<InventoryView>();
                     return;
+                case "WarningView":
+                    go.AddComponent<WarningView>();
+                    return;
                 case "SpriteRenderer":
                     if (go.GetComponent<SpriteRenderer>() == null) go.AddComponent<SpriteRenderer>();
                     return;
@@ -577,6 +626,9 @@ namespace GoodEnoughRepairs.EditorTools
                     break;
                 case "InventoryView":
                     c = go.GetComponent<InventoryView>();
+                    break;
+                case "WarningView":
+                    c = go.GetComponent<WarningView>();
                     break;
                 case "SpriteRenderer":
                     c = go.GetComponent<SpriteRenderer>();
@@ -755,6 +807,7 @@ namespace GoodEnoughRepairs.EditorTools
             GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
             ShipView view = instance.GetComponent<ShipView>();
             InventoryView invView = instance.GetComponent<InventoryView>();
+            WarningView warnView = instance.GetComponent<WarningView>();
 
             Vector3 pos;
             float scale;
@@ -792,12 +845,27 @@ namespace GoodEnoughRepairs.EditorTools
                 SerializedProperty prop = so.FindProperty(sc.stationField);
                 if (prop == null) throw Fail(specPath, "StationView has no field " + sc.stationField);
 
-                bool wantsInventory = prop.type != null && prop.type.Contains("InventoryView");
-                UnityEngine.Object component = wantsInventory ? (UnityEngine.Object)invView : view;
+                string propType = prop.type ?? "";
+                UnityEngine.Object component;
+                string needed;
+                if (propType.Contains("WarningView"))
+                {
+                    component = warnView;
+                    needed = "WarningView";
+                }
+                else if (propType.Contains("InventoryView"))
+                {
+                    component = invView;
+                    needed = "InventoryView";
+                }
+                else
+                {
+                    component = view;
+                    needed = "ShipView";
+                }
                 if (component == null)
                 {
-                    throw Fail(specPath, "the prefab root has no " + (wantsInventory ? "InventoryView" : "ShipView") +
-                        " to connect to " + sc.stationField);
+                    throw Fail(specPath, "the prefab root has no " + needed + " to connect to " + sc.stationField);
                 }
                 prop.objectReferenceValue = component;
                 so.ApplyModifiedPropertiesWithoutUndo();
@@ -810,13 +878,15 @@ namespace GoodEnoughRepairs.EditorTools
 
             if (!string.IsNullOrEmpty(sc.screenshot))
             {
-                if (view == null && invView == null)
+                if (view == null && invView == null && warnView == null)
                 {
-                    throw Fail(specPath, "a screenshot needs a ShipView or an InventoryView on the prefab root");
+                    throw Fail(specPath,
+                        "a screenshot needs a ShipView, an InventoryView or a WarningView on the prefab root");
                 }
                 int w = screenPlacement ? Mathf.RoundToInt(sc.refWidth) : 1280;
                 int h = screenPlacement ? Mathf.RoundToInt(sc.refHeight) : 720;
-                TakeScreenshot(view, invView, cam, sc.screenshot, SampleOverrides(sc, specPath), w, h, specPath);
+                TakeScreenshot(view, invView, warnView, sc.sampleDialog, cam, sc.screenshot,
+                    SampleOverrides(sc, specPath), w, h, specPath);
             }
 
             if (screenPlacement) cam.ResetAspect();
@@ -824,8 +894,8 @@ namespace GoodEnoughRepairs.EditorTools
 
         // Done after the scene is saved: showing the sample changes bar scales and
         // colors, and that must not end up in the scene file.
-        private static void TakeScreenshot(ShipView view, InventoryView invView, Camera cam, string fileName,
-            int[] conditions, int w, int h, string specPath)
+        private static void TakeScreenshot(ShipView view, InventoryView invView, WarningView warnView,
+            string dialog, Camera cam, string fileName, int[] conditions, int w, int h, string specPath)
         {
             BalanceData balance = BalanceLoader.Load();
             if (balance == null) throw Fail(specPath, "the balance could not be loaded for the sample ship");
@@ -834,15 +904,35 @@ namespace GoodEnoughRepairs.EditorTools
             Ship ship = ShipFactory.Create(balance, balance.days[0], new System.Random(1));
             DockingBays bays = new DockingBays();
             bays.TryDock(ship);
+            Inventory inventory = new Inventory();
 
             if (view != null)
             {
+                view.Bind(new BuyRelease(bays, inventory, balance), null);
                 view.Show(ship, surplusMargin, conditions);
+            }
+            else if (warnView != null)
+            {
+                BuyRelease commands = new BuyRelease(bays, inventory, balance);
+                warnView.Bind(commands, ContentLoader.Load());
+                if (dialog == "buy")
+                {
+                    bool opened = false;
+                    PartType[] types = PartTypes.All;
+                    for (int i = 0; i < types.Length && !opened; i++)
+                    {
+                        opened = warnView.OpenBuy(ship, types[i]);
+                    }
+                    if (!opened) throw Fail(specPath, "the sample ship has no slot that can be bought");
+                }
+                else
+                {
+                    warnView.OpenRelease(ship);
+                }
             }
             else
             {
                 // The sample ship's five parts go into inventory slots 1-5.
-                Inventory inventory = new Inventory();
                 PartType[] types = PartTypes.All;
                 for (int i = 0; i < types.Length; i++)
                 {
