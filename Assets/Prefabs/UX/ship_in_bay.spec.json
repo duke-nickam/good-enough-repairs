@@ -50,7 +50,7 @@
     "stationField": "bay1View",
     "refWidth": 1280, "refHeight": 720,
     "rectX": 20, "rectY": 20, "rectW": 260, "rectH": 150,
-    "contentHeight": 4.0, "offsetY": 0,
+    "contentHeight": 3.7, "offsetY": 0,
     "screenshot": "ship_in_bay.png",
     "sampleConditions": [
       { "part": "Engine", "condition": 35 },
