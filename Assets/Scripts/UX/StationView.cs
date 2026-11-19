@@ -75,7 +75,11 @@ namespace GoodEnoughRepairs
             bays.TryDock(ship);
         }
 
-        /// <summary>Puts the ship sprite at the center of bay 1's rectangle on screen.</summary>
+        /// <summary>
+        /// Puts the ship at the center of bay 1's rectangle on screen. The ship is
+        /// centered on its content bounds (body and bars), the same rule the
+        /// prefab builder uses (ShipView.CenterOn).
+        /// </summary>
         private static void CenterInBay1(ShipView view)
         {
             Camera cam = Camera.main;
@@ -88,13 +92,7 @@ namespace GoodEnoughRepairs
             Vector3 target = cam.ScreenToWorldPoint(screen);
             target.z = t.position.z;
             t.position = target;
-
-            if (view.body != null)
-            {
-                Vector3 offset = target - view.body.bounds.center;
-                offset.z = 0f;
-                t.position += offset;
-            }
+            view.CenterOn(target);
         }
 
         private void OnGUI()

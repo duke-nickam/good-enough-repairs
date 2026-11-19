@@ -48,7 +48,16 @@
   "scene": {
     "path": "Assets/Scenes/Main.unity",
     "stationField": "bay1View",
-    "worldX": -6.806, "worldY": 3.822, "worldScale": 0.563,
-    "screenshot": "ship_in_bay.png"
+    "refWidth": 1280, "refHeight": 720,
+    "rectX": 20, "rectY": 20, "rectW": 260, "rectH": 150,
+    "contentHeight": 3.7, "offsetY": 0,
+    "screenshot": "ship_in_bay.png",
+    "sampleConditions": [
+      { "part": "Engine", "condition": 35 },
+      { "part": "HullPlate", "condition": 20 },
+      { "part": "ShieldGenerator", "condition": 98 },
+      { "part": "Thruster", "condition": 72 },
+      { "part": "PowerCore", "condition": 100 }
+    ]
   }
 }

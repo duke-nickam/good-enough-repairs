@@ -72,6 +72,17 @@ namespace GoodEnoughRepairs
         /// </summary>
         public void Show(Ship ship, int surplusMargin)
         {
+            Show(ship, surplusMargin, null);
+        }
+
+        /// <summary>
+        /// Shows the ship, with optional sample conditions for the prefab builder's
+        /// screenshot. conditionOverrides has one entry per part slot (PartTypes.All
+        /// order): 0-100 to show that condition instead of the part's, or -1 to show
+        /// the real part. Pass null to show the real parts. The ship is not changed.
+        /// </summary>
+        public void Show(Ship ship, int surplusMargin, int[] conditionOverrides)
+        {
             if (ship == null)
             {
                 if (gameObject.activeSelf) gameObject.SetActive(false);
@@ -89,20 +100,99 @@ namespace GoodEnoughRepairs
                 if (fill == null) continue;
 
                 Part part = ship.GetPart(types[i]);
-                int condition = part == null ? Part.MinCondition : part.Condition;
+                bool overridden = conditionOverrides != null && i < conditionOverrides.Length &&
+                    conditionOverrides[i] >= Part.MinCondition;
+
+                int condition;
+                BarBandKind band;
+                if (overridden)
+                {
+                    condition = Mathf.Clamp(conditionOverrides[i], Part.MinCondition, Part.MaxCondition);
+                    band = BarBand.Of(condition, ship.RequiredLevel, surplusMargin);
+                }
+                else
+                {
+                    condition = part == null ? Part.MinCondition : part.Condition;
+                    band = BarBand.Of(part, ship.RequiredLevel, surplusMargin);
+                }
                 float fraction = Mathf.Clamp01(condition / (float)Part.MaxCondition);
 
                 Vector3 full = fullScales[i];
                 fill.transform.localScale = new Vector3(full.x * fraction, full.y, full.z);
-                fill.color = BarColors.ColorOf(
-                    BarBand.Of(part, ship.RequiredLevel, surplusMargin),
-                    belowColor, passesColor, surplusColor);
+                fill.color = BarColors.ColorOf(band, belowColor, passesColor, surplusColor);
             }
+        }
+
+        /// <summary>
+        /// World bounds of the ship's content: the body and all bar fills at full
+        /// length (so the bounds do not change with the conditions shown). The one
+        /// place that defines what "the ship" covers when it is centered. Returns
+        /// false when there is nothing to measure.
+        /// </summary>
+        public bool TryGetContentBounds(out Bounds bounds)
+        {
+            bounds = new Bounds(transform.position, Vector3.zero);
+            bool any = false;
+
+            if (body != null && body.sprite != null)
+            {
+                bounds = body.bounds;
+                any = true;
+            }
+
+            CaptureScales();
+            int count = barFills == null ? 0 : barFills.Length;
+            for (int i = 0; i < count; i++)
+            {
+                SpriteRenderer fill = barFills[i];
+                if (fill == null || fill.sprite == null) continue;
+
+                Transform ft = fill.transform;
+                Matrix4x4 parentToWorld = ft.parent == null ? Matrix4x4.identity : ft.parent.localToWorldMatrix;
+                Matrix4x4 fullToWorld = parentToWorld *
+                    Matrix4x4.TRS(ft.localPosition, ft.localRotation, fullScales[i]);
+
+                Bounds local = fill.sprite.bounds;
+                Vector3 c = local.center;
+                Vector3 e = local.extents;
+                for (int sx = -1; sx <= 1; sx += 2)
+                {
+                    for (int sy = -1; sy <= 1; sy += 2)
+                    {
+                        Vector3 corner = fullToWorld.MultiplyPoint3x4(
+                            new Vector3(c.x + sx * e.x, c.y + sy * e.y, c.z));
+                        if (!any)
+                        {
+                            bounds = new Bounds(corner, Vector3.zero);
+                            any = true;
+                        }
+                        else
+                        {
+                            bounds.Encapsulate(corner);
+                        }
+                    }
+                }
+            }
+            return any;
+        }
+
+        /// <summary>
+        /// Moves the ship so the center of its content bounds (TryGetContentBounds)
+        /// is at worldPoint, in X and Y. Used by both StationView and the prefab
+        /// builder, so they center the ship the same way.
+        /// </summary>
+        public void CenterOn(Vector3 worldPoint)
+        {
+            Bounds bounds;
+            if (!TryGetContentBounds(out bounds)) return;
+            Vector3 offset = worldPoint - bounds.center;
+            offset.z = 0f;
+            transform.position += offset;
         }
 
         private void CaptureScales()
         {
-            if (fullScales != null) return;
+            if (fullScales != null && barFills != null && fullScales.Length == barFills.Length) return;
             int count = barFills == null ? 0 : barFills.Length;
             fullScales = new Vector3[count];
             for (int i = 0; i < count; i++)

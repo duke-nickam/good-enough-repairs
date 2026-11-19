@@ -69,21 +69,44 @@
  *       stationField   name of the StationView field that gets the instance's
  *                      ShipView, for example "bay1View". Empty means do not connect.
  *       Placement, option A: fit into a screen rectangle
- *         refWidth, refHeight   reference screen size in pixels, for example 1280, 720
+ *         refWidth, refHeight   reference screen size in pixels, for example 1280, 720.
+ *                      Before placing, the builder sets the camera aspect to
+ *                      refWidth / refHeight, so the position matches a game view of
+ *                      that shape.
  *         rectX, rectY, rectW, rectH   the rectangle in reference pixels (top left
- *                      is 0,0). The instance is centered in it and scaled so that
- *                      "contentHeight" prefab units fill the rectangle's height.
+ *                      is 0,0). The instance is scaled so that "contentHeight"
+ *                      prefab units fill the rectangle's height, then moved so the
+ *                      center of its content bounds (the body and all five bar fills
+ *                      at full length, ShipView.TryGetContentBounds) is at the
+ *                      rectangle's center. StationView centers the bay 1 ship on
+ *                      the same bounds, through the same ShipView code.
  *         contentHeight   height of the prefab's content in prefab units
- *         offsetY         vertical shift in prefab units, applied after scaling
- *                         (for example -0.65)
+ *         offsetY         vertical shift in prefab units, applied after scaling and
+ *                         centering (for example -0.65)
  *       Placement, option B (used when rectW is 0): worldX, worldY, worldScale
- *                      (worldScale 0 means 1)
+ *                      (worldScale 0 means 1). The prefab origin is placed there.
  *       screenshot     file name of the screenshot, for example "ship_in_bay.png".
  *                      Empty means no screenshot. It is saved in the system temp
  *                      folder under ger_shots, outside the project. Before the shot
  *                      the builder shows a docked sample ship (day 1, seed 1) on the
  *                      instance. This is done after the scene is saved, so the
  *                      shown bar sizes and colors do not end up in the scene file.
+ *                      With option A the shot has the reference width and height.
+ *       sampleConditions[]   optional. Sets the condition of sample ship parts for
+ *                      the screenshot, so it can show red, green and blue bars.
+ *                      Parts not listed keep the generated sample ship's condition.
+ *                      Each entry:
+ *           part           "Engine", "HullPlate", "ShieldGenerator", "Thruster" or
+ *                          "PowerCore"
+ *           condition      whole number from 0 to 100
+ *                      A bad part name, a repeated part or a condition outside
+ *                      0-100 stops the build. The bar color is judged against the
+ *                      sample ship's own required level (fighter 70%, freighter 60%;
+ *                      the type comes from the generated ship and cannot be set).
+ *                      Example: "sampleConditions": [
+ *                        { "part": "Engine", "condition": 35 },
+ *                        { "part": "HullPlate", "condition": 65 },
+ *                        { "part": "ShieldGenerator", "condition": 95 } ]
  *
  * FULL EXAMPLE (the ship in a bay: body, five condition bars, ShipView, bay 1)
  *
@@ -140,7 +163,12 @@
  *     "refWidth": 1280, "refHeight": 720,
  *     "rectX": 20, "rectY": 20, "rectW": 260, "rectH": 150,
  *     "contentHeight": 3.4, "offsetY": -0.65,
- *     "screenshot": "ship_in_bay.png"
+ *     "screenshot": "ship_in_bay.png",
+ *     "sampleConditions": [
+ *       { "part": "Engine", "condition": 35 },
+ *       { "part": "HullPlate", "condition": 65 },
+ *       { "part": "ShieldGenerator", "condition": 95 }
+ *     ]
  *   }
  * }
  *
@@ -196,6 +224,13 @@ namespace GoodEnoughRepairs.EditorTools
     }
 
     [Serializable]
+    public class SpecPartCondition
+    {
+        public string part;
+        public int condition;
+    }
+
+    [Serializable]
     public class SpecScene
     {
         public string path;
@@ -212,6 +247,7 @@ namespace GoodEnoughRepairs.EditorTools
         public float worldY;
         public float worldScale;
         public string screenshot;
+        public SpecPartCondition[] sampleConditions;
     }
 
     [Serializable]
@@ -304,6 +340,55 @@ namespace GoodEnoughRepairs.EditorTools
                     if (!keys.Add(s.key)) throw Fail(specPath, "duplicate sprite key " + s.key);
                 }
             }
+
+            if (spec.scene != null) SampleOverrides(spec.scene, specPath);
+        }
+
+        // Index of a part name in the game's part order (PartTypes.All), or -1.
+        private static int PartIndex(string name)
+        {
+            PartType type;
+            switch (name)
+            {
+                case "Engine": type = PartType.Engine; break;
+                case "HullPlate": type = PartType.HullPlate; break;
+                case "ShieldGenerator": type = PartType.ShieldGenerator; break;
+                case "Thruster": type = PartType.Thruster; break;
+                case "PowerCore": type = PartType.PowerCore; break;
+                default: return -1;
+            }
+            PartType[] all = PartTypes.All;
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] == type) return i;
+            }
+            return -1;
+        }
+
+        // One value per part slot: the condition from the spec, or -1 for "keep the
+        // generated one". Stops the build on a bad entry.
+        private static int[] SampleOverrides(SpecScene sc, string specPath)
+        {
+            int[] result = new int[PartTypes.All.Length];
+            for (int i = 0; i < result.Length; i++) result[i] = -1;
+            if (sc.sampleConditions == null) return result;
+
+            for (int i = 0; i < sc.sampleConditions.Length; i++)
+            {
+                SpecPartCondition c = sc.sampleConditions[i];
+                string where = "scene.sampleConditions[" + i + "]";
+                if (c == null || string.IsNullOrEmpty(c.part)) throw Fail(specPath, where + ".part is missing");
+                int index = PartIndex(c.part);
+                if (index < 0) throw Fail(specPath, where + ": unknown part " + c.part);
+                if (result[index] >= 0) throw Fail(specPath, where + ": part " + c.part + " is listed twice");
+                if (c.condition < Part.MinCondition || c.condition > Part.MaxCondition)
+                {
+                    throw Fail(specPath, where + ": condition must be from " + Part.MinCondition + " to " +
+                        Part.MaxCondition);
+                }
+                result[index] = c.condition;
+            }
+            return result;
         }
 
         private static Dictionary<string, Sprite> MakeSprites(PrefabSpec spec, string specPath)
@@ -574,6 +659,18 @@ namespace GoodEnoughRepairs.EditorTools
                 cam.orthographicSize = 5f;
             }
 
+            bool screenPlacement = sc.rectW > 0f;
+            if (screenPlacement)
+            {
+                if (sc.refWidth <= 0f || sc.refHeight <= 0f || sc.contentHeight <= 0f)
+                {
+                    throw Fail(specPath, "scene: refWidth, refHeight and contentHeight must be more than 0");
+                }
+                // The edit-mode camera has the aspect of the editor window. Use the
+                // reference screen's shape so the placement matches the game view.
+                cam.aspect = sc.refWidth / sc.refHeight;
+            }
+
             // Remove an older instance so the builder can be run again.
             GameObject[] all = UnityEngine.Object.FindObjectsByType<GameObject>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None);
@@ -589,15 +686,12 @@ namespace GoodEnoughRepairs.EditorTools
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(spec.prefabPath);
             if (prefab == null) throw Fail(specPath, "prefab could not be loaded: " + spec.prefabPath);
             GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            ShipView view = instance.GetComponent<ShipView>();
 
             Vector3 pos;
             float scale;
-            if (sc.rectW > 0f)
+            if (screenPlacement)
             {
-                if (sc.refWidth <= 0f || sc.refHeight <= 0f || sc.contentHeight <= 0f)
-                {
-                    throw Fail(specPath, "scene: refWidth, refHeight and contentHeight must be more than 0");
-                }
                 float depth = Mathf.Abs(cam.transform.position.z);
                 float vx = (sc.rectX + sc.rectW / 2f) / sc.refWidth;
                 float vy = 1f - (sc.rectY + sc.rectH / 2f) / sc.refHeight;
@@ -615,7 +709,8 @@ namespace GoodEnoughRepairs.EditorTools
             instance.transform.position = pos;
             instance.transform.localScale = new Vector3(scale, scale, 1f);
 
-            ShipView view = instance.GetComponent<ShipView>();
+            // Same centering rule as StationView: the center of the body and bars.
+            if (screenPlacement && view != null) view.CenterOn(pos);
 
             if (!string.IsNullOrEmpty(sc.stationField))
             {
@@ -641,13 +736,18 @@ namespace GoodEnoughRepairs.EditorTools
             if (!string.IsNullOrEmpty(sc.screenshot))
             {
                 if (view == null) throw Fail(specPath, "a screenshot needs a ShipView on the prefab root");
-                TakeScreenshot(view, cam, sc.screenshot, specPath);
+                int w = screenPlacement ? Mathf.RoundToInt(sc.refWidth) : 1280;
+                int h = screenPlacement ? Mathf.RoundToInt(sc.refHeight) : 720;
+                TakeScreenshot(view, cam, sc.screenshot, SampleOverrides(sc, specPath), w, h, specPath);
             }
+
+            if (screenPlacement) cam.ResetAspect();
         }
 
         // Done after the scene is saved: Show changes bar scales and colors, and
         // that must not end up in the scene file.
-        private static void TakeScreenshot(ShipView view, Camera cam, string fileName, string specPath)
+        private static void TakeScreenshot(ShipView view, Camera cam, string fileName, int[] conditions,
+            int w, int h, string specPath)
         {
             BalanceData balance = BalanceLoader.Load();
             if (balance == null) throw Fail(specPath, "the balance could not be loaded for the sample ship");
@@ -656,10 +756,8 @@ namespace GoodEnoughRepairs.EditorTools
             Ship ship = ShipFactory.Create(balance, balance.days[0], new System.Random(1));
             DockingBays bays = new DockingBays();
             bays.TryDock(ship);
-            view.Show(ship, surplusMargin);
+            view.Show(ship, surplusMargin, conditions);
 
-            int w = 1280;
-            int h = 720;
             RenderTexture rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32);
             RenderTexture oldTarget = cam.targetTexture;
             RenderTexture oldActive = RenderTexture.active;
