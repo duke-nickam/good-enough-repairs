@@ -441,7 +441,8 @@ class ClaudeAgents:
         types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
         content = [{"type": "text", "text": prompt + "\n\n---\n\nThe screenshots of the result follow. Judge what "
                                                   "you see in them."}]
-        for path in images:
+        for k, path in enumerate(images, 1):  # each image named, so the reviewer can tell the screenshots apart
+            content.append({"type": "text", "text": f"Screenshot {k} of {len(images)}: {pathlib.Path(path).name}"})
             data = base64.b64encode(pathlib.Path(path).read_bytes()).decode("ascii")
             content.append({"type": "image", "source": {"type": "base64",
                             "media_type": types.get(pathlib.Path(path).suffix.lower(), "image/png"), "data": data}})
