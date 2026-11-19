@@ -353,6 +353,7 @@ class ClaudeAgents:
         self.production_plan = ""
         self.project_info = ""  # Unity and package versions, set by the runner each pass
         self.crew_docs = ""  # docs/crew/*.md, set by the runner each pass
+        self.check_usage = ""  # how each check script in agents/checks/ is called, set by the runner each pass
 
     def _call(self, agent, task_kind, prompt, attempt=1, images=None):
         exe = shutil.which("claude")
@@ -412,6 +413,9 @@ class ClaudeAgents:
         if self.crew_docs:
             prompt += ("\n\n---\n\nThe crew's documents (docs/crew/), approved by the designer. Plan by them: "
                        f"paths, folders and assemblies come from here, not from guesses.\n\n{self.crew_docs}")
+        if self.check_usage:
+            prompt += ("\n\n---\n\nThe check scripts and how to call them. Write every check command in exactly "
+                       f"this form, with real arguments:\n\n{self.check_usage}")
         if epic:
             prompt += (f"\n\n---\n\nPlan the tasks of this one epic only: #{epic['number']} {epic['title']}: "
                        f"{epic['goal']}\nReply with a plan whose epics list has exactly this one epic, with this title.")

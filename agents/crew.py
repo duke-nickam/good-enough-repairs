@@ -39,6 +39,24 @@ def load_settings():
     return json.loads(SETTINGS.read_text(encoding="utf-8"))
 
 
+def check_usage(root):
+    """How each check script is called: the usage part of its docstring, for the Director's plans."""
+    import ast
+    out = []
+    for p in sorted((root / "agents" / "checks").glob("*.py")):
+        doc = ast.get_docstring(ast.parse(p.read_text(encoding="utf-8"))) or ""
+        lines = doc.splitlines()
+        start = next((i for i, l in enumerate(lines) if l.strip().lower().startswith("usage")), None)
+        if start is not None:
+            block = [lines[start]]
+            for l in lines[start + 1:start + 12]:  # the indented lines that explain the arguments
+                if l.strip() and not l.startswith(" "):
+                    break
+                block.append(l)
+            out.append(f"--- agents/checks/{p.name}\n" + "\n".join(block).rstrip())
+    return "\n\n".join(out)
+
+
 def project_info(root):
     """The project's Unity and package versions, read fresh each pass, so agents write for the versions in use."""
     parts = []
@@ -191,6 +209,7 @@ def main():
             agents.project_info = project_info(ROOT)
             agents.crew_docs = "\n\n".join(f"--- {p.relative_to(ROOT).as_posix()}\n{p.read_text(encoding='utf-8')}"
                                             for p in sorted((ROOT / "docs" / "crew").glob("*.md")))
+            agents.check_usage = check_usage(ROOT)
             try:
                 runner.run_once()
             finally:

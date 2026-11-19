@@ -4,7 +4,7 @@
 Usage: python agents/checks/build_unity.py <method> <builder source path> [unity project path]
 
   method          full name of the static editor method, for example
-                  GoodEnoughRepairs.EditorTools.ShipInBayBuilder.Build
+                  GoodEnoughRepairs.EditorTools.PrefabSpecBuilder.BuildAll
   builder source  the C# file of the builder (checked to exist and to hold the method)
   project path    optional; by default the project is found by walking up from the
                   builder source path to the folder that holds Assets and ProjectSettings
