@@ -19,6 +19,12 @@ namespace GoodEnoughRepairs
         /// </summary>
         public ShipView bay1View;
 
+        /// <summary>
+        /// Optional inventory panel prefab instance. When assigned, it gets the
+        /// shared inventory and the move and bin commands, and runs the drag and drop.
+        /// </summary>
+        public InventoryView inventoryView;
+
         private const float Margin = 20f;
         private const float Gap = 16f;
         private const float BayHeight = 150f;
@@ -53,6 +59,8 @@ namespace GoodEnoughRepairs
             bays.ShipDocked += OnShipDocked;
             bays.ShipLeft += OnShipLeft;
             untilNextShipMs = 0f;
+
+            if (inventoryView != null) inventoryView.Bind(new PartMoves(new Inventory(), balance), balance);
         }
 
         private void Update()
