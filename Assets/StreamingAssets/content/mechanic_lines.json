@@ -10,6 +10,13 @@
       "This one's still limping. I'll patch it with a stock part if you say the word, and the bill comes out of your pay. Your call.",
       "Releasing now means I fit a part from my own shelf, and that doesn't come cheap. You'd save more fitting one you bought yourself."
     ],
+    "buy_warning": [
+      "Buying new is the quick fix, and the price tag says so. Have a look at the other bays before you sign.",
+      "A brand-new part, fresh from the crate. Lovely shine, lovely price. Is there nothing better already lying about?",
+      "Shelling out for a fresh one? Fine by me, but a part you already own can be worth more than it looks.",
+      "Brand new and fully sound, and it'll cost you for it. Check what the other ships are carrying first, clever types always do.",
+      "You can buy your way out of this, I won't stop you. I'd just rather you squeezed the bays first."
+    ],
     "penalty_fill": [
       "There, that'll do. Wasn't pretty, but it'll fly. Stock rates, no hard feelings.",
       "Slotted it in from the shelf. Stock parts never complain, and they never come cheap.",
