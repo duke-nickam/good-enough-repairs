@@ -10,6 +10,7 @@ Usage (from the project root):
   python agents/crew.py --watch   keeps running, checks the board every few minutes (Ctrl+C stops)
   python agents/crew.py --mock    a scripted demo on a local stand-in board: no GitHub, no Claude
   python agents/crew.py todo 65 66   the designer's move: tasks from Backlog or Needs designer to Todo
+  python agents/crew.py todo 124     an epic's number starts all its tasks in Backlog (they keep their order)
   python agents/crew.py done 65      the designer's move: accept a task waiting in Needs designer
   python agents/crew.py triage 115  send a task in Needs designer to the Director: its last review is
                                     blocked outside its files, so the Director plans the missing piece
@@ -185,7 +186,18 @@ def move(board, command, numbers):
         return False
     items = {i.number: i for i in board.items()}
     ok = True
-    for n in numbers:
+    expanded = []
+    for n in numbers:  # an epic number stands for its tasks: start the epic, its tasks follow their own order
+        i = items.get(n)
+        if i and i.kind == "epic" and command == "todo":
+            tasks = [t.number for t in items.values() if t.kind == "task" and t.state == "OPEN" and
+                     t.status in allowed and f"**Epic:** #{n}" in (board.issue(t.number).body or "")]
+            print(f"  epic #{n} {i.title}: {len(tasks)} task(s) to start" + (": " + ", ".join(f"#{x}" for x in tasks)
+                                                                             if tasks else ""))
+            expanded += tasks
+        else:
+            expanded.append(n)
+    for n in expanded:
         i = items.get(n)
         if not i or i.kind != "task" or i.state != "OPEN":
             print(f"  #{n}: not an open task on the board, skipped")
