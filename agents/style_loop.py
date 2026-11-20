@@ -101,6 +101,8 @@ Reply with one JSON object only, no other text: {"lines": ["<line>", ...]}"""
 
 EVAL_FORMAT = """Task: score the mechanic's lines against the style guide, as a strict but fair editor.
 Score only the rules listed for you, each from 0 to 10 for the lines as a set (10 = every line fully follows it).
+A rule that limits what a line may say scores 10 when nothing in the lines breaks it: never mark a line down for
+leaving out something the rule does not require, such as station imagery in a line that does not show the station.
 For every rule give the reason, and as evidence quote the exact words that broke it (empty if none).
 Reply with one JSON object only, no other text:
 {"rules": [{"id": "<rule id>", "score": <0-10>, "reason": "<why>", "evidence": "<exact words>"}],
@@ -260,7 +262,11 @@ def main():
         log = loop.run(seed)
     except AgentError as e:
         sys.exit(f"[style loop] stopped: an agent call failed, so nothing was written. {e}")
-    name = args.moment + ("-seed" if seed else "")
+    name = base = args.moment + ("-seed" if seed else "")
+    k = 1
+    while (OUT / f"{name}.md").exists():  # every run keeps its own log
+        k += 1
+        name = f"{base}-run{k}"
     path = write_log(log, name)
     print(f"[style loop] {'met the bar' if log['passed'] else 'stopped at the round limit'}: "
           f"{log['best_total']}/100, {log['tokens']:,} tokens. Log: {path.relative_to(ROOT).as_posix()}")

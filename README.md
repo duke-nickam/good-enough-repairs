@@ -125,4 +125,49 @@ No game code was edited by hand. The designer:
 - Every agent gets the project's Unity and package versions.
 - Agents can delete files, so they can move them.
 
+## Assignment 6: the style loop
+
+A self-correcting loop, **Generator -> Evaluator -> Refiner**, that holds the mechanic's lines to the game's own style. Run: `python agents/style_loop.py <moment> [--seed <draft.json>]`.
+
+| Assignment part | Where it lives |
+|---|---|
+| Style guide from the GDD | [`docs/style-guide.md`](docs/style-guide.md): 11 rules with weights, each quoting its source in the GDD or the Assignment 4 review, and the job of each moment the mechanic speaks. The loop reads its rule table directly, so the page and the loop never disagree |
+| Generator | The crew's **UX Designer** (fast model), who writes the mechanic's lines on the board too |
+| Evaluator | The **Director** (large model) scores the 7 reading rules; **code** measures the 4 others (digits, long dashes, length, count and generic sci-fi words), so no agent can argue past them. Every rule gets a score 0-10, a reason and the exact words that broke it; the total is out of 100 |
+| Refiner | The **UX Designer on its large model**, the GDD's "large model if it makes too many mistakes". It changes only what scored low and says what it changed and why |
+| No intervention | The loop runs until 90/100 with no rule below 6, or 5 rounds. Every round is logged in [`docs/assignment-6/`](docs/assignment-6/) |
+
+**Why the rules are this game's.** The player is the only mechanic, proud and cheeky, underpaid and resourceful; the swap trick is never explained, only nudged; a fallback hint points at a spare "on screen", never "in your inventory"; the world is fighters, freighters, three bays and five named parts; the station is rugged but meticulously kept; no digits, because economy numbers can change. Each comes from the GDD or a fix the Director made in Assignment 4.
+
+### The runs
+
+| Run | Rounds | Score per round | Tokens |
+|---|---|---|---|
+| [Bad seed, release warning, first run](docs/assignment-6/release_warning-seed.md) | 5 | 30, 80.5, 86.5, 89, 89 (round limit) | 76k |
+| [Bad seed, release warning, after the fix below](docs/assignment-6/release_warning-seed-run2.md) | 3 | 33, 88, **91** | 42k |
+| [Buy warning, from scratch](docs/assignment-6/buy_warning.md) | 3 | 87, 88.5, **91** | 49k |
+| [Run end (win), from scratch](docs/assignment-6/run_end_win.md) | 3 | 87.5, 90 (blocked: one rule at 4/10), **94** | 50k |
+
+The **seed** is a deliberately bad draft ([`seed-release-warning.json`](docs/assignment-6/seed-release-warning.json)): "Captain, this freighter's hyperdrive is shot", a long dash, "250 credits", "take the 65% engine from the fighter", "our crew of mechanics" with "the boss", "gleaming new bays", and "Release it if you want, genius". Round 1 scored 33/100, with reasons such as:
+
+- S1 1/10: "explicitly tells the player to move a part from one ship to another, and names the 65% level"
+- V3 0/10: "invents a crew of mechanics and a boss, which breaks the only-mechanic rule"
+- V1 3/10: "mean to the player ('genius', 'you'll pay through the nose')"
+
+Three rounds later, with no one stepping in:
+
+> "Release it if you like, it's your ship. I'll fit a stock part in the empty slot, but it'll cost you more than doing it yourself."
+
+From scratch, the buy warning and the run end met the bar in three rounds:
+
+> "Shop price on that one, and it hurts. I only sell new when the scrap pile has nothing left to give." (buy warning)
+>
+> "Every bay is empty and every ship flew home. Fighters took the glory, freighters took the praise, and I took the spanners and did the lot." (run end, win)
+
+The bar is more than the total: the run end reached 90/100 in round 2, but one line broke the length rule (4/10), so the loop went on and shortened it.
+
+### What the loop taught the system
+
+The first seed run stalled at 89. From round 3 the lines followed every rule, but the Evaluator kept marking down "underpaid and resourceful" and "rugged, kept station" because two lines showed no station. It read those rules as quotas: every line must show the station. The Refiner obeyed and packed benches and patched panels into every line, until one broke the length rule. The fix went into the guide and the Evaluator, not the content: both rules now say they are limits (a line that does not show the station follows them), and the Evaluator never asks for more than a rule requires. The second run met the bar in 3 rounds with about half the tokens.
+
 Author: Nikola Bulog - ELVTR AI Game Development course.

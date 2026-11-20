@@ -1,0 +1,336 @@
+{
+  "moment": "run_end_win",
+  "count": 3,
+  "threshold": 90,
+  "rounds": [
+    {
+      "round": 1,
+      "lines": [
+        "The week's done, every bay is empty, and every ship is flying home. They called the fighters important and the freighters tough. Nobody mentioned who kept them both going.",
+        "Big talk from the fighters, big dents from the freighters. Guess who fixed the lot of them. The quiet one with the spanners turned out to be the one they needed.",
+        "Seven days, and the station still stands. Pride is nice to polish, but I'll polish the spanners first. Same bays next run, same grin."
+      ],
+      "origin": "Generator: UX Designer (haiku), 8,299 tokens",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "The set grins and brags without being mean to the player. Line 2 is cheeky, and line 3 is proud and playful. Line 1 is a little drier but still has the dig at the ships.",
+          "evidence": ""
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "Nothing sounds rich, high-tech or wasteful. Spanners and polishing them are humble, hands-on images.",
+          "evidence": ""
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only the player speaks. 'The quiet one with the spanners' refers to the player, and no other mechanic, crew or successor appears.",
+          "evidence": ""
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 7,
+          "reason": "Lines 1 and 2 brag that the overlooked mechanic proved who is important, which is the moment's job. Line 3 is more a humble sign-off ('I'll polish the spanners first', 'Same bays next run') and its bragging is weak. It also promises a next run, which is not part of the job.",
+          "evidence": "Pride is nice to polish, but I'll polish the spanners first. Same bays next run, same grin."
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "No swap trick, no moving parts between ships, no percentage levels.",
+          "evidence": ""
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "Fighters, freighters, bays and the station are all in the game's world. Nothing is invented. 'Every ship is flying home' is a slight stretch, since ships just exit, but it is harmless.",
+          "evidence": "every ship is flying home"
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "The station is shown only through bays, spanners and polishing tools, which suit a rugged, tidy place. It is never shiny and never a mess.",
+          "evidence": ""
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no digits",
+          "evidence": ""
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no long dashes",
+          "evidence": ""
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 4,
+          "reason": "2 line(s) over 160 characters or 3 sentences",
+          "evidence": "171 chars, 3 sentences: The week's done, every bay is empty, and every ship is flying home. They called the fighters important and the freighters tough. Nobody mentioned who kept them both going. | 161 chars, 3 sentences: Big talk from the fighters, big dents from the freighters. Guess who fixed the lot of them. The quiet one with the spanners turned out to be the one they needed."
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "right count, all different, own world",
+          "evidence": ""
+        }
+      ],
+      "total": 87.5,
+      "summary": "Line 3 is more a modest sign-off than a brag, so it does the moment's job least well.",
+      "evaluator": "Director (sonnet), 8,359 tokens",
+      "passed": false,
+      "changes": [
+        "line 1: cut the last sentence to 'Nobody asked who kept them going' to bring it under 160 characters, kept the rest word for word (F3)",
+        "line 2: shortened the second and third sentences ('Guess who fixed the lot.' and 'The quiet one with the spanners was the one they needed.') to get under 160 characters (F3)",
+        "line 3: replaced the humble sign-off and the next-run promise with a brag that the ships flew on the mechanic's patches and the mechanic takes the credit with a grin (M1, V1)"
+      ]
+    },
+    {
+      "round": 2,
+      "lines": [
+        "The week's done, every bay is empty, and every ship is flying home. They called the fighters important and the freighters tough. Nobody asked who kept them going.",
+        "Big talk from the fighters, big dents from the freighters. Guess who fixed the lot. The quiet one with the spanners was the one they needed.",
+        "Seven days, and the station still stands. Every ship that left flew on my patches, and not one of them thanked the spanners. I'll take the credit myself, with a grin."
+      ],
+      "origin": "Refiner: UX Designer (sonnet), 8,074 tokens",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "Lines 2 and 3 grin and brag well. Line 1 is proud but flatter and ends on a mild jab. Line 3 teases the ships a little. Nothing is mean to the player.",
+          "evidence": ""
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Spanners, patches and a quiet worker all fit an underpaid, resourceful mechanic. Nothing sounds rich, high-tech or wasteful.",
+          "evidence": ""
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "The player is the only mechanic. No crew, boss, apprentice or successor is mentioned.",
+          "evidence": ""
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "All three brag that the overlooked mechanic proved important. Line 3 is the boldest brag. Line 1 is more a hint than a brag, and line 2 is a little modest ('the one they needed').",
+          "evidence": "Nobody asked who kept them going."
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "No line tells the player to move parts between ships or names any percentage levels. 'Patches' is only a nudge.",
+          "evidence": ""
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "Fighters, freighters, bays and spanners are all in the game's world. 'Station' and 'bay' are valid. The one stretch is 'flying home', which implies a destination, but it invents no place or faction.",
+          "evidence": "every ship is flying home"
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "No line describes the station in a way that is shiny or messy. 'Every bay is empty' is neutral, and spanners and patches suit a rugged station.",
+          "evidence": ""
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no digits",
+          "evidence": ""
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no long dashes",
+          "evidence": ""
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 4,
+          "reason": "2 line(s) over 160 characters or 3 sentences",
+          "evidence": "162 chars, 3 sentences: The week's done, every bay is empty, and every ship is flying home. They called the fighters important and the freighters tough. Nobody asked who kept them going. | 166 chars, 3 sentences: Seven days, and the station still stands. Every ship that left flew on my patches, and not one of them thanked the spanners. I'll take the credit myself, with a grin."
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "right count, all different, own world",
+          "evidence": ""
+        }
+      ],
+      "total": 90.0,
+      "summary": "Line 1 is the weakest brag: it only hints at the mechanic's worth and ends on a quiet jab, while lines 2 and 3 carry the cheeky pride the moment needs.",
+      "evaluator": "Director (sonnet), 8,360 tokens",
+      "passed": false,
+      "changes": [
+        "line 1: rewritten shorter (under 160 characters, two sentences) and made a bolder brag, with the mechanic doing the lot instead of a mild jab (F3, V1, M1)",
+        "line 3: cut 'that' and 'flew on', and 'them' after 'one', so it fits under 160 characters, keeping the brag and the grin (F3)",
+        "line 2: kept word for word"
+      ]
+    },
+    {
+      "round": 3,
+      "lines": [
+        "Every bay is empty and every ship flew home. Fighters took the glory, freighters took the praise, and I took the spanners and did the lot.",
+        "Big talk from the fighters, big dents from the freighters. Guess who fixed the lot. The quiet one with the spanners was the one they needed.",
+        "Seven days, and the station still stands. Every ship left on my patches, and not one thanked the spanners. I'll take the credit myself, with a grin."
+      ],
+      "origin": "Refiner: UX Designer (sonnet), 8,573 tokens",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "Lines 1 and 3 grin and brag in the mechanic's voice. Line 2 teases the fighters and freighters cheekily. Line 3 says nobody thanked him, but that is a complaint about the ships, not meanness to the player. The grin is clear, though a little mild in line 1.",
+          "evidence": ""
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Nothing sounds rich, high-tech or wasteful. Spanners and patches fit an underpaid, resourceful mechanic.",
+          "evidence": ""
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only one mechanic speaks in every line. No crew, boss, apprentice or successor appears.",
+          "evidence": ""
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "All three lines brag that the overlooked mechanic did the work and mattered. Line 2 states it most directly ('the one they needed'). Line 1 reads a little more as a complaint about glory than proof of importance, and line 3 leans on missing thanks, but each still brags.",
+          "evidence": "not one thanked the spanners"
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "No line mentions moving parts between ships or the 60% or 70% levels.",
+          "evidence": ""
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only fighters, freighters, bays, spanners and the station appear. Nothing is invented. 'Patches' fits the repair world.",
+          "evidence": ""
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Line 1 shows empty bays and line 3 shows the station standing. Neither is shiny or messy, and both fit a kept station.",
+          "evidence": ""
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no digits",
+          "evidence": ""
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no long dashes",
+          "evidence": ""
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "every line short and plain",
+          "evidence": ""
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "right count, all different, own world",
+          "evidence": ""
+        }
+      ],
+      "total": 94.0,
+      "summary": "The lines fit the voice and the world well, but two of them lean on missing thanks and glory rather than plainly proving the mechanic was the important one.",
+      "evaluator": "Director (sonnet), 8,336 tokens",
+      "passed": true
+    }
+  ],
+  "started": "2026-11-20T16:12:04+01:00",
+  "best_round": 3,
+  "best_total": 94.0,
+  "best_lines": [
+    "Every bay is empty and every ship flew home. Fighters took the glory, freighters took the praise, and I took the spanners and did the lot.",
+    "Big talk from the fighters, big dents from the freighters. Guess who fixed the lot. The quiet one with the spanners was the one they needed.",
+    "Seven days, and the station still stands. Every ship left on my patches, and not one thanked the spanners. I'll take the credit myself, with a grin."
+  ],
+  "passed": true,
+  "tokens": 50001
+}

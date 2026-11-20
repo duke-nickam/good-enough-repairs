@@ -26,17 +26,17 @@ The tutorial hint is fixed text in the GDD ("That engine is too weak for a fight
 
 ## Rules
 
-Each rule is scored 0-10. The total is the weighted sum, out of 100. Rules judged by code are measured, so no agent can argue past them; the rest are judged by the Evaluator with a reason and the words that broke the rule.
+Each rule is scored 0-10. A rule that limits what a line may say is fully followed when nothing in the line breaks it: the loop never asks for more of something a rule does not require (learned in the loop's first run, docs/assignment-6/release_warning-seed.md). The total is the weighted sum, out of 100. Rules judged by code are measured, so no agent can argue past them; the rest are judged by the Evaluator with a reason and the words that broke the rule.
 
 | ID | Rule | Weight | Judged by | Source |
 |---|---|---|---|---|
 | V1 | Proud and cheeky: the voice grins, enjoys squeezing the most out of every part, and is never mean to the player | 15 | Evaluator | GDD, Setting & theme: "Tone: proud and cheeky" and "the game's voice in hints and messages has the same grin" |
-| V2 | Underpaid and resourceful: patched, saved, squeezed and earned the hard way; never rich, never high-tech, never wasteful | 10 | Evaluator | GDD, Setting & theme: "Underpaid, resourceful, proud of it" |
+| V2 | Underpaid and resourceful: nothing may sound rich, high-tech or wasteful; a line need not mention patching or saving to follow this rule | 10 | Evaluator | GDD, Setting & theme: "Underpaid, resourceful, proud of it" |
 | V3 | The player is the only mechanic: no other mechanics, crew, boss, apprentice or successor | 10 | Evaluator | Assignment 4 review (#44): a bankrupt ending mentioned "the next mechanic" |
 | M1 | The line does its moment's job, as in the moments table above | 15 | Evaluator | GDD: the moments in Docking bays, Player actions, Win/lose conditions |
 | S1 | Never explain the swap trick: no telling the player to move parts between ships or naming the 60% and 70% levels; a nudge with a grin is fine | 15 | Evaluator | GDD, The secret strategy: "The game never explains the trick up front" |
 | W1 | Only this game's world: fighters (battle damage), freighters (wear and tear), the static repair station with three bays, the junkyard, the bin, credits, and the five parts (engine, hull plate, shield generator, thruster, power core); no invented places, factions, aliens or tech | 10 | Evaluator | GDD, Setting & theme and Ships and parts |
-| W2 | The station is rugged and meticulously kept: worn metal, patched panels, every tool in its place; never shiny, never a mess | 5 | Evaluator | GDD, Art & audio direction: "Mood" |
+| W2 | When a line shows the station, it is rugged and meticulously kept (worn metal, patched panels, every tool in its place), never shiny and never a mess; a line that does not show the station follows this rule | 5 | Evaluator | GDD, Art & audio direction: "Mood" |
 | F1 | No digits: economy numbers live in the balance file and can change | 5 | Code | Assignment 4 content check: "no digits in text (economy numbers can change)" |
 | F2 | No long dashes | 5 | Code | Project writing rule, enforced by the Assignment 4 content check |
 | F3 | Short and plain: at most three sentences and 160 characters per line | 5 | Code | GDD, Art & audio direction: "readability matters more than detail"; Assignment 4 review: day briefs cut to one or two sentences (#44) |

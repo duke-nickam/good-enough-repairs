@@ -1,0 +1,553 @@
+{
+  "moment": "release_warning",
+  "count": 3,
+  "threshold": 90,
+  "rounds": [
+    {
+      "round": 1,
+      "lines": [
+        "Captain, this freighter's hyperdrive is shot — leaving now costs you 250 credits, so just take the 65% engine from the fighter and drop it into the freighter instead.",
+        "Our crew of mechanics keeps these gleaming new bays spotless, and the boss says we never cut corners on a job.",
+        "Release it if you want, genius. I'll slap a part in and you'll pay through the nose."
+      ],
+      "origin": "seed draft (given, not generated)",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 3,
+          "reason": "Line 3 is cheeky but mean to the player ('genius', 'pay through the nose'). Line 1 is a plain instruction with no grin and no pride. Line 2 is bland corporate pride with no cheek.",
+          "evidence": "Release it if you want, genius. I'll slap a part in and you'll pay through the nose."
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 3,
+          "reason": "Line 2 brags about gleaming new bays, which is rich and not underpaid or resourceful. Line 1 and line 3 show no patching or squeezing, though line 1 does reuse a part.",
+          "evidence": "keeps these gleaming new bays spotless"
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 1,
+          "reason": "Line 2 invents a crew of mechanics and a boss, which breaks the only-mechanic rule.",
+          "evidence": "Our crew of mechanics keeps these gleaming new bays spotless, and the boss says we never cut corners on a job."
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 2,
+          "reason": "None of the lines makes clear that the shop fills the slot at a premium so buying yourself is cheaper. Line 1 tells the player to swap rather than buy and states the loss. Line 2 is off-topic. Line 3 hints at a high price but not that buying yourself is cheaper, and it taunts instead of leaving the choice to the player.",
+          "evidence": "leaving now costs you 250 credits, so just take the 65% engine from the fighter"
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 0,
+          "reason": "Line 1 spells out the swap trick: it tells the player to move a named part from the fighter to the freighter and gives the 65% level.",
+          "evidence": "just take the 65% engine from the fighter and drop it into the freighter instead"
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 5,
+          "reason": "Line 1 uses the generic sci-fi 'hyperdrive' instead of the five parts and 'Captain' is generic. Line 2 stays within the world but is about invented crew. Line 3 is fine.",
+          "evidence": "this freighter's hyperdrive is shot"
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 3,
+          "reason": "Line 2 describes a shiny station ('gleaming new'), which contradicts the rugged, worn look. Lines 1 and 3 say nothing about the station.",
+          "evidence": "gleaming new bays spotless"
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 5,
+          "reason": "1 line(s) with digits",
+          "evidence": "Captain, this freighter's hyperdrive is shot — leaving now costs you 250 credits, so just take the 65% engine from the fighter and drop it into the freighter instead."
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 5,
+          "reason": "1 line(s) with a long dash",
+          "evidence": "Captain, this freighter's hyperdrive is shot — leaving now costs you 250 credits, so just take the 65% engine from the fighter and drop it into the freighter instead."
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 7,
+          "reason": "1 line(s) over 160 characters or 3 sentences",
+          "evidence": "166 chars, 1 sentences: Captain, this freighter's hyperdrive is shot — leaving now costs you 250 credits, so just take the 65% engine from the fighter and drop it into the freighter instead."
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 7,
+          "reason": "generic sci-fi word: hyperdrive, captain",
+          "evidence": "Captain, this freighter's hyperdrive is shot — leaving now costs you 250 credits, so just take the 65% engine from the fighter and drop it into the freighter instead."
+        }
+      ],
+      "total": 30.0,
+      "summary": "Line 1 openly explains the swap trick, line 2 invents a crew and boss and a shiny station, and none of the lines say that buying the part yourself is cheaper than the shop's premium fill.",
+      "evaluator": "Director (sonnet), 8,440 tokens",
+      "passed": false,
+      "changes": [
+        "line 1: rewrote as a release warning that leaves the choice to the player, says the shop fills the slot at a markup and buying yourself is cheaper; removed the swap instruction, the named part, the 65% level, the digits, the long dash, the 'hyperdrive' and 'Captain' (V1, M1, S1, F1, F2, F3, F4, W1)",
+        "line 2: removed the invented crew and boss and the 'gleaming new bays'; now the lone mechanic, with worn hooks and patched panels kept in place, and a resourceful nudge to buy the part yourself (V2, V3, M1, W2)",
+        "line 3: dropped the insulting 'genius' and 'pay through the nose'; kept the cheeky tone, now friendly, and made clear the shop's premium and that releasing is the player's call (V1, M1)"
+      ]
+    },
+    {
+      "round": 2,
+      "lines": [
+        "Go on and release it, it's your call. But the shop will fill that slot at a markup, and my own bench part comes cheaper.",
+        "Every wrench has its hook, every patched panel its spot. I'd hate to see you pay shop rates for a part I can scrape up cheaper.",
+        "Release it if you like, the call is yours. The shop fills that slot dear, so a part from our own shelf stays kinder to your purse."
+      ],
+      "origin": "Refiner: UX Designer (sonnet), 8,756 tokens",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 7,
+          "reason": "Line 1 is cheeky and warm. Line 3 is polite but mild, with little grin. Line 2 is playful and a bit proud. None is mean. Overall the grin is present but not strong, and the 'purse' line is more courtly than cheeky.",
+          "evidence": "Release it if you like, the call is yours. The shop fills that slot dear, so a part from our own shelf stays kinder to your purse."
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "Lines 1 and 2 clearly show the underpaid, scrape-it-together voice ('bench part', 'scrape up cheaper', 'patched panel'). Line 3 ('our own shelf', 'purse') is thriftier but less hands-on resourceful. Nothing is rich or wasteful.",
+          "evidence": "a part I can scrape up cheaper"
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 7,
+          "reason": "No other mechanics or crew are named. But 'our own shelf' in line 3 implies a shared team or shop, and 'my own bench part' / 'I'd hate to see you pay' keep the mechanic singular. 'Our' slightly blurs the lone-mechanic rule.",
+          "evidence": "a part from our own shelf"
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 6,
+          "reason": "Lines 1 and 3 do the job: the shop fills at a markup, own part is cheaper, and release is the player's call. Line 2 never says the shop fills the slot or that releasing is the player's choice, and it opens with an off-topic aphorism. It only hints at paying shop rates.",
+          "evidence": "Every wrench has its hook, every patched panel its spot. I'd hate to see you pay shop rates for a part I can scrape up cheaper."
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "No line tells the player to move parts between ships or names any percentage. 'A part I can scrape up' and 'own bench part' are nudges that point at own stock, not at the swap trick.",
+          "evidence": ""
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "Only the shop, slot, parts and bench/shelf are used. 'Bench' and 'shelf' are small station furniture, not invented places, factions or tech.",
+          "evidence": "my own bench part"
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 7,
+          "reason": "Line 2 clearly evokes the meticulously kept, patched station (wrench hooks, patched panels). Lines 1 and 3 carry only a faint touch ('bench', 'shelf') and no rugged feel.",
+          "evidence": "Go on and release it, it's your call."
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no digits",
+          "evidence": ""
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no long dashes",
+          "evidence": ""
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "every line short and plain",
+          "evidence": ""
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "right count, all different, own world",
+          "evidence": ""
+        }
+      ],
+      "total": 80.5,
+      "summary": "Line 2 drifts from the moment's job: it never says the shop fills the slot or that releasing is the player's call, and line 3 uses 'our' which blurs the single-mechanic voice.",
+      "evaluator": "Director (sonnet), 8,512 tokens",
+      "passed": false,
+      "changes": [
+        "line 2: added that the shop fills the slot at a premium and that releasing is the player's call, and kept the wrench-hook image as the opener (M1)",
+        "line 2: tightened the wording so the cheeky grin and the tidy bench carry the voice (V1, W2)",
+        "line 3: replaced 'our own shelf' with 'my ... bench' so only one mechanic speaks (V3)",
+        "line 3: swapped the courtly 'purse' phrasing for 'scraped off my patched-up bench' and a grin (V1, V2)",
+        "line 3: added the patched-up bench for a rugged, kept-station feel (W2)"
+      ]
+    },
+    {
+      "round": 3,
+      "lines": [
+        "Go on and release it, it's your call. But the shop will fill that slot at a markup, and my own bench part comes cheaper.",
+        "Every wrench has its hook, and the shop still fills that slot at a premium. Release it if you like, but a part off my bench costs you less.",
+        "Your call, of course. The shop fills that slot at a premium, while a part scraped off my patched-up bench comes cheaper, and I'll grin either way."
+      ],
+      "origin": "Refiner: UX Designer (sonnet), 8,775 tokens",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "Lines 1 and 3 are cheeky and warm; line 1 is a bit flat but never mean. Line 3 has a clear grin. Line 2 is playful but 'Every wrench has its hook' is an odd, muddled quip that adds little cheek.",
+          "evidence": "Every wrench has its hook"
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "Line 3 shows the patched, scraped-together bench well. Lines 1 and 2 only mention 'my own bench part', which is thin on the underpaid, resourceful feel, though nothing is rich or wasteful.",
+          "evidence": "my own bench part comes cheaper"
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only the mechanic speaks; no other mechanics, crew, boss or successor.",
+          "evidence": ""
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "All three say the shop fills the slot at a premium, the bench part is cheaper, and the release is the player's call. Line 2 'if you like' and line 1 'it's your call' are clear; line 3 'Your call, of course' is clear. Line 2 is slightly weaker on the player's-call framing but still fine.",
+          "evidence": "Release it if you like, but a part off my bench costs you less."
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 7,
+          "reason": "No one names percentages or tells the player to move parts between ships. But 'a part off my bench' and 'a part scraped off my patched-up bench' lean toward telling the player to use their own stock, which is a firm nudge to the trick. Line 3's 'scraped off' hints at harvesting. Still a nudge with a grin, but close to explaining it.",
+          "evidence": "a part scraped off my patched-up bench comes cheaper"
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "The shop, slot, bench and parts fit the world. 'The bench' is an unlisted place but is a natural part of the station. 'Wrench' and 'hook' are harmless. Nothing invented in tech or factions.",
+          "evidence": "my own bench part"
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 7,
+          "reason": "Line 3 gives 'patched-up bench', which matches the rugged, kept station. Lines 1 and 2 say nothing about the station's look, so the mood is mostly absent; nothing shiny or messy though. 'Scraped off' in line 3 leans slightly toward messy.",
+          "evidence": "scraped off my patched-up bench"
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no digits",
+          "evidence": ""
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no long dashes",
+          "evidence": ""
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "every line short and plain",
+          "evidence": ""
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "right count, all different, own world",
+          "evidence": ""
+        }
+      ],
+      "total": 86.5,
+      "summary": "Lines 1 and 2 are thin on the underpaid, patched-up station flavor, and line 2's 'Every wrench has its hook' is a muddled quip, while line 3's 'scraped off my bench' edges toward hinting at the swap trick.",
+      "evaluator": "Director (sonnet), 8,497 tokens",
+      "passed": false,
+      "changes": [
+        "line 2: replaced the muddled 'Every wrench has its hook' quip with a plain, grinning 'Just saying, with a grin' and added 'well-kept bench' for the rugged, tidy station (V1, V2, W2)",
+        "line 3: changed 'scraped off my patched-up bench' to 'from my patched-up, tidy bench' so it no longer hints at harvesting or a mess, and keeps the kept-station mood (S1, W2)"
+      ]
+    },
+    {
+      "round": 4,
+      "lines": [
+        "Go on and release it, it's your call. But the shop will fill that slot at a markup, and my own bench part comes cheaper.",
+        "Release it if you like, it's your call. The shop fills that slot at a premium, and a part off my well-kept bench costs you less. Just saying, with a grin.",
+        "Your call, of course. The shop fills that slot at a premium, while a part from my patched-up, tidy bench comes cheaper, and I'll grin either way."
+      ],
+      "origin": "Refiner: UX Designer (sonnet), 8,051 tokens",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "Lines 1 and 2 grin and tease without being mean. Line 3 is cheeky too, though 'I'll grin either way' states the grin instead of showing it. Line 1 reads a bit flat.",
+          "evidence": "and I'll grin either way"
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 7,
+          "reason": "Line 3 shows patching ('patched-up') and line 1 shows a modest 'own bench part'. Line 2 says 'well-kept', which is neutral. Little sense of being underpaid or squeezing value, though nothing is rich or wasteful.",
+          "evidence": "a part off my well-kept bench costs you less"
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only the one mechanic speaks. No other crew, boss or successor is mentioned.",
+          "evidence": ""
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "All three say the shop fills the slot at a premium, the mechanic's own part is cheaper, and the release is the player's call. Line 1 says 'markup' rather than 'premium' but means the same. Line 3 only hints at releasing ('Your call, of course') without naming it, which is slightly weaker. Cheaper is stated, though not explicitly as 'buying the part yourself'.",
+          "evidence": "Your call, of course."
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "No line tells the player to move parts between ships or names the 60% or 70% levels. 'A part off my bench' is a mild nudge about using own parts, which is allowed, and it points at stock rather than a swap.",
+          "evidence": "a part off my well-kept bench costs you less"
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only shop, slot, bench and parts appear, all within the game's world. No invented places, factions or tech.",
+          "evidence": ""
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 6,
+          "reason": "Line 1 has no station imagery. Line 2 has 'well-kept', and line 3 has 'patched-up, tidy', which fit the rugged-but-kept mood. As a set the mood is only partly there, and 'well-kept' is generic.",
+          "evidence": "Go on and release it, it's your call. But the shop will fill that slot at a markup, and my own bench part comes cheaper."
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no digits",
+          "evidence": ""
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no long dashes",
+          "evidence": ""
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "every line short and plain",
+          "evidence": ""
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "right count, all different, own world",
+          "evidence": ""
+        }
+      ],
+      "total": 89.0,
+      "summary": "Line 1 carries no station mood or underpaid-resourceful flavor, and line 3 describes its grin instead of showing it, so the set needs more patched-and-squeezed character.",
+      "evaluator": "Director (sonnet), 8,413 tokens",
+      "passed": false,
+      "changes": [
+        "line 1: added the worn bench image ('scuffed old bench') and a cheeky closing aside to replace the flat ending (V1, W2)",
+        "line 2: swapped generic 'well-kept' for 'patched-up' to show a resourceful, underpaid station (V2, W2)",
+        "line 3: replaced the stated 'I'll grin either way' with a shown pride in squeezing credits and tools in place, and added worn metal imagery (V1, V2, W2)"
+      ]
+    },
+    {
+      "round": 5,
+      "lines": [
+        "Release it if you like, it's your call. But the shop fills that slot at a markup, and a part off my scuffed old bench comes cheaper. Funny how that works.",
+        "Release it if you like, it's your call. The shop fills that slot at a premium, and a part from my patched-up bench costs you less. Just saying, with a grin.",
+        "Your call, of course. The shop fills that slot at a premium, while a part from my worn but tidy bench comes cheaper. Every tool in its place, every credit squeezed."
+      ],
+      "origin": "Refiner: UX Designer (sonnet), 7,944 tokens",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "Lines 1 and 2 have a grin, though line 2's 'Just saying, with a grin' narrates the grin instead of showing it. Line 3 is proud but drier; 'every credit squeezed' fits the squeezing theme. None is mean to the player.",
+          "evidence": "Just saying, with a grin."
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "Scuffed, patched-up and worn benches and squeezed credits give the underpaid, resourceful feel. Line 3 is strongest. Line 1's 'Funny how that works' adds little to it.",
+          "evidence": "Funny how that works."
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only the one mechanic speaks. No crew, boss or successor is mentioned.",
+          "evidence": ""
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "All three say the shop fills the slot at a markup or premium and that a part from the mechanic's own bench is cheaper, and all leave the release as the player's call. Line 1's 'markup' is slightly less direct than 'premium', but the meaning is clear. Lines 1 and 2 say 'it's your call' explicitly; line 3 says 'Your call, of course.'",
+          "evidence": ""
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "No swap instructions and no percentages. 'A part from my bench' is a nudge, not an explanation of moving parts between ships. It is mildly close to telling the player where to get parts, but it stays vague.",
+          "evidence": "a part off my scuffed old bench comes cheaper"
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only the shop, slot, part, bench and credits appear. No invented places, factions or tech.",
+          "evidence": ""
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 7,
+          "reason": "Line 3 hits the rugged but meticulous mood ('worn but tidy', 'every tool in its place'). Lines 1 and 2 only show the worn side ('scuffed old', 'patched-up') with no sign of care, so the set leans toward a mess.",
+          "evidence": "my scuffed old bench; my patched-up bench"
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no digits",
+          "evidence": ""
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no long dashes",
+          "evidence": ""
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 7,
+          "reason": "1 line(s) over 160 characters or 3 sentences",
+          "evidence": "164 chars, 3 sentences: Your call, of course. The shop fills that slot at a premium, while a part from my worn but tidy bench comes cheaper. Every tool in its place, every credit squeezed."
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "right count, all different, own world",
+          "evidence": ""
+        }
+      ],
+      "total": 89.0,
+      "summary": "Lines 1 and 2 show only the worn side of the station and miss the meticulously kept half, and line 2 narrates its grin instead of showing it.",
+      "evaluator": "Director (sonnet), 8,381 tokens",
+      "passed": false
+    }
+  ],
+  "started": "2026-11-20T16:04:08+01:00",
+  "best_round": 4,
+  "best_total": 89.0,
+  "best_lines": [
+    "Go on and release it, it's your call. But the shop will fill that slot at a markup, and my own bench part comes cheaper.",
+    "Release it if you like, it's your call. The shop fills that slot at a premium, and a part off my well-kept bench costs you less. Just saying, with a grin.",
+    "Your call, of course. The shop fills that slot at a premium, while a part from my patched-up, tidy bench comes cheaper, and I'll grin either way."
+  ],
+  "passed": false,
+  "tokens": 75769
+}

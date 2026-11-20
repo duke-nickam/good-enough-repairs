@@ -1,0 +1,334 @@
+{
+  "moment": "buy_warning",
+  "count": 3,
+  "threshold": 90,
+  "rounds": [
+    {
+      "round": 1,
+      "lines": [
+        "Brand-new parts cost a fortune around here. Before you pay that, check the bays one more time, there's usually a better road.",
+        "Shop price on that one, and it hurts. I only sell new when the scrap pile has nothing left to give.",
+        "A fresh part at full condition, priced like a luxury. Fine if you're desperate, but I'd rather see you squeeze the old ones first."
+      ],
+      "origin": "Generator: UX Designer (haiku), 7,614 tokens",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 7,
+          "reason": "Lines 1 and 2 carry a dry, cheeky grin and are not mean. Line 3 is more flat and slightly scolding ('I'd rather see you squeeze the old ones first'), but it still shows pride in squeezing parts and is not mean.",
+          "evidence": ""
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 6,
+          "reason": "Line 3 says 'priced like a luxury' and 'full condition', which brings in a rich, premium feel. It is used as a complaint about the price, but it still leans toward wealth. Lines 1 and 2 keep the underpaid, scrappy tone.",
+          "evidence": "priced like a luxury"
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only the player/mechanic is present. No other mechanics, crew, boss or successor.",
+          "evidence": ""
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "All three treat buying new as expensive and a last resort. Line 2 says new only when the scrap pile has nothing left. Line 1 says check the bays again. Line 3 says fine if desperate. None spells out the swap trick.",
+          "evidence": ""
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "Line 1's 'check the bays one more time, there's usually a better road' and line 3's 'squeeze the old ones first' are nudges, not explanations. Line 1 comes closest, since 'check the bays' hints at looking at the ships, but it does not tell the player to move parts or name any levels.",
+          "evidence": "check the bays one more time, there's usually a better road"
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "The lines use only the game's world: new parts, bays, scrap pile, shop. No invented places, factions or tech.",
+          "evidence": ""
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "No line shows the station in a way that is shiny or messy. 'Scrap pile' is a resource, not a station description.",
+          "evidence": ""
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no digits",
+          "evidence": ""
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no long dashes",
+          "evidence": ""
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "every line short and plain",
+          "evidence": ""
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "right count, all different, own world",
+          "evidence": ""
+        }
+      ],
+      "total": 87.0,
+      "summary": "Line 3's 'priced like a luxury' and its slightly scolding tone make it the weakest on voice, and line 1's 'check the bays' comes close to hinting at the swap trick.",
+      "evaluator": "Director (sonnet), 8,427 tokens",
+      "passed": false,
+      "changes": [
+        "line 3: replaced 'A fresh part at full condition, priced like a luxury' with a scrappy complaint about the sting of the price, removing the rich, premium feel (V2)",
+        "line 3: made the voice cheekier with a grin ('I'd bet a good part is already sitting somewhere on this station') instead of the flat scolding (V1)",
+        "line 3: swapped the direct 'squeeze the old ones first' for a vague hint that a good part may already be on the station, so it stays a nudge and does not tell the player what to do (S1)"
+      ]
+    },
+    {
+      "round": 2,
+      "lines": [
+        "Brand-new parts cost a fortune around here. Before you pay that, check the bays one more time, there's usually a better road.",
+        "Shop price on that one, and it hurts. I only sell new when the scrap pile has nothing left to give.",
+        "A brand-new part, and the price stings. Fine if you're stuck, but I'd bet a good part is already sitting somewhere on this station."
+      ],
+      "origin": "Refiner: UX Designer (sonnet), 7,969 tokens",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "The voice is cheeky and proud with a light grin (it hurts, the price stings, there's usually a better road). Never mean to the player. Line 3 is slightly dry but still playful.",
+          "evidence": ""
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "Nothing sounds rich or high-tech. Lines stress that new parts are costly and lean on scrap and existing parts. Resourceful tone throughout.",
+          "evidence": ""
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only the mechanic speaks. Line 2 'I only sell new' is the mechanic as the shop, with no other mechanic, crew or boss.",
+          "evidence": ""
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "All three treat buying new as costly and a last resort. Line 2 is the clearest ('only sell new when the scrap pile has nothing left'). Line 3 ('Fine if you're stuck') frames it as last resort too. Line 1 is a little softer but still clear.",
+          "evidence": ""
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 7,
+          "reason": "No percentages and no instruction to move parts between ships. Line 3 hints that a good part is already on the station, and line 1 says check the bays again. These are nudges with a grin and allowed, but line 3 comes close to pointing at the trick.",
+          "evidence": "I'd bet a good part is already sitting somewhere on this station."
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "Only the game's world: bays, scrap pile, station, parts, price. The scrap pile is a plausible stand-in for the junkyard or bin, not an invented place.",
+          "evidence": ""
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "No line shows the station as shiny or messy. 'Scrap pile' is not a mess description, and the rest does not show the station.",
+          "evidence": ""
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no digits",
+          "evidence": ""
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no long dashes",
+          "evidence": ""
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "every line short and plain",
+          "evidence": ""
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "right count, all different, own world",
+          "evidence": ""
+        }
+      ],
+      "total": 88.5,
+      "summary": "Line 3 comes closest to spelling out the swap trick by saying a good part is already on the station, while the set otherwise fits the moment and voice well.",
+      "evaluator": "Director (sonnet), 8,388 tokens",
+      "passed": false,
+      "changes": [
+        "line 3: removed the bet that a good part is already on the station and replaced it with a cheeky last-resort nudge to look over the bays, and added a proud grin about parts earning their keep (S1, V1, M1)"
+      ]
+    },
+    {
+      "round": 3,
+      "lines": [
+        "Brand-new parts cost a fortune around here. Before you pay that, check the bays one more time, there's usually a better road.",
+        "Shop price on that one, and it hurts. I only sell new when the scrap pile has nothing left to give.",
+        "A brand-new part, and oh, the price stings. Last resort, friend. Give the bays a good squint first, I like a part that earns its keep."
+      ],
+      "origin": "Refiner: UX Designer (sonnet), 7,822 tokens",
+      "report": [
+        {
+          "id": "V1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "The voice grins and is never mean. Line 3 is the most cheeky and proud ('I like a part that earns its keep'). Line 1 is a bit drier but still has a wry tone. Line 2 is cheeky but terse.",
+          "evidence": ""
+        },
+        {
+          "id": "V2",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "Nothing sounds rich or high-tech. 'Cost a fortune' and 'scrap pile' fit an underpaid, resourceful mechanic. Line 2 'I only sell new' is slightly shopkeeper-like but not wasteful or rich.",
+          "evidence": "I only sell new when the scrap pile has nothing left to give."
+        },
+        {
+          "id": "V3",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "No other mechanics, crew, boss or successor is mentioned. 'Friend' addresses the player or a customer, not a mechanic.",
+          "evidence": ""
+        },
+        {
+          "id": "M1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "All three lines treat buying new as expensive and a last resort. Line 2 says it most directly ('only sell new when the scrap pile has nothing left'). Lines 1 and 3 add 'last resort' or the price pain. Line 2 sounds like the mechanic is the shop, which is slightly off but still fits the moment.",
+          "evidence": "Shop price on that one, and it hurts."
+        },
+        {
+          "id": "S1",
+          "weight": 15,
+          "judge": "Evaluator",
+          "score": 8,
+          "reason": "No percentages or explicit instruction to move parts between ships. 'Check the bays one more time, there's usually a better road' and 'give the bays a good squint' are nudges with a grin, but they come close to pointing at the ships' parts. Still allowed as a nudge.",
+          "evidence": "check the bays one more time, there's usually a better road"
+        },
+        {
+          "id": "W1",
+          "weight": 10,
+          "judge": "Evaluator",
+          "score": 9,
+          "reason": "Uses only the game's world: bays, scrap pile, parts, price. 'Scrap pile' is a loose name for the junkyard or bin, not an invented place.",
+          "evidence": "the scrap pile"
+        },
+        {
+          "id": "W2",
+          "weight": 5,
+          "judge": "Evaluator",
+          "score": 10,
+          "reason": "No line shows the station in a way that is shiny or messy. 'Earns its keep' and 'scrap pile' do not break the rugged, kept mood.",
+          "evidence": ""
+        },
+        {
+          "id": "F1",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no digits",
+          "evidence": ""
+        },
+        {
+          "id": "F2",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "no long dashes",
+          "evidence": ""
+        },
+        {
+          "id": "F3",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "every line short and plain",
+          "evidence": ""
+        },
+        {
+          "id": "F4",
+          "weight": 5,
+          "judge": "Code",
+          "score": 10,
+          "reason": "right count, all different, own world",
+          "evidence": ""
+        }
+      ],
+      "total": 91.0,
+      "summary": "The lines fit the moment well; the main risk is that the 'check the bays' nudge in lines 1 and 3 edges toward hinting at the swap, and line 2 sounds like a shopkeeper instead of the mechanic.",
+      "evaluator": "Director (sonnet), 8,528 tokens",
+      "passed": true
+    }
+  ],
+  "started": "2026-11-20T16:11:19+01:00",
+  "best_round": 3,
+  "best_total": 91.0,
+  "best_lines": [
+    "Brand-new parts cost a fortune around here. Before you pay that, check the bays one more time, there's usually a better road.",
+    "Shop price on that one, and it hurts. I only sell new when the scrap pile has nothing left to give.",
+    "A brand-new part, and oh, the price stings. Last resort, friend. Give the bays a good squint first, I like a part that earns its keep."
+  ],
+  "passed": true,
+  "tokens": 48748
+}
