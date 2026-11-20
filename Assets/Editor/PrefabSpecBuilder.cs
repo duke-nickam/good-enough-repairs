@@ -10,21 +10,49 @@
  *   PrefabSpecBuilder.BuildAll()          builds every *.spec.json under Assets/
  *                                         (Unity batch mode:
  *                                         -executeMethod GoodEnoughRepairs.EditorTools.PrefabSpecBuilder.BuildAll)
- *   PrefabSpecBuilder.Build(specPath)     builds one spec file, for example
- *                                         "Assets/Prefabs/UX/ShipInBay.spec.json"
+ *   PrefabSpecBuilder.BuildSpecAt(path)   builds one spec file from the given path,
+ *                                         for example "Assets/Prefabs/UX/ship_in_bay.spec.json".
+ *                                         The path may be a changed copy of a spec.
+ *   PrefabSpecBuilder.Build(specPath)     the same as BuildSpecAt (kept for old callers)
  *
- * The builder prints "MADE: <path>" for every file Unity made (sprite PNG, prefab,
- * scene) and "SCREENSHOT: <absolute path>" for every screenshot. A bad spec stops
- * the build with an error that names the spec file. It never saves a half prefab.
- * Running a spec twice gives the same result: the prefab is overwritten and older
- * instances in the scene are replaced. Every build reads the spec file from disk
- * and refreshes the asset database first, so a shot always comes from the
- * current specs.
+ * The builder prints "MADE: <path>" for every file Unity made or updated (sprite
+ * PNG, prefab, scene) and "SCREENSHOT: <absolute path>" for every screenshot. A bad
+ * spec stops the build with an error that names the spec file. It never saves a
+ * half prefab. Every build reads the spec file from disk and refreshes the asset
+ * database first, so a shot always comes from the current specs.
+ *
+ * UPDATE, NOT REBUILD
+ *   The builder works like a person editing the prefab:
+ *   - If the prefab does not exist yet, it is built from scratch.
+ *   - If it exists, it is opened and compared with the spec. Objects are matched
+ *     by their name path from the root, for example "Slot1/Slot1_Fill".
+ *     Only properties that differ are set (position, scale, sprite, color,
+ *     sorting order, text settings, components, links). Objects that stay keep
+ *     their identity: the same object and the same components, never recreated.
+ *   - An object that is new in the spec is added alone. An object in the prefab
+ *     that the spec does not list (gone from the spec, renamed, moved to another
+ *     parent, or added by hand) is removed alone. A rename or a move counts as
+ *     remove and add.
+ *   - Child order follows the spec order.
+ *   - Components: ShipView, InventoryView, WarningView, SpriteRenderer and text
+ *     (TextMesh and TextKeyView) are removed when the spec no longer asks for
+ *     them. Canvas, Image and Button are added when missing but not removed, so
+ *     remove the object instead.
+ *   - Links are set when they differ. A link dropped from the spec is not cleared
+ *     unless its target object is removed.
+ *   - A spec error stops the build before the prefab is saved.
+ *   In the scene, the instance with the right name that is an instance of the
+ *   prefab is kept: only its position and scale are set when they differ, and the
+ *   StationView connection is set. A missing instance is added. An instance that
+ *   the spec no longer lists (for example a bay that is gone) is removed alone.
+ *   The prefab or a scene instance is never deleted and rebuilt as a whole when it
+ *   exists. The scene file itself must exist (the builder never creates scenes).
  *
  * SPEC FILE RULES
  *   - File name ends with ".spec.json", anywhere under Assets/.
  *   - JSON that Unity's JsonUtility can read: objects and arrays, no dictionaries.
  *   - Leave a field out to get its default. Text defaults to "", numbers to 0.
+ *   - Object names must not contain "/" (it is the path separator).
  *   - Colors are text: "#RRGGBB" or "#RRGGBBAA", or one of these names from the
  *     game's BarColors: "below", "passes", "surplus", "track", "marker", "panel".
  *     No color (empty) means white.
@@ -184,7 +212,8 @@
  *       stationField   optional. StationView field to connect. Empty means
  *                      "bay1View", "bay2View" or "bay3View" from the bay number.
  *   Instance names in the scene: "<root name>_Bay1", "_Bay2", "_Bay3". Running the
- *   spec again replaces them. The measure tool reads the same entries and fails a
+ *   spec again updates them in place. A bay that is no longer listed has its
+ *   instance removed. The measure tool reads the same entries and fails a
  *   bay that is not listed.
  *   Example:
  *     "scene": { "path": "Assets/Scenes/Main.unity",
@@ -439,6 +468,7 @@ namespace GoodEnoughRepairs.EditorTools
     /// Builds prefabs from JSON specs. The format is documented in the comment at
     /// the top of this file. No reflection and no type names as text: components
     /// are attached through direct references in the switches below.
+    /// An existing prefab or scene instance is updated in place, never rebuilt.
     /// </summary>
     public static class PrefabSpecBuilder
     {
@@ -465,12 +495,21 @@ namespace GoodEnoughRepairs.EditorTools
             Array.Sort(files, StringComparer.Ordinal);
             for (int i = 0; i < files.Length; i++)
             {
-                Build(files[i].Replace('\\', '/'));
+                BuildSpecAt(files[i].Replace('\\', '/'));
             }
         }
 
-        /// <summary>Builds one spec file.</summary>
+        /// <summary>Builds one spec file. Same as BuildSpecAt.</summary>
         public static void Build(string specPath)
+        {
+            BuildSpecAt(specPath);
+        }
+
+        /// <summary>
+        /// Builds one spec from the given spec path (any path, for example a changed
+        /// copy of a spec). An existing prefab and scene instances are updated in place.
+        /// </summary>
+        public static void BuildSpecAt(string specPath)
         {
             if (string.IsNullOrEmpty(specPath) || !File.Exists(specPath))
             {
@@ -484,16 +523,27 @@ namespace GoodEnoughRepairs.EditorTools
             Validate(spec, specPath);
 
             Dictionary<string, Sprite> sprites = MakeSprites(spec, specPath);
-            GameObject root = MakePrefabContent(spec, sprites, specPath);
-            try
+
+            string folder = Path.GetDirectoryName(spec.prefabPath);
+            if (!string.IsNullOrEmpty(folder)) Directory.CreateDirectory(folder);
+
+            bool exists = File.Exists(spec.prefabPath) &&
+                AssetDatabase.LoadAssetAtPath<GameObject>(spec.prefabPath) != null;
+            if (!exists)
             {
-                string folder = Path.GetDirectoryName(spec.prefabPath);
-                if (!string.IsNullOrEmpty(folder)) Directory.CreateDirectory(folder);
-                PrefabUtility.SaveAsPrefabAsset(root, spec.prefabPath);
+                GameObject root = MakePrefabContent(spec, sprites, specPath);
+                try
+                {
+                    PrefabUtility.SaveAsPrefabAsset(root, spec.prefabPath);
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(root);
+                }
             }
-            finally
+            else
             {
-                UnityEngine.Object.DestroyImmediate(root);
+                PatchPrefab(spec, sprites, specPath);
             }
             Debug.Log("MADE: " + spec.prefabPath);
 
@@ -516,6 +566,7 @@ namespace GoodEnoughRepairs.EditorTools
                 throw Fail(specPath, "prefabPath must end with .prefab");
             }
             if (spec.root == null || string.IsNullOrEmpty(spec.root.name)) throw Fail(specPath, "root.name is missing");
+            ObjectPaths(spec, specPath);
 
             HashSet<string> keys = new HashSet<string>();
             if (spec.sprites != null)
@@ -540,6 +591,40 @@ namespace GoodEnoughRepairs.EditorTools
                 }
                 ValidateBays(spec.scene, specPath);
             }
+        }
+
+        // Name path of every object in the spec, from the root: the root is "", a
+        // child of the root is "Name", a grandchild is "Parent/Name". Stops the build
+        // on a missing or repeated name, or a parent that is unknown or comes later.
+        private static Dictionary<string, string> ObjectPaths(PrefabSpec spec, string specPath)
+        {
+            Dictionary<string, string> paths = new Dictionary<string, string>();
+            paths[spec.root.name] = "";
+            if (spec.objects == null) return paths;
+            for (int i = 0; i < spec.objects.Length; i++)
+            {
+                SpecObject o = spec.objects[i];
+                if (o == null || string.IsNullOrEmpty(o.name)) throw Fail(specPath, "objects[" + i + "].name is missing");
+                if (o.name.IndexOf('/') >= 0) throw Fail(specPath, o.name + ": the name must not contain /");
+                if (paths.ContainsKey(o.name)) throw Fail(specPath, "duplicate object name " + o.name);
+
+                string parentPath = "";
+                if (!string.IsNullOrEmpty(o.parent))
+                {
+                    if (!paths.TryGetValue(o.parent, out parentPath))
+                    {
+                        throw Fail(specPath, o.name + ": parent " + o.parent + " is unknown or comes later");
+                    }
+                }
+                paths[o.name] = parentPath.Length == 0 ? o.name : parentPath + "/" + o.name;
+            }
+            return paths;
+        }
+
+        private static string ParentOfPath(string path)
+        {
+            int k = path.LastIndexOf('/');
+            return k < 0 ? "" : path.Substring(0, k);
         }
 
         private static void ValidateBays(SpecScene sc, string specPath)
@@ -687,6 +772,32 @@ namespace GoodEnoughRepairs.EditorTools
             return v == 0f ? 1f : v;
         }
 
+        private static bool Listed(SpecObject o, string name)
+        {
+            if (o.components == null) return false;
+            for (int i = 0; i < o.components.Length; i++)
+            {
+                if (o.components[i] == name) return true;
+            }
+            return false;
+        }
+
+        private static void DestroyIfPresent<T>(GameObject go) where T : Component
+        {
+            T c = go.GetComponent<T>();
+            if (c != null) UnityEngine.Object.DestroyImmediate(c);
+        }
+
+        // Sets local position and scale from the spec, only when they differ.
+        private static void ApplyTransform(Transform t, SpecObject o)
+        {
+            Vector3 pos = new Vector3(o.posX, o.posY, o.posZ);
+            if (t.localPosition != pos) t.localPosition = pos;
+            Vector3 scale = new Vector3(OneIfZero(o.scaleX), OneIfZero(o.scaleY), OneIfZero(o.scaleZ));
+            if (t.localScale != scale) t.localScale = scale;
+        }
+
+        // Makes a new object from the spec.
         private static GameObject MakeObject(SpecObject o, Transform parent, Dictionary<string, Sprite> sprites,
             string specPath)
         {
@@ -694,24 +805,17 @@ namespace GoodEnoughRepairs.EditorTools
             if (parent != null) go.transform.SetParent(parent, false);
             go.transform.localPosition = new Vector3(o.posX, o.posY, o.posZ);
             go.transform.localScale = new Vector3(OneIfZero(o.scaleX), OneIfZero(o.scaleY), OneIfZero(o.scaleZ));
+            ApplyContent(go, o, sprites, specPath);
+            return go;
+        }
 
-            if (!string.IsNullOrEmpty(o.sprite))
-            {
-                Sprite sprite;
-                if (!sprites.TryGetValue(o.sprite, out sprite))
-                {
-                    throw Fail(specPath, o.name + ": unknown sprite key " + o.sprite);
-                }
-                SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = sprite;
-                sr.color = ParseColor(o.color, specPath, o.name);
-                sr.sortingOrder = o.sortingOrder;
-            }
-
-            if (!string.IsNullOrEmpty(o.textKey))
-            {
-                AddText(go, o, specPath);
-            }
+        // Brings the sprite, text and components of an object in line with the spec.
+        // Works on a new object and on an existing one: it only sets what differs.
+        private static void ApplyContent(GameObject go, SpecObject o, Dictionary<string, Sprite> sprites,
+            string specPath)
+        {
+            ApplySprite(go, o, sprites, specPath);
+            ApplyText(go, o, specPath);
 
             if (o.components != null)
             {
@@ -720,13 +824,49 @@ namespace GoodEnoughRepairs.EditorTools
                     AddComponentByName(go, o.components[i], o, specPath);
                 }
             }
-            return go;
+
+            // Components the spec no longer asks for.
+            if (!Listed(o, "ShipView")) DestroyIfPresent<ShipView>(go);
+            if (!Listed(o, "InventoryView")) DestroyIfPresent<InventoryView>(go);
+            if (!Listed(o, "WarningView")) DestroyIfPresent<WarningView>(go);
+            if (string.IsNullOrEmpty(o.sprite) && !Listed(o, "SpriteRenderer")) DestroyIfPresent<SpriteRenderer>(go);
+        }
+
+        private static void ApplySprite(GameObject go, SpecObject o, Dictionary<string, Sprite> sprites,
+            string specPath)
+        {
+            if (string.IsNullOrEmpty(o.sprite)) return;
+
+            Sprite sprite;
+            if (!sprites.TryGetValue(o.sprite, out sprite))
+            {
+                throw Fail(specPath, o.name + ": unknown sprite key " + o.sprite);
+            }
+            SpriteRenderer sr = go.GetComponent<SpriteRenderer>();
+            if (sr == null) sr = go.AddComponent<SpriteRenderer>();
+            if (sr.sprite != sprite) sr.sprite = sprite;
+            Color color = ParseColor(o.color, specPath, o.name);
+            if (sr.color != color) sr.color = color;
+            if (sr.sortingOrder != o.sortingOrder) sr.sortingOrder = o.sortingOrder;
         }
 
         // A text element: a TextMesh with a built-in font, and a TextKeyView that
-        // fills it from the text key.
-        private static void AddText(GameObject go, SpecObject o, string specPath)
+        // fills it from the text key. Sets only what differs. With no textKey, the
+        // text parts are removed.
+        private static void ApplyText(GameObject go, SpecObject o, string specPath)
         {
+            if (string.IsNullOrEmpty(o.textKey))
+            {
+                if (!Listed(o, "TextKeyView")) DestroyIfPresent<TextKeyView>(go);
+                TextMesh old = go.GetComponent<TextMesh>();
+                if (old != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(old);
+                    DestroyIfPresent<MeshRenderer>(go);
+                }
+                return;
+            }
+
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (font == null) throw Fail(specPath, o.name + ": the built-in font could not be loaded");
 
@@ -751,41 +891,59 @@ namespace GoodEnoughRepairs.EditorTools
             }
             if (o.textSize < 0f) throw Fail(specPath, o.name + ": textSize must not be negative");
 
-            TextMesh tm = go.AddComponent<TextMesh>();
-            tm.font = font;
-            tm.fontSize = TextFontSize;
-            tm.characterSize = (o.textSize > 0f ? o.textSize : DefaultTextSize) / TextSizeDivisor;
-            tm.anchor = anchor;
-            tm.alignment = alignment;
-            tm.color = ParseColor(o.textColor, specPath, o.name);
+            TextMesh tm = go.GetComponent<TextMesh>();
+            if (tm == null) tm = go.AddComponent<TextMesh>();
+            if (tm.font != font) tm.font = font;
+            if (tm.fontSize != TextFontSize) tm.fontSize = TextFontSize;
+            float characterSize = (o.textSize > 0f ? o.textSize : DefaultTextSize) / TextSizeDivisor;
+            if (!Mathf.Approximately(tm.characterSize, characterSize)) tm.characterSize = characterSize;
+            if (tm.anchor != anchor) tm.anchor = anchor;
+            if (tm.alignment != alignment) tm.alignment = alignment;
+            Color color = ParseColor(o.textColor, specPath, o.name);
+            if (tm.color != color) tm.color = color;
 
             MeshRenderer mr = go.GetComponent<MeshRenderer>();
             if (mr != null)
             {
-                mr.sharedMaterial = font.material;
-                mr.sortingOrder = o.sortingOrder;
+                if (mr.sharedMaterial != font.material) mr.sharedMaterial = font.material;
+                if (mr.sortingOrder != o.sortingOrder) mr.sortingOrder = o.sortingOrder;
             }
 
-            TextKeyView view = go.AddComponent<TextKeyView>();
-            view.textKey = o.textKey;
-            view.textMesh = tm;
-            view.Refresh();
+            bool refresh = false;
+            TextKeyView view = go.GetComponent<TextKeyView>();
+            if (view == null)
+            {
+                view = go.AddComponent<TextKeyView>();
+                refresh = true;
+            }
+            if (view.textKey != o.textKey)
+            {
+                view.textKey = o.textKey;
+                refresh = true;
+            }
+            if (view.textMesh != tm)
+            {
+                view.textMesh = tm;
+                refresh = true;
+            }
+            if (refresh) view.Refresh();
         }
 
         // The fixed list of components a spec may attach. Each name is one direct,
-        // compile-time reference. To allow a new type, add one case here.
+        // compile-time reference. To allow a new type, add one case here. Every case
+        // does nothing when the component is already there.
         private static void AddComponentByName(GameObject go, string name, SpecObject o, string specPath)
         {
             switch (name)
             {
                 case "ShipView":
-                    go.AddComponent<ShipView>();
+                    if (go.GetComponent<ShipView>() == null) go.AddComponent<ShipView>();
                     return;
                 case "InventoryView":
-                    go.AddComponent<InventoryView>();
+                    if (go.GetComponent<InventoryView>() == null) go.AddComponent<InventoryView>();
                     return;
                 case "WarningView":
-                    go.AddComponent<WarningView>();
+                    if (go.GetComponent<WarningView>() == null) go.AddComponent<WarningView>();
                     return;
                 case "TextKeyView":
                     if (go.GetComponent<TextKeyView>() == null) go.AddComponent<TextKeyView>();
@@ -794,13 +952,16 @@ namespace GoodEnoughRepairs.EditorTools
                     if (go.GetComponent<SpriteRenderer>() == null) go.AddComponent<SpriteRenderer>();
                     return;
                 case "Canvas":
-                    UiParts.MakeCanvas(go, o.sortingOrder);
+                    Canvas canvas = go.GetComponent<Canvas>();
+                    if (canvas == null) UiParts.MakeCanvas(go, o.sortingOrder);
+                    else if (canvas.sortingOrder != o.sortingOrder) canvas.sortingOrder = o.sortingOrder;
                     return;
                 case "Image":
-                    UiParts.MakeImage(go);
+                    if (go.GetComponent<CanvasRenderer>() == null) UiParts.MakeImage(go);
                     return;
                 case "Button":
-                    UiParts.MakeButton(go);
+                    Component existingButton = UiParts.GetButton(go);
+                    if (existingButton == null) UiParts.MakeButton(go);
                     return;
                 default:
                     throw Fail(specPath, go.name + ": unknown component " + name);
@@ -862,6 +1023,7 @@ namespace GoodEnoughRepairs.EditorTools
             }
         }
 
+        // Builds a whole prefab content from scratch (the prefab does not exist yet).
         private static GameObject MakePrefabContent(PrefabSpec spec, Dictionary<string, Sprite> sprites,
             string specPath)
         {
@@ -909,6 +1071,106 @@ namespace GoodEnoughRepairs.EditorTools
             }
         }
 
+        // Opens the existing prefab, patches it to match the spec and saves it back
+        // to the same asset. On an error nothing is saved.
+        private static void PatchPrefab(PrefabSpec spec, Dictionary<string, Sprite> sprites, string specPath)
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(spec.prefabPath);
+            try
+            {
+                PatchContent(spec, root, sprites, specPath);
+                PrefabUtility.SaveAsPrefabAsset(root, spec.prefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        private static void CollectStale(Transform parent, string parentPath, HashSet<string> wanted,
+            HashSet<string> seen, List<GameObject> stale)
+        {
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                Transform c = parent.GetChild(i);
+                string path = parentPath.Length == 0 ? c.name : parentPath + "/" + c.name;
+                if (wanted.Contains(path) && seen.Add(path))
+                {
+                    CollectStale(c, path, wanted, seen, stale);
+                }
+                else
+                {
+                    stale.Add(c.gameObject);
+                }
+            }
+        }
+
+        private static void PatchContent(PrefabSpec spec, GameObject root, Dictionary<string, Sprite> sprites,
+            string specPath)
+        {
+            Dictionary<string, string> paths = ObjectPaths(spec, specPath);
+
+            // Remove objects the spec does not list (matched by name path).
+            HashSet<string> wanted = new HashSet<string>();
+            foreach (KeyValuePair<string, string> pair in paths)
+            {
+                if (pair.Value.Length > 0) wanted.Add(pair.Value);
+            }
+            List<GameObject> stale = new List<GameObject>();
+            CollectStale(root.transform, "", wanted, new HashSet<string>(), stale);
+            for (int i = 0; i < stale.Count; i++)
+            {
+                if (stale[i] != null) UnityEngine.Object.DestroyImmediate(stale[i]);
+            }
+
+            if (root.name != spec.root.name) root.name = spec.root.name;
+            Dictionary<string, GameObject> map = new Dictionary<string, GameObject>();
+            map[spec.root.name] = root;
+            ApplyContent(root, spec.root, sprites, specPath);
+            ApplyTransform(root.transform, spec.root);
+
+            Dictionary<string, int> nextIndex = new Dictionary<string, int>();
+            if (spec.objects != null)
+            {
+                for (int i = 0; i < spec.objects.Length; i++)
+                {
+                    SpecObject o = spec.objects[i];
+                    string path = paths[o.name];
+                    string parentPath = ParentOfPath(path);
+                    Transform parent = parentPath.Length == 0 ? root.transform : root.transform.Find(parentPath);
+                    if (parent == null) throw Fail(specPath, o.name + ": parent object could not be found");
+
+                    Transform existing = root.transform.Find(path);
+                    GameObject go;
+                    if (existing == null)
+                    {
+                        go = MakeObject(o, parent, sprites, specPath);
+                    }
+                    else
+                    {
+                        go = existing.gameObject;
+                        ApplyContent(go, o, sprites, specPath);
+                        ApplyTransform(go.transform, o);
+                    }
+                    map[o.name] = go;
+
+                    // Child order follows the spec order.
+                    int index;
+                    nextIndex.TryGetValue(parentPath, out index);
+                    if (go.transform.GetSiblingIndex() != index) go.transform.SetSiblingIndex(index);
+                    nextIndex[parentPath] = index + 1;
+                }
+            }
+
+            if (spec.links != null)
+            {
+                for (int i = 0; i < spec.links.Length; i++)
+                {
+                    ApplyLink(spec.links[i], map, specPath);
+                }
+            }
+        }
+
         private static void ApplyLink(SpecLink link, Dictionary<string, GameObject> map, string specPath)
         {
             GameObject owner;
@@ -943,7 +1205,7 @@ namespace GoodEnoughRepairs.EditorTools
                         throw Fail(specPath, link.field + " elements have no field " + link.subField);
                     }
                 }
-                element.objectReferenceValue = value;
+                if (element.objectReferenceValue != value) element.objectReferenceValue = value;
             }
             else
             {
@@ -951,19 +1213,25 @@ namespace GoodEnoughRepairs.EditorTools
                 {
                     throw Fail(specPath, "subField needs an array element (index 0 or more) on " + link.field);
                 }
-                prop.objectReferenceValue = value;
+                if (prop.objectReferenceValue != value) prop.objectReferenceValue = value;
             }
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        // Puts one instance of the prefab in the open scene. With screen set, the
-        // rectangle (reference pixels) decides the position and scale, and the
-        // ship's content is centered with the same ShipView code StationView uses.
-        private static GameObject PlaceOne(GameObject prefab, string name, Camera cam, SpecScene sc,
-            float rx, float ry, float rw, float rh, bool screen)
+        // Puts one instance of the prefab in the open scene, or updates the existing
+        // one. With screen set, the rectangle (reference pixels) decides the position
+        // and scale, and the ship's content is centered with the same ShipView code
+        // StationView uses. An existing instance is kept: only position and scale
+        // are set, and only when they differ.
+        private static GameObject PlaceOne(GameObject prefab, GameObject existing, string name, Camera cam,
+            SpecScene sc, float rx, float ry, float rw, float rh, bool screen)
         {
-            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-            instance.name = name;
+            GameObject instance = existing;
+            if (instance == null)
+            {
+                instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                instance.name = name;
+            }
             ShipView view = instance.GetComponent<ShipView>();
 
             Vector3 pos;
@@ -984,12 +1252,56 @@ namespace GoodEnoughRepairs.EditorTools
                 pos = new Vector3(sc.worldX, sc.worldY, 0f);
                 scale = OneIfZero(sc.worldScale);
             }
+
+            Vector3 oldPos = instance.transform.position;
+            Vector3 newScale = new Vector3(scale, scale, 1f);
+            if (existing == null || instance.transform.localScale != newScale)
+            {
+                instance.transform.localScale = newScale;
+            }
             instance.transform.position = pos;
-            instance.transform.localScale = new Vector3(scale, scale, 1f);
 
             // Same centering rule as StationView: the center of the body and bars.
             if (screen && view != null) view.CenterOn(pos);
+
+            // Keep the exact old position when nothing really changed.
+            if (existing != null && instance.transform.position == oldPos)
+            {
+                instance.transform.position = oldPos;
+            }
             return instance;
+        }
+
+        // Finds the scene instances this spec owns (root-level objects named like the
+        // spec's root or its bay instances). Keeps the first prefab instance for every
+        // wanted name and removes every other matching object (a bay that is gone, a
+        // repeated name, or an object that is not an instance of this prefab).
+        private static Dictionary<string, GameObject> SelectInstances(string rootName, string prefabPath,
+            HashSet<string> desired)
+        {
+            string bayPrefix = rootName + BaySuffix;
+            GameObject[] all = UnityEngine.Object.FindObjectsByType<GameObject>(
+                FindObjectsInactive.Include, FindObjectsSortMode.InstanceID);
+
+            Dictionary<string, GameObject> kept = new Dictionary<string, GameObject>();
+            List<GameObject> matching = new List<GameObject>();
+            for (int i = 0; i < all.Length; i++)
+            {
+                GameObject g = all[i];
+                if (g == null || g.transform.parent != null) continue;
+                if (!(g.name == rootName || g.name.StartsWith(bayPrefix, StringComparison.Ordinal))) continue;
+                matching.Add(g);
+                if (desired.Contains(g.name) && !kept.ContainsKey(g.name) &&
+                    PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(g) == prefabPath)
+                {
+                    kept[g.name] = g;
+                }
+            }
+            for (int i = 0; i < matching.Count; i++)
+            {
+                if (!kept.ContainsValue(matching[i])) UnityEngine.Object.DestroyImmediate(matching[i]);
+            }
+            return kept;
         }
 
         private static StationView GetStation()
@@ -1031,9 +1343,12 @@ namespace GoodEnoughRepairs.EditorTools
             {
                 throw Fail(specPath, "the prefab root has no " + needed + " to connect to " + field);
             }
-            prop.objectReferenceValue = component;
-            so.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(station);
+            if (prop.objectReferenceValue != component)
+            {
+                prop.objectReferenceValue = component;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(station);
+            }
         }
 
         private static void PlaceInScene(PrefabSpec spec, string specPath)
@@ -1073,22 +1388,21 @@ namespace GoodEnoughRepairs.EditorTools
                 cam.aspect = sc.refWidth / sc.refHeight;
             }
 
-            // Remove older instances so the builder can be run again.
-            string bayPrefix = spec.root.name + BaySuffix;
-            GameObject[] all = UnityEngine.Object.FindObjectsByType<GameObject>(
-                FindObjectsInactive.Include, FindObjectsSortMode.None);
-            for (int i = 0; i < all.Length; i++)
-            {
-                GameObject g = all[i];
-                if (g == null || g.transform.parent != null) continue;
-                if (g.name == spec.root.name || g.name.StartsWith(bayPrefix, StringComparison.Ordinal))
-                {
-                    UnityEngine.Object.DestroyImmediate(g);
-                }
-            }
-
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(spec.prefabPath);
             if (prefab == null) throw Fail(specPath, "prefab could not be loaded: " + spec.prefabPath);
+
+            // Keep the instances that are already there, remove the ones the spec no
+            // longer lists, add the missing ones.
+            HashSet<string> desired = new HashSet<string>();
+            if (hasBays)
+            {
+                for (int i = 0; i < sc.bays.Length; i++) desired.Add(InstanceName(spec.root.name, sc.bays[i].bay));
+            }
+            else
+            {
+                desired.Add(spec.root.name);
+            }
+            Dictionary<string, GameObject> kept = SelectInstances(spec.root.name, spec.prefabPath, desired);
 
             List<GameObject> instances = new List<GameObject>();
             List<string> fields = new List<string>();
@@ -1097,14 +1411,19 @@ namespace GoodEnoughRepairs.EditorTools
                 for (int i = 0; i < sc.bays.Length; i++)
                 {
                     SpecBay b = sc.bays[i];
-                    instances.Add(PlaceOne(prefab, InstanceName(spec.root.name, b.bay), cam, sc,
+                    string instanceName = InstanceName(spec.root.name, b.bay);
+                    GameObject existing;
+                    kept.TryGetValue(instanceName, out existing);
+                    instances.Add(PlaceOne(prefab, existing, instanceName, cam, sc,
                         b.rectX, b.rectY, b.rectW, b.rectH, true));
                     fields.Add(string.IsNullOrEmpty(b.stationField) ? "bay" + b.bay + "View" : b.stationField);
                 }
             }
             else
             {
-                instances.Add(PlaceOne(prefab, spec.root.name, cam, sc,
+                GameObject existing;
+                kept.TryGetValue(spec.root.name, out existing);
+                instances.Add(PlaceOne(prefab, existing, spec.root.name, cam, sc,
                     sc.rectX, sc.rectY, sc.rectW, sc.rectH, sc.rectW > 0f));
                 fields.Add(sc.stationField);
             }
