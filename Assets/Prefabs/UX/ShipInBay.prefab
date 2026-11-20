@@ -587,7 +587,7 @@ TextMesh:
   m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
   m_Color:
     serializedVersion: 2
-    rgba: 4279636496
+    rgba: 4289105791
 --- !u!114 &2631235450395166804
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -916,7 +916,7 @@ TextMesh:
   m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
   m_Color:
     serializedVersion: 2
-    rgba: 4279636496
+    rgba: 4289105791
 --- !u!114 &4928164045382814366
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1966,7 +1966,7 @@ TextMesh:
   m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
   m_Color:
     serializedVersion: 2
-    rgba: 4279636496
+    rgba: 4289105791
 --- !u!114 &4091886051628957304
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2267,7 +2267,7 @@ TextMesh:
   m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
   m_Color:
     serializedVersion: 2
-    rgba: 4279636496
+    rgba: 4289105791
 --- !u!114 &4005226420699855249
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2477,7 +2477,7 @@ TextMesh:
   m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
   m_Color:
     serializedVersion: 2
-    rgba: 4279636496
+    rgba: 4289105791
 --- !u!114 &4098011906646894759
 MonoBehaviour:
   m_ObjectHideFlags: 0
