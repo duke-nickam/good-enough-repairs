@@ -1,8 +1,8 @@
 /*
  * PREFAB SPEC BUILDER
  *
- * Turns a prefab spec (a JSON file) into a prefab. It can also place an instance
- * in a scene, connect it to a StationView field, show a docked sample ship (or a
+ * Turns a prefab spec (a JSON file) into a prefab. It can also place instances
+ * in a scene, connect them to StationView fields, show a docked sample ship (or a
  * sample inventory, or a sample warning dialog) in edit mode and save a
  * screenshot outside the project.
  *
@@ -16,8 +16,8 @@
  * The builder prints "MADE: <path>" for every file Unity made (sprite PNG, prefab,
  * scene) and "SCREENSHOT: <absolute path>" for every screenshot. A bad spec stops
  * the build with an error that names the spec file. It never saves a half prefab.
- * Running a spec twice gives the same result: the prefab is overwritten and an
- * older instance in the scene is replaced.
+ * Running a spec twice gives the same result: the prefab is overwritten and older
+ * instances in the scene are replaced.
  *
  * SPEC FILE RULES
  *   - File name ends with ".spec.json", anywhere under Assets/.
@@ -78,6 +78,7 @@
  *                      component, for example "bay1View" (gets the ShipView),
  *                      "inventoryView" (gets the InventoryView) or "warningView"
  *                      (gets the WarningView). Empty means do not connect.
+ *                      Not used when "bays" is given.
  *       Placement, option A: fit into a screen rectangle (ship prefabs)
  *         refWidth, refHeight   reference screen size in pixels, for example 1280, 720.
  *                      Before placing, the builder sets the camera aspect to
@@ -88,23 +89,27 @@
  *                      prefab units fill the rectangle's height, then moved so the
  *                      center of its content bounds (the body and all five bar fills
  *                      at full length, ShipView.TryGetContentBounds) is at the
- *                      rectangle's center. StationView centers the bay 1 ship on
+ *                      rectangle's center. StationView centers each bay's ship on
  *                      the same bounds, through the same ShipView code. For a
  *                      prefab without a ShipView, the prefab origin goes to the
  *                      rectangle's center.
  *         contentHeight   height of the prefab's content in prefab units
  *         offsetY         vertical shift in prefab units, applied after scaling and
  *                         centering (for example -0.65)
- *       Placement, option B (used when rectW is 0): worldX, worldY, worldScale
- *                      (worldScale 0 means 1). The prefab origin is placed there.
- *                      Use this for the inventory panel and the warning dialog.
+ *       Placement, option A for several bays: "bays" (see BAYS below).
+ *       Placement, option B (used when rectW is 0 and there is no "bays"): worldX,
+ *                      worldY, worldScale (worldScale 0 means 1). The prefab origin
+ *                      is placed there. Use this for the inventory panel and the
+ *                      warning dialog.
  *       screenshot     file name of the screenshot, for example "ship_in_bay.png".
  *                      Empty means no screenshot. It is saved in the system temp
  *                      folder under ger_shots, outside the project. Before the shot
  *                      the builder shows a docked sample ship (day 1, seed 1) on the
  *                      instance, or, for an InventoryView, the sample ship's five
  *                      parts in inventory slots 1-5, or, for a WarningView, the
- *                      warning dialog open on the sample ship. This is done after
+ *                      warning dialog open on the sample ship. With "bays", the
+ *                      first instance gets the seed 1 ship and every other instance
+ *                      its own sample ship (seed 2, 3). This is done after
  *                      the scene is saved, so the shown bar sizes and colors do not
  *                      end up in the scene file. With option A the shot has the
  *                      reference width and height. Text drawn with OnGUI (button
@@ -128,6 +133,28 @@
  *                        { "part": "Engine", "condition": 35 },
  *                        { "part": "HullPlate", "condition": 65 },
  *                        { "part": "ShieldGenerator", "condition": 95 } ]
+ *
+ * BAYS: ONE SHIP VIEW IN EACH OF THE THREE BAYS (scene.bays)
+ *   "bays" is an array with one entry per bay the spec places. It needs refWidth,
+ *   refHeight and contentHeight (and may use offsetY) in the scene block. Each
+ *   entry:
+ *       bay            bay number, 1 to 3 (required, each number once)
+ *       rectX, rectY, rectW, rectH   the bay's rectangle in reference pixels, top
+ *                      left is 0,0 (rectW and rectH more than 0). Same placement
+ *                      rule as option A: scaled to contentHeight, content center on
+ *                      the rectangle's center.
+ *       stationField   optional. StationView field to connect. Empty means
+ *                      "bay1View", "bay2View" or "bay3View" from the bay number.
+ *   Instance names in the scene: "<root name>_Bay1", "_Bay2", "_Bay3". Running the
+ *   spec again replaces them. The measure tool reads the same entries and fails a
+ *   bay that is not listed.
+ *   Example:
+ *     "scene": { "path": "Assets/Scenes/Main.unity",
+ *       "refWidth": 1280, "refHeight": 720, "contentHeight": 3.4, "offsetY": -0.65,
+ *       "bays": [
+ *         { "bay": 1, "rectX": 20,  "rectY": 20, "rectW": 260, "rectH": 150 },
+ *         { "bay": 2, "rectX": 296, "rectY": 20, "rectW": 260, "rectH": 150 },
+ *         { "bay": 3, "rectX": 572, "rectY": 20, "rectW": 260, "rectH": 150 } ] }
  *
  * DRAG HANDLES ON A SHIP (ShipView)
  *   ShipView.slotAreas is an array of five SpriteRenderers, in part order (engine,
@@ -209,37 +236,13 @@
  *     { "name": "BarTrack_Engine", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
  *       "posX": -1.2, "posY": -0.1, "scaleX": 2.4, "scaleY": 0.2 },
  *     { "name": "BarFill_Engine", "sprite": "barLeft", "color": "passes", "sortingOrder": 2,
- *       "posX": -1.2, "posY": -0.1, "scaleX": 2.4, "scaleY": 0.12 },
- *     { "name": "BarTrack_HullPlate", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
- *       "posX": -1.2, "posY": -0.4, "scaleX": 2.4, "scaleY": 0.2 },
- *     { "name": "BarFill_HullPlate", "sprite": "barLeft", "color": "passes", "sortingOrder": 2,
- *       "posX": -1.2, "posY": -0.4, "scaleX": 2.4, "scaleY": 0.12 },
- *     { "name": "BarTrack_ShieldGenerator", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
- *       "posX": -1.2, "posY": -0.7, "scaleX": 2.4, "scaleY": 0.2 },
- *     { "name": "BarFill_ShieldGenerator", "sprite": "barLeft", "color": "passes", "sortingOrder": 2,
- *       "posX": -1.2, "posY": -0.7, "scaleX": 2.4, "scaleY": 0.12 },
- *     { "name": "BarTrack_Thruster", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
- *       "posX": -1.2, "posY": -1.0, "scaleX": 2.4, "scaleY": 0.2 },
- *     { "name": "BarFill_Thruster", "sprite": "barLeft", "color": "passes", "sortingOrder": 2,
- *       "posX": -1.2, "posY": -1.0, "scaleX": 2.4, "scaleY": 0.12 },
- *     { "name": "BarTrack_PowerCore", "sprite": "barLeft", "color": "track", "sortingOrder": 1,
- *       "posX": -1.2, "posY": -1.3, "scaleX": 2.4, "scaleY": 0.2 },
- *     { "name": "BarFill_PowerCore", "sprite": "barLeft", "color": "passes", "sortingOrder": 2,
- *       "posX": -1.2, "posY": -1.3, "scaleX": 2.4, "scaleY": 0.12 }
+ *       "posX": -1.2, "posY": -0.1, "scaleX": 2.4, "scaleY": 0.12 }
  *   ],
  *   "links": [
  *     { "owner": "ShipInBay", "component": "ShipView", "field": "body", "index": -1,
  *       "target": "Body", "targetType": "SpriteRenderer" },
  *     { "owner": "ShipInBay", "component": "ShipView", "field": "barFills", "index": 0,
- *       "target": "BarFill_Engine", "targetType": "SpriteRenderer" },
- *     { "owner": "ShipInBay", "component": "ShipView", "field": "barFills", "index": 1,
- *       "target": "BarFill_HullPlate", "targetType": "SpriteRenderer" },
- *     { "owner": "ShipInBay", "component": "ShipView", "field": "barFills", "index": 2,
- *       "target": "BarFill_ShieldGenerator", "targetType": "SpriteRenderer" },
- *     { "owner": "ShipInBay", "component": "ShipView", "field": "barFills", "index": 3,
- *       "target": "BarFill_Thruster", "targetType": "SpriteRenderer" },
- *     { "owner": "ShipInBay", "component": "ShipView", "field": "barFills", "index": 4,
- *       "target": "BarFill_PowerCore", "targetType": "SpriteRenderer" }
+ *       "target": "BarFill_Engine", "targetType": "SpriteRenderer" }
  *   ],
  *   "scene": {
  *     "path": "Assets/Scenes/Main.unity",
@@ -247,14 +250,10 @@
  *     "refWidth": 1280, "refHeight": 720,
  *     "rectX": 20, "rectY": 20, "rectW": 260, "rectH": 150,
  *     "contentHeight": 3.4, "offsetY": -0.65,
- *     "screenshot": "ship_in_bay.png",
- *     "sampleConditions": [
- *       { "part": "Engine", "condition": 35 },
- *       { "part": "HullPlate", "condition": 65 },
- *       { "part": "ShieldGenerator", "condition": 95 }
- *     ]
+ *     "screenshot": "ship_in_bay.png"
  *   }
  * }
+ * (shortened here: a real ship has all five bars and five barFills links)
  *
  * The bar fill order in barFills is the game's part order: engine, hull plate,
  * shield generator, thruster, power core.
@@ -316,6 +315,17 @@ namespace GoodEnoughRepairs.EditorTools
     }
 
     [Serializable]
+    public class SpecBay
+    {
+        public int bay;
+        public string stationField;
+        public float rectX;
+        public float rectY;
+        public float rectW;
+        public float rectH;
+    }
+
+    [Serializable]
     public class SpecScene
     {
         public string path;
@@ -334,6 +344,7 @@ namespace GoodEnoughRepairs.EditorTools
         public string screenshot;
         public string sampleDialog;
         public SpecPartCondition[] sampleConditions;
+        public SpecBay[] bays;
     }
 
     [Serializable]
@@ -355,6 +366,13 @@ namespace GoodEnoughRepairs.EditorTools
     public static class PrefabSpecBuilder
     {
         private const string SpecSuffix = ".spec.json";
+        private const string BaySuffix = "_Bay";
+
+        /// <summary>Name of the scene instance for a bay entry of a spec.</summary>
+        public static string InstanceName(string rootName, int bay)
+        {
+            return rootName + BaySuffix + bay;
+        }
 
         /// <summary>Builds every *.spec.json under Assets/.</summary>
         public static void BuildAll()
@@ -434,6 +452,28 @@ namespace GoodEnoughRepairs.EditorTools
                 if (!string.IsNullOrEmpty(d) && d != "buy" && d != "release")
                 {
                     throw Fail(specPath, "scene.sampleDialog must be \"buy\" or \"release\"");
+                }
+                ValidateBays(spec.scene, specPath);
+            }
+        }
+
+        private static void ValidateBays(SpecScene sc, string specPath)
+        {
+            if (sc.bays == null || sc.bays.Length == 0) return;
+            HashSet<int> seen = new HashSet<int>();
+            for (int i = 0; i < sc.bays.Length; i++)
+            {
+                SpecBay b = sc.bays[i];
+                string where = "scene.bays[" + i + "]";
+                if (b == null) throw Fail(specPath, where + " is empty");
+                if (b.bay < 1 || b.bay > GameRules.DockingBays)
+                {
+                    throw Fail(specPath, where + ".bay must be from 1 to " + GameRules.DockingBays);
+                }
+                if (!seen.Add(b.bay)) throw Fail(specPath, where + ": bay " + b.bay + " is listed twice");
+                if (b.rectW <= 0f || b.rectH <= 0f)
+                {
+                    throw Fail(specPath, where + ": rectW and rectH must be more than 0");
                 }
             }
         }
@@ -754,6 +794,86 @@ namespace GoodEnoughRepairs.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        // Puts one instance of the prefab in the open scene. With screen set, the
+        // rectangle (reference pixels) decides the position and scale, and the
+        // ship's content is centered with the same ShipView code StationView uses.
+        private static GameObject PlaceOne(GameObject prefab, string name, Camera cam, SpecScene sc,
+            float rx, float ry, float rw, float rh, bool screen)
+        {
+            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            instance.name = name;
+            ShipView view = instance.GetComponent<ShipView>();
+
+            Vector3 pos;
+            float scale;
+            if (screen)
+            {
+                float depth = Mathf.Abs(cam.transform.position.z);
+                float vx = (rx + rw / 2f) / sc.refWidth;
+                float vy = 1f - (ry + rh / 2f) / sc.refHeight;
+                pos = cam.ViewportToWorldPoint(new Vector3(vx, vy, depth));
+                pos.z = 0f;
+                float unitsPerPixel = 2f * cam.orthographicSize / sc.refHeight;
+                scale = rh * unitsPerPixel / sc.contentHeight;
+                pos += new Vector3(0f, sc.offsetY * scale, 0f);
+            }
+            else
+            {
+                pos = new Vector3(sc.worldX, sc.worldY, 0f);
+                scale = OneIfZero(sc.worldScale);
+            }
+            instance.transform.position = pos;
+            instance.transform.localScale = new Vector3(scale, scale, 1f);
+
+            // Same centering rule as StationView: the center of the body and bars.
+            if (screen && view != null) view.CenterOn(pos);
+            return instance;
+        }
+
+        private static StationView GetStation()
+        {
+            StationView station = UnityEngine.Object.FindFirstObjectByType<StationView>();
+            if (station == null)
+            {
+                GameObject st = new GameObject("Station");
+                station = st.AddComponent<StationView>();
+            }
+            return station;
+        }
+
+        private static void ConnectStation(StationView station, string field, GameObject instance, string specPath)
+        {
+            SerializedObject so = new SerializedObject(station);
+            SerializedProperty prop = so.FindProperty(field);
+            if (prop == null) throw Fail(specPath, "StationView has no field " + field);
+
+            string propType = prop.type ?? "";
+            UnityEngine.Object component;
+            string needed;
+            if (propType.Contains("WarningView"))
+            {
+                component = instance.GetComponent<WarningView>();
+                needed = "WarningView";
+            }
+            else if (propType.Contains("InventoryView"))
+            {
+                component = instance.GetComponent<InventoryView>();
+                needed = "InventoryView";
+            }
+            else
+            {
+                component = instance.GetComponent<ShipView>();
+                needed = "ShipView";
+            }
+            if (component == null)
+            {
+                throw Fail(specPath, "the prefab root has no " + needed + " to connect to " + field);
+            }
+            prop.objectReferenceValue = component;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(station);
+        }
+
         private static void PlaceInScene(PrefabSpec spec, string specPath)
         {
             SpecScene sc = spec.scene;
@@ -778,7 +898,8 @@ namespace GoodEnoughRepairs.EditorTools
                 cam.orthographicSize = 5f;
             }
 
-            bool screenPlacement = sc.rectW > 0f;
+            bool hasBays = sc.bays != null && sc.bays.Length > 0;
+            bool screenPlacement = hasBays || sc.rectW > 0f;
             if (screenPlacement)
             {
                 if (sc.refWidth <= 0f || sc.refHeight <= 0f || sc.contentHeight <= 0f)
@@ -790,13 +911,15 @@ namespace GoodEnoughRepairs.EditorTools
                 cam.aspect = sc.refWidth / sc.refHeight;
             }
 
-            // Remove an older instance so the builder can be run again.
+            // Remove older instances so the builder can be run again.
+            string bayPrefix = spec.root.name + BaySuffix;
             GameObject[] all = UnityEngine.Object.FindObjectsByType<GameObject>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None);
             for (int i = 0; i < all.Length; i++)
             {
                 GameObject g = all[i];
-                if (g != null && g.name == spec.root.name && g.transform.parent == null)
+                if (g == null || g.transform.parent != null) continue;
+                if (g.name == spec.root.name || g.name.StartsWith(bayPrefix, StringComparison.Ordinal))
                 {
                     UnityEngine.Object.DestroyImmediate(g);
                 }
@@ -804,76 +927,41 @@ namespace GoodEnoughRepairs.EditorTools
 
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(spec.prefabPath);
             if (prefab == null) throw Fail(specPath, "prefab could not be loaded: " + spec.prefabPath);
-            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-            ShipView view = instance.GetComponent<ShipView>();
-            InventoryView invView = instance.GetComponent<InventoryView>();
-            WarningView warnView = instance.GetComponent<WarningView>();
 
-            Vector3 pos;
-            float scale;
-            if (screenPlacement)
+            List<GameObject> instances = new List<GameObject>();
+            List<string> fields = new List<string>();
+            if (hasBays)
             {
-                float depth = Mathf.Abs(cam.transform.position.z);
-                float vx = (sc.rectX + sc.rectW / 2f) / sc.refWidth;
-                float vy = 1f - (sc.rectY + sc.rectH / 2f) / sc.refHeight;
-                pos = cam.ViewportToWorldPoint(new Vector3(vx, vy, depth));
-                pos.z = 0f;
-                float unitsPerPixel = 2f * cam.orthographicSize / sc.refHeight;
-                scale = sc.rectH * unitsPerPixel / sc.contentHeight;
-                pos += new Vector3(0f, sc.offsetY * scale, 0f);
+                for (int i = 0; i < sc.bays.Length; i++)
+                {
+                    SpecBay b = sc.bays[i];
+                    instances.Add(PlaceOne(prefab, InstanceName(spec.root.name, b.bay), cam, sc,
+                        b.rectX, b.rectY, b.rectW, b.rectH, true));
+                    fields.Add(string.IsNullOrEmpty(b.stationField) ? "bay" + b.bay + "View" : b.stationField);
+                }
             }
             else
             {
-                pos = new Vector3(sc.worldX, sc.worldY, 0f);
-                scale = OneIfZero(sc.worldScale);
+                instances.Add(PlaceOne(prefab, spec.root.name, cam, sc,
+                    sc.rectX, sc.rectY, sc.rectW, sc.rectH, sc.rectW > 0f));
+                fields.Add(sc.stationField);
             }
-            instance.transform.position = pos;
-            instance.transform.localScale = new Vector3(scale, scale, 1f);
 
-            // Same centering rule as StationView: the center of the body and bars.
-            if (screenPlacement && view != null) view.CenterOn(pos);
-
-            if (!string.IsNullOrEmpty(sc.stationField))
+            StationView station = null;
+            for (int i = 0; i < instances.Count; i++)
             {
-                StationView station = UnityEngine.Object.FindFirstObjectByType<StationView>();
-                if (station == null)
-                {
-                    GameObject st = new GameObject("Station");
-                    station = st.AddComponent<StationView>();
-                }
-                SerializedObject so = new SerializedObject(station);
-                SerializedProperty prop = so.FindProperty(sc.stationField);
-                if (prop == null) throw Fail(specPath, "StationView has no field " + sc.stationField);
-
-                string propType = prop.type ?? "";
-                UnityEngine.Object component;
-                string needed;
-                if (propType.Contains("WarningView"))
-                {
-                    component = warnView;
-                    needed = "WarningView";
-                }
-                else if (propType.Contains("InventoryView"))
-                {
-                    component = invView;
-                    needed = "InventoryView";
-                }
-                else
-                {
-                    component = view;
-                    needed = "ShipView";
-                }
-                if (component == null)
-                {
-                    throw Fail(specPath, "the prefab root has no " + needed + " to connect to " + sc.stationField);
-                }
-                prop.objectReferenceValue = component;
-                so.ApplyModifiedPropertiesWithoutUndo();
-                EditorUtility.SetDirty(station);
+                if (string.IsNullOrEmpty(fields[i])) continue;
+                if (station == null) station = GetStation();
+                ConnectStation(station, fields[i], instances[i], specPath);
             }
 
-            EditorSceneManager.MarkSceneDirty(instance.scene);
-            EditorSceneManager.SaveScene(instance.scene);
+            GameObject first = instances[0];
+            ShipView view = first.GetComponent<ShipView>();
+            InventoryView invView = first.GetComponent<InventoryView>();
+            WarningView warnView = first.GetComponent<WarningView>();
+
+            EditorSceneManager.MarkSceneDirty(first.scene);
+            EditorSceneManager.SaveScene(first.scene);
             Debug.Log("MADE: " + sc.path);
 
             if (!string.IsNullOrEmpty(sc.screenshot))
@@ -883,9 +971,15 @@ namespace GoodEnoughRepairs.EditorTools
                     throw Fail(specPath,
                         "a screenshot needs a ShipView, an InventoryView or a WarningView on the prefab root");
                 }
+                List<ShipView> others = new List<ShipView>();
+                for (int i = 1; i < instances.Count; i++)
+                {
+                    ShipView v = instances[i].GetComponent<ShipView>();
+                    if (v != null) others.Add(v);
+                }
                 int w = screenPlacement ? Mathf.RoundToInt(sc.refWidth) : 1280;
                 int h = screenPlacement ? Mathf.RoundToInt(sc.refHeight) : 720;
-                TakeScreenshot(view, invView, warnView, sc.sampleDialog, cam, sc.screenshot,
+                TakeScreenshot(view, others, invView, warnView, sc.sampleDialog, cam, sc.screenshot,
                     SampleOverrides(sc, specPath), w, h, specPath);
             }
 
@@ -894,8 +988,9 @@ namespace GoodEnoughRepairs.EditorTools
 
         // Done after the scene is saved: showing the sample changes bar scales and
         // colors, and that must not end up in the scene file.
-        private static void TakeScreenshot(ShipView view, InventoryView invView, WarningView warnView,
-            string dialog, Camera cam, string fileName, int[] conditions, int w, int h, string specPath)
+        private static void TakeScreenshot(ShipView view, List<ShipView> others, InventoryView invView,
+            WarningView warnView, string dialog, Camera cam, string fileName, int[] conditions, int w, int h,
+            string specPath)
         {
             BalanceData balance = BalanceLoader.Load();
             if (balance == null) throw Fail(specPath, "the balance could not be loaded for the sample ship");
@@ -910,6 +1005,16 @@ namespace GoodEnoughRepairs.EditorTools
             {
                 view.Bind(new BuyRelease(bays, inventory, balance), null);
                 view.Show(ship, surplusMargin, conditions);
+
+                // Other bays get their own sample ship.
+                for (int i = 0; i < others.Count; i++)
+                {
+                    Ship extra = ShipFactory.Create(balance, balance.days[0], new System.Random(i + 2));
+                    DockingBays extraBays = new DockingBays();
+                    extraBays.TryDock(extra);
+                    others[i].Bind(new BuyRelease(extraBays, new Inventory(), balance), null);
+                    others[i].Show(extra, surplusMargin, conditions);
+                }
             }
             else if (warnView != null)
             {

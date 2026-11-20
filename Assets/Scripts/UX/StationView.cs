@@ -13,11 +13,17 @@ namespace GoodEnoughRepairs
         [SerializeField] private int seed = 1;
 
         /// <summary>
-        /// Optional prefab instance for the first bay. When assigned, it shows the
-        /// bay 1 ship every frame, centered in the bay, and OnGUI no longer draws
-        /// that bay's ship. When null, OnGUI draws it as before.
+        /// Optional prefab instance for bay 1. When assigned, it shows the bay 1
+        /// ship every frame, centered in the bay, and the old OnGUI ship panel is
+        /// not used for that bay. An empty bay hides its view.
         /// </summary>
         public ShipView bay1View;
+
+        /// <summary>Optional prefab instance for bay 2. Works like bay1View.</summary>
+        public ShipView bay2View;
+
+        /// <summary>Optional prefab instance for bay 3. Works like bay1View.</summary>
+        public ShipView bay3View;
 
         /// <summary>
         /// Optional inventory panel prefab instance. When assigned, it gets the
@@ -47,6 +53,18 @@ namespace GoodEnoughRepairs
         private float untilNextShipMs;
         private GUIStyle centeredLabel;
 
+        /// <summary>The ship view of a bay (0-2), or null when the bay has none.</summary>
+        private ShipView ViewOf(int bay)
+        {
+            switch (bay)
+            {
+                case 0: return bay1View;
+                case 1: return bay2View;
+                case 2: return bay3View;
+                default: return null;
+            }
+        }
+
         private void Awake()
         {
             balance = BalanceLoader.Load();
@@ -75,17 +93,23 @@ namespace GoodEnoughRepairs
 
             if (inventoryView != null) inventoryView.Bind(new PartMoves(inventory, balance), balance);
             if (warningView != null) warningView.Bind(buyRelease, ContentLoader.Load());
-            if (bay1View != null) bay1View.Bind(buyRelease, warningView);
+            for (int bay = 0; bay < bays.BayCount; bay++)
+            {
+                ShipView v = ViewOf(bay);
+                if (v != null) v.Bind(buyRelease, warningView);
+            }
         }
 
         private void Update()
         {
             if (bays == null) return;
 
-            if (bay1View != null)
+            for (int bay = 0; bay < shown.Length; bay++)
             {
-                bay1View.Show(shown[0], surplusMargin);
-                if (shown[0] != null) CenterInBay1(bay1View);
+                ShipView v = ViewOf(bay);
+                if (v == null) continue;
+                v.Show(shown[bay], surplusMargin);
+                if (shown[bay] != null) CenterInBay(v, bay);
             }
 
             if (bays.IsFull) return;
@@ -99,16 +123,16 @@ namespace GoodEnoughRepairs
         }
 
         /// <summary>
-        /// Puts the ship at the center of bay 1's rectangle on screen. The ship is
+        /// Puts the ship at the center of the bay's rectangle on screen. The ship is
         /// centered on its content bounds (body and bars), the same rule the
         /// prefab builder uses (ShipView.CenterOn).
         /// </summary>
-        private static void CenterInBay1(ShipView view)
+        private static void CenterInBay(ShipView view, int bay)
         {
             Camera cam = Camera.main;
             if (cam == null) return;
 
-            Rect rect = BayRect(0);
+            Rect rect = BayRect(bay);
             Transform t = view.transform;
             float depth = Mathf.Abs(t.position.z - cam.transform.position.z);
             Vector3 screen = new Vector3(rect.center.x, Screen.height - rect.center.y, depth);
@@ -130,9 +154,12 @@ namespace GoodEnoughRepairs
 
             for (int bay = 0; bay < shown.Length; bay++)
             {
-                if (!(bay == 0 && bay1View != null)) DrawBay(bay);
+                bool hasView = ViewOf(bay) != null;
+                if (!(hasView && shown[bay] != null)) DrawBay(bay);
+
+                // A bay with a ship view opens nothing: the view is already the ship.
                 Rect rect = BayRect(bay);
-                if (shown[bay] != null && GUI.Button(rect, GUIContent.none, GUIStyle.none))
+                if (!hasView && shown[bay] != null && GUI.Button(rect, GUIContent.none, GUIStyle.none))
                 {
                     views[bay] = views[bay] == null ? new ShipPanel(shown[bay], surplusMargin) : null;
                 }
