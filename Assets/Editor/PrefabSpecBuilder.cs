@@ -144,7 +144,8 @@
  *                      ship and every other instance its own sample ship (seed 2,
  *                      3). For the inventory and warning shots, every ShipView in
  *                      the scene gets its own sample ship too, so no '{' text shows.
- *                      The inventory shot is taken with the warning dialog hidden.
+ *                      Every shot except the warning shot is taken with the warning
+ *                      dialog hidden.
  *                      All of this is done after the scene is saved, so the shown
  *                      bar sizes, colors and the open dialog do not end up in the
  *                      scene file. After the shot the scene is loaded again from
@@ -1180,6 +1181,16 @@ namespace GoodEnoughRepairs.EditorTools
             BalanceData balance = BalanceLoader.Load();
             if (balance == null) throw Fail(specPath, "the balance could not be loaded for the sample ship");
 
+            // Every shot except the warning shot is taken with the warning dialog
+            // closed. In edit mode WarningView.Awake does not run, so the dialog
+            // would stay open (with raw text) in the scene.
+            if (warnView == null)
+            {
+                WarningView sceneWarning = UnityEngine.Object.FindFirstObjectByType<WarningView>(
+                    FindObjectsInactive.Include);
+                if (sceneWarning != null) sceneWarning.Close();
+            }
+
             int surplusMargin = BarBand.SurplusMargin(balance.requiredFighterPercent, balance.requiredFreighterPercent);
             Ship ship = ShipFactory.Create(balance, balance.days[0], new System.Random(1));
             DockingBays bays = new DockingBays();
@@ -1227,11 +1238,6 @@ namespace GoodEnoughRepairs.EditorTools
             }
             else
             {
-                // The warning dialog must not be in the inventory shot.
-                WarningView sceneWarning = UnityEngine.Object.FindFirstObjectByType<WarningView>(
-                    FindObjectsInactive.Include);
-                if (sceneWarning != null) sceneWarning.Close();
-
                 // Every bay ship view in the scene gets its own sample ship.
                 FillSampleShips(balance, surplusMargin, 2);
 
