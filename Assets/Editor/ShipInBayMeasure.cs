@@ -1,10 +1,10 @@
 /*
  * SHIP IN BAY MEASURE
  *
- * Batch-mode check of the ship in bay 1. It builds Assets/Prefabs/UX/ship_in_bay.spec.json
- * into Main.unity with PrefabSpecBuilder, shows the sample ship (day 1, seed 1, with the
- * spec's sampleConditions applied) and measures it in screen pixels at the spec's
- * reference size.
+ * Batch-mode check of the ships in bays 1 to 3. It builds Assets/Prefabs/UX/ship_in_bay.spec.json
+ * into Main.unity with PrefabSpecBuilder, shows a sample ship in each placed bay (day 1,
+ * seed = bay number, with the spec's sampleConditions applied) and measures in screen
+ * pixels at the spec's reference size.
  *
  * HOW TO RUN
  *   Unity -batchmode -projectPath <project> -quit
@@ -17,15 +17,17 @@
  * Exit code 0 on PASS, 1 on FAIL, a failed build, or a missing object.
  *
  * MEASUREMENTS
- *   1. The center of the ship's content bounds (body and bars, ShipView.TryGetContentBounds)
- *      against the center of the spec's screen rectangle (bay 1).
- *   2. For the first sample part of each band (red, green, blue), judged with BarBand
- *      against the sample ship's required level: the fill ratio (fill width / track
- *      width) against condition / 100, within the tolerance in pixels, and the fill
- *      color against the band's color.
+ *   1. For each of bays 1, 2 and 3, one line: the center of the ship's content bounds
+ *      (body and bars, ShipView.TryGetContentBounds) against the center of that bay's
+ *      screen rectangle in the spec (scene.bays, or the single scene rectangle as bay 1).
+ *      A bay the spec does not place is a FAIL (missing).
+ *   2. For bay 1: the first sample part of each band (red, green, blue), judged with
+ *      BarBand against the sample ship's required level: the fill ratio (fill width /
+ *      track width) against condition / 100, within the tolerance in pixels, and the
+ *      fill color against the band's color.
  *
- * Where values come from: rectangle and sample conditions from the spec, the required
- * level from the generated ship. The scene is not saved after the sample ship is shown.
+ * Where values come from: rectangles and sample conditions from the spec, the required
+ * level from the generated ship. The scene is not saved after the sample ships are shown.
  */
 
 using System;
@@ -111,38 +113,94 @@ namespace GoodEnoughRepairs.EditorTools
             return Mathf.Abs(c.x - a.x);
         }
 
+        // What the spec places for one bay: the scene instance name and the rectangle.
+        private sealed class Placement
+        {
+            public string InstanceName;
+            public Rect Rect;
+        }
+
+        // One entry per bay (index 0 is bay 1). Null when the spec does not place it.
+        private static Placement[] PlacementsOf(PrefabSpec spec, SpecScene sc)
+        {
+            Placement[] result = new Placement[GameRules.DockingBays];
+            bool hasBays = sc.bays != null && sc.bays.Length > 0;
+            if (hasBays)
+            {
+                for (int i = 0; i < sc.bays.Length; i++)
+                {
+                    SpecBay b = sc.bays[i];
+                    if (b == null || b.bay < 1 || b.bay > result.Length || b.rectW <= 0f || b.rectH <= 0f) continue;
+                    Placement p = new Placement();
+                    p.InstanceName = PrefabSpecBuilder.InstanceName(spec.root.name, b.bay);
+                    p.Rect = new Rect(b.rectX, b.rectY, b.rectW, b.rectH);
+                    result[b.bay - 1] = p;
+                }
+            }
+            else if (sc.rectW > 0f)
+            {
+                Placement p = new Placement();
+                p.InstanceName = spec.root.name;
+                p.Rect = new Rect(sc.rectX, sc.rectY, sc.rectW, sc.rectH);
+                result[0] = p;
+            }
+            return result;
+        }
+
+        private static void MissingAllBays(string what)
+        {
+            for (int bay = 1; bay <= GameRules.DockingBays; bay++) Missing("bay " + bay + " ship center", what);
+        }
+
         private static void Measure()
         {
             Debug.Log("TOLERANCE: " + N(TolerancePx) + " px");
 
-            if (!File.Exists(SpecPath)) { Missing("spec", SpecPath); return; }
+            if (!File.Exists(SpecPath)) { MissingAllBays(SpecPath); return; }
             PrefabSpec spec = JsonUtility.FromJson<PrefabSpec>(File.ReadAllText(SpecPath));
-            if (spec == null || spec.scene == null || spec.root == null) { Missing("spec scene", SpecPath); return; }
+            if (spec == null || spec.scene == null || spec.root == null) { MissingAllBays("spec scene"); return; }
             SpecScene sc = spec.scene;
-            if (sc.rectW <= 0f || sc.refWidth <= 0f || sc.refHeight <= 0f)
+            if (sc.refWidth <= 0f || sc.refHeight <= 0f)
             {
-                Missing("bay 1 rectangle", "scene.rectW, refWidth, refHeight");
+                MissingAllBays("scene.refWidth, refHeight");
                 return;
             }
 
-            PrefabSpecBuilder.Build(SpecPath);
+            Placement[] placements = PlacementsOf(spec, sc);
 
-            ShipView view = null;
-            ShipView[] views = UnityEngine.Object.FindObjectsByType<ShipView>(FindObjectsSortMode.None);
-            for (int i = 0; i < views.Length; i++)
-            {
-                if (views[i].gameObject.name == spec.root.name) view = views[i];
-            }
-            if (view == null) { Missing("ship", spec.root.name + " in " + sc.path); return; }
+            PrefabSpecBuilder.Build(SpecPath);
 
             Camera cam = Camera.main;
             if (cam == null) cam = UnityEngine.Object.FindFirstObjectByType<Camera>();
-            if (cam == null) { Missing("camera", "scene camera"); return; }
+            if (cam == null) { MissingAllBays("scene camera"); return; }
             cam.aspect = sc.refWidth / sc.refHeight;
 
             try
             {
-                MeasureView(spec, sc, view, cam);
+                BalanceData balance = BalanceLoader.Load();
+                if (balance == null || balance.days == null || balance.days.Length == 0)
+                {
+                    MissingAllBays("balance.json");
+                    return;
+                }
+
+                ShipView[] views = UnityEngine.Object.FindObjectsByType<ShipView>(
+                    FindObjectsInactive.Include, FindObjectsSortMode.None);
+                for (int bay = 1; bay <= placements.Length; bay++)
+                {
+                    Placement p = placements[bay - 1];
+                    string label = "bay " + bay + " ship center";
+                    if (p == null) { Missing(label, "the spec does not place bay " + bay); continue; }
+
+                    ShipView view = null;
+                    for (int i = 0; i < views.Length; i++)
+                    {
+                        if (views[i] != null && views[i].gameObject.name == p.InstanceName) view = views[i];
+                    }
+                    if (view == null) { Missing(label, p.InstanceName + " in " + sc.path); continue; }
+
+                    MeasureView(sc, view, cam, balance, bay, p.Rect);
+                }
             }
             finally
             {
@@ -150,16 +208,11 @@ namespace GoodEnoughRepairs.EditorTools
             }
         }
 
-        private static void MeasureView(PrefabSpec spec, SpecScene sc, ShipView view, Camera cam)
+        private static void MeasureView(SpecScene sc, ShipView view, Camera cam, BalanceData balance, int bay,
+            Rect rect)
         {
-            BalanceData balance = BalanceLoader.Load();
-            if (balance == null || balance.days == null || balance.days.Length == 0)
-            {
-                Missing("balance", "balance.json");
-                return;
-            }
             int margin = BarBand.SurplusMargin(balance.requiredFighterPercent, balance.requiredFreighterPercent);
-            Ship ship = ShipFactory.Create(balance, balance.days[0], new System.Random(1));
+            Ship ship = ShipFactory.Create(balance, balance.days[0], new System.Random(bay));
             DockingBays bays = new DockingBays();
             bays.TryDock(ship);
 
@@ -177,22 +230,24 @@ namespace GoodEnoughRepairs.EditorTools
             }
             view.Show(ship, margin, overrides);
 
-            // 1. Ship center against bay 1 center.
+            // 1. Ship center against this bay's center.
             Bounds bounds;
             if (!view.TryGetContentBounds(out bounds))
             {
-                Missing("ship center", "content bounds");
+                Missing("bay " + bay + " ship center", "content bounds");
             }
             else
             {
                 Vector2 got = ToPx(cam, bounds.center, sc.refWidth, sc.refHeight);
-                Vector2 want = new Vector2(sc.rectX + sc.rectW / 2f, sc.rectY + sc.rectH / 2f);
+                Vector2 want = new Vector2(rect.x + rect.width / 2f, rect.y + rect.height / 2f);
                 bool ok = Mathf.Abs(got.x - want.x) <= TolerancePx && Mathf.Abs(got.y - want.y) <= TolerancePx;
-                Line("ship center vs bay 1 center (px x,y)", N(got.x) + "," + N(got.y),
+                Line("ship center vs bay " + bay + " center (px x,y)", N(got.x) + "," + N(got.y),
                     N(want.x) + "," + N(want.y), ok);
             }
 
-            // 2. One bar per band, from the spec's sample conditions.
+            if (bay != 1) return;
+
+            // 2. One bar per band, from the spec's sample conditions (bay 1).
             BarBandKind[] bands = { BarBandKind.Red, BarBandKind.Green, BarBandKind.Blue };
             string[] names = { "red", "green", "blue" };
             for (int b = 0; b < bands.Length; b++)
