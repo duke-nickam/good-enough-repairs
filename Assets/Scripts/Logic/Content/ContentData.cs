@@ -15,6 +15,7 @@ namespace GoodEnoughRepairs
     {
         public string[] day_start;
         public string[] release_warning;
+        public string[] buy_warning;
         public string[] penalty_fill;
         public string[] day_end;
         public string[] bankruptcy;
@@ -79,6 +80,7 @@ namespace GoodEnoughRepairs
     {
         public const string DayStart = "day_start";
         public const string ReleaseWarning = "release_warning";
+        public const string BuyWarning = "buy_warning";
         public const string PenaltyFill = "penalty_fill";
         public const string DayEnd = "day_end";
         public const string Bankruptcy = "bankruptcy";
@@ -321,6 +323,7 @@ namespace GoodEnoughRepairs
             {
                 case MomentKeys.DayStart: return m.day_start;
                 case MomentKeys.ReleaseWarning: return m.release_warning;
+                case MomentKeys.BuyWarning: return m.buy_warning;
                 case MomentKeys.PenaltyFill: return m.penalty_fill;
                 case MomentKeys.DayEnd: return m.day_end;
                 case MomentKeys.Bankruptcy: return m.bankruptcy;

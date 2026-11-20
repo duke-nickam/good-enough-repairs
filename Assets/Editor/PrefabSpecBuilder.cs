@@ -27,8 +27,9 @@
  *   - If it exists, it is opened and compared with the spec. Objects are matched
  *     by their name path from the root, for example "Slot1/Slot1_Fill".
  *     Only properties that differ are set (position, scale, sprite, color,
- *     sorting order, text settings, components, links). Objects that stay keep
- *     their identity: the same object and the same components, never recreated.
+ *     sorting order, text settings, components, links, hidden flag). Objects that
+ *     stay keep their identity: the same object and the same components, never
+ *     recreated.
  *   - An object that is new in the spec is added alone. An object in the prefab
  *     that the spec does not list (gone from the spec, renamed, moved to another
  *     parent, or added by hand) is removed alone. A rename or a move counts as
@@ -51,7 +52,8 @@
  * SPEC FILE RULES
  *   - File name ends with ".spec.json", anywhere under Assets/.
  *   - JSON that Unity's JsonUtility can read: objects and arrays, no dictionaries.
- *   - Leave a field out to get its default. Text defaults to "", numbers to 0.
+ *   - Leave a field out to get its default. Text defaults to "", numbers to 0,
+ *     flags to false.
  *   - Object names must not contain "/" (it is the path separator).
  *   - Colors are text: "#RRGGBB" or "#RRGGBBAA", or one of these names from the
  *     game's BarColors: "below", "passes", "surplus", "track", "marker", "panel".
@@ -74,6 +76,10 @@
  *   objects[]     children, in order. A parent must come before its children:
  *       name           unique name in this spec (required)
  *       parent         name of the parent object; empty means the root
+ *       hidden         true saves the object inactive (hidden) in the prefab. Its
+ *                      children are hidden with it. Default false (active). A code
+ *                      view shows it later, for example WarningView shows its
+ *                      dialogRoot. Links and text still work on a hidden object.
  *       sprite         a sprite key from "sprites"; adds a SpriteRenderer with it
  *       color          SpriteRenderer color (only when "sprite" is set)
  *       sortingOrder   SpriteRenderer sorting order (only when "sprite" is set);
@@ -265,7 +271,8 @@
  *   Fields to link, all with "index": -1:
  *     dialogRoot      GameObject: a child that holds all the dialog objects. It is
  *                     hidden when the game starts and shown while a warning is open.
- *                     The WarningView must not be on this object.
+ *                     The WarningView must not be on this object. Give it
+ *                     "hidden": true so the prefab is saved closed.
  *     panel           SpriteRenderer: dialog background
  *     textArea        SpriteRenderer, optional
  *     confirmButton   SpriteRenderer: the Confirm button sprite (the look)
@@ -280,7 +287,10 @@
  *     cancelText      TextKeyView, optional: the Cancel label. The view sets its key.
  *     Message lines, TextKeyView, each optional (a line with no link is not shown).
  *     The view shows only the lines that apply and fills their {0}, {1}:
- *     mechanicText        release: the mechanic's line (give any textKey)
+ *     mechanicText        buy and release: the mechanic's line, taken from
+ *                         mechanic_lines.json (buy_warning on buy, release_warning
+ *                         on release). Give it any textKey: the view overwrites
+ *                         the text.
  *     buyPriceText        buy: key buy_price
  *     buyBinnedText       buy, when the old part is binned: key buy_binned
  *     releasePaymentText  release: key release_payment
@@ -385,6 +395,7 @@ namespace GoodEnoughRepairs.EditorTools
     {
         public string name;
         public string parent;
+        public bool hidden;
         public string sprite;
         public string color;
         public int sortingOrder;
@@ -830,6 +841,10 @@ namespace GoodEnoughRepairs.EditorTools
             if (!Listed(o, "InventoryView")) DestroyIfPresent<InventoryView>(go);
             if (!Listed(o, "WarningView")) DestroyIfPresent<WarningView>(go);
             if (string.IsNullOrEmpty(o.sprite) && !Listed(o, "SpriteRenderer")) DestroyIfPresent<SpriteRenderer>(go);
+
+            // Hidden flag: an object with "hidden": true is saved inactive.
+            bool wantActive = !o.hidden;
+            if (go.activeSelf != wantActive) go.SetActive(wantActive);
         }
 
         private static void ApplySprite(GameObject go, SpecObject o, Dictionary<string, Sprite> sprites,
