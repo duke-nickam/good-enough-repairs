@@ -92,11 +92,16 @@ namespace GoodEnoughRepairs
     /// previews and holds no rules. Confirm calls BuyRelease.Buy or
     /// BuyRelease.Release; Cancel closes the dialog and changes nothing.
     ///
+    /// Every release goes through RequestRelease (or OpenRelease): a ship with
+    /// nothing empty or weak is released at once through the release command, any
+    /// other ship opens the release warning first. There is no other release path.
+    ///
     /// All words come from ui_text.json, shown in text elements on the prefab
     /// (TextKeyView). Only the lines that apply to the open warning are shown:
-    /// buy: price, and the binned line when the old part would be binned; release:
-    /// the mechanic's line, payment, the penalty line when parts get fitted, and
-    /// the net result. A line without a linked text element is not shown.
+    /// buy: the mechanic's line (buy_warning), price, and the binned line when the
+    /// old part would be binned; release: the mechanic's line (release_warning),
+    /// payment, the penalty line when parts get fitted, and the net result. A line
+    /// without a linked text element is not shown.
     ///
     /// Confirm and Cancel are UI buttons (clicked from code), and a click blocker
     /// is shown with the dialog so nothing behind it gets UI clicks. There is no
@@ -151,7 +156,7 @@ namespace GoodEnoughRepairs
         [Tooltip("Cancel label. This view sets its key (cancel_buy or cancel_release).")]
         public TextKeyView cancelText;
 
-        [Tooltip("Release warning: the mechanic's line.")]
+        [Tooltip("The mechanic's line, buy and release. The view overwrites the text, so any textKey will do.")]
         public TextKeyView mechanicText;
 
         [Tooltip("Buy warning: key buy_price, {0} is the price.")]
@@ -185,6 +190,12 @@ namespace GoodEnoughRepairs
             get { return kind != Kind.None; }
         }
 
+        /// <summary>The mechanic's line of the open warning, or "" when there is none.</summary>
+        public string MechanicLine
+        {
+            get { return mechanicLine; }
+        }
+
         private ContentData Text
         {
             get { return content ?? TextKeyView.Shared; }
@@ -200,7 +211,7 @@ namespace GoodEnoughRepairs
             {
                 case WarningLine.BuyPrice: return isBuy;
                 case WarningLine.BuyBinned: return isBuy && oldPartBinned;
-                case WarningLine.Mechanic: return !isBuy && hasMechanicLine;
+                case WarningLine.Mechanic: return hasMechanicLine;
                 case WarningLine.ReleasePayment: return !isBuy;
                 case WarningLine.ReleasePenalty: return !isBuy && penaltyFills > 0;
                 case WarningLine.ReleaseNet: return !isBuy;
@@ -250,8 +261,9 @@ namespace GoodEnoughRepairs
         }
 
         /// <summary>
-        /// Releases at once when no slot is empty or weak (no warning is needed).
-        /// Otherwise opens the release warning.
+        /// The only way a ship is released from the views. A ship with no empty or
+        /// weak slot is released at once through the release command (no warning is
+        /// needed). Otherwise the release warning opens, and only Confirm releases.
         /// </summary>
         public void RequestRelease(Ship target)
         {
@@ -275,7 +287,7 @@ namespace GoodEnoughRepairs
             ship = target;
             partType = type;
             buyPreview = p;
-            mechanicLine = "";
+            mechanicLine = PickLine(MomentKeys.BuyWarning);
             SetOpen(Kind.Buy);
             return true;
         }
@@ -288,10 +300,16 @@ namespace GoodEnoughRepairs
             if (!p.CanRelease) return false;
             ship = target;
             releasePreview = p;
-            ContentData t = Text;
-            mechanicLine = t == null ? "" : (t.GetLine(MomentKeys.ReleaseWarning) ?? "");
+            mechanicLine = PickLine(MomentKeys.ReleaseWarning);
             SetOpen(Kind.Release);
             return true;
+        }
+
+        // A mechanic's line from content, picked once when the warning opens.
+        private string PickLine(string moment)
+        {
+            ContentData t = Text;
+            return t == null ? "" : (t.GetLine(moment) ?? "");
         }
 
         /// <summary>Runs the command the warning is about, then closes. Does nothing when closed.</summary>
@@ -319,6 +337,7 @@ namespace GoodEnoughRepairs
             ship = null;
             buyPreview = null;
             releasePreview = null;
+            mechanicLine = "";
             for (int i = 0; i < shown.Length; i++) shown[i] = false;
             HideDialog();
         }

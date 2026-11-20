@@ -187,5 +187,31 @@ namespace GoodEnoughRepairs.Tests
             }
             Assert.AreEqual(bays.BayCount, bays.FreeBayCount);
         }
+
+        [Test]
+        public void ReleaseFillsEveryWeakSlotSoTheShipLeavesRepaired()
+        {
+            Ship ship = bays.GetShip(0);
+            int weak = ship.BelowLevelCount;
+            Assert.Greater(weak, 0, "the sample ship starts with weak parts");
+
+            ReleaseResult r = buyRelease.Release(ship);
+
+            Assert.IsTrue(r.Success);
+            Assert.AreEqual(weak, r.PenaltyFills);
+            Assert.AreEqual(0, ship.BelowLevelCount);
+        }
+
+        [Test]
+        public void ReleasingAShipTwiceIsRefused()
+        {
+            Ship ship = bays.GetShip(1);
+            Assert.IsTrue(buyRelease.Release(ship).Success);
+
+            ReleaseResult again = buyRelease.Release(ship);
+
+            Assert.IsFalse(again.Success);
+            Assert.AreEqual(ReleaseRefusal.NotDocked, again.Reason);
+        }
     }
 }

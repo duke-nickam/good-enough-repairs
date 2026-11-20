@@ -6,15 +6,21 @@ using UnityEngine;
 namespace GoodEnoughRepairs.Tests
 {
     /// <summary>
-    /// Tests for the warning dialog's message lines. The EditMode test assembly
-    /// has no reference to the UX assembly, so WarningView is reached by name
-    /// at run time instead of a compile-time reference.
+    /// Tests for the warning dialog: its message lines, the release path and the
+    /// buy warning's mechanic line. The EditMode test assembly has no reference to
+    /// the UX assembly, so WarningView is reached by name at run time instead of a
+    /// compile-time reference.
     /// </summary>
     public sealed class WarningViewTests
     {
         private const string UxAssembly = "GoodEnoughRepairs.UX";
+        private const string BuyLine = "TEST-BUY-LINE";
+        private const string ReleaseLine = "TEST-RELEASE-LINE";
 
         private GameObject go;
+        private DockingBays bays;
+        private BuyRelease commands;
+        private BalanceData balance;
 
         [TearDown]
         public void TearDown()
@@ -50,13 +56,12 @@ namespace GoodEnoughRepairs.Tests
         }
 
         [Test]
-        public void BuyWarningShowsPriceOnly()
+        public void BuyWarningShowsPriceAndNoReleaseLines()
         {
             Assert.IsTrue(Applies("BuyPrice", true, false, 0, false));
             Assert.IsFalse(Applies("BuyBinned", true, false, 0, false));
             Assert.IsFalse(Applies("ReleasePayment", true, false, 0, true));
             Assert.IsFalse(Applies("ReleaseNet", true, false, 0, true));
-            Assert.IsFalse(Applies("Mechanic", true, false, 0, true));
         }
 
         [Test]
@@ -82,22 +87,34 @@ namespace GoodEnoughRepairs.Tests
         }
 
         [Test]
-        public void MechanicLineOnlyOnReleaseWithALine()
+        public void MechanicLineShowsOnBuyAndReleaseOnlyWithALine()
         {
             Assert.IsTrue(Applies("Mechanic", false, false, 1, true));
+            Assert.IsTrue(Applies("Mechanic", true, false, 0, true));
             Assert.IsFalse(Applies("Mechanic", false, false, 1, false));
+            Assert.IsFalse(Applies("Mechanic", true, false, 0, false));
         }
 
-        private object MakeView(out Ship ship)
+        private static ContentData MakeContent(bool withLines)
         {
-            BalanceData balance = BalanceLoader.Load();
+            if (!withLines) return ContentData.Empty();
+            MechanicLinesFile file = new MechanicLinesFile();
+            file.moments = new MomentLines();
+            file.moments.buy_warning = new string[] { BuyLine };
+            file.moments.release_warning = new string[] { ReleaseLine };
+            return new ContentData(file, null, null);
+        }
+
+        private object MakeView(out Ship ship, bool withLines)
+        {
+            balance = BalanceLoader.Load();
             ship = ShipFactory.Create(balance, balance.days[0], new System.Random(1));
-            DockingBays bays = new DockingBays();
+            bays = new DockingBays();
             bays.TryDock(ship);
-            BuyRelease commands = new BuyRelease(bays, new Inventory(), balance);
+            commands = new BuyRelease(bays, new Inventory(), balance);
             go = new GameObject("WarningViewTest");
             Component view = go.AddComponent(ViewType());
-            Call(view, "Bind", commands, ContentLoader.Load());
+            Call(view, "Bind", commands, MakeContent(withLines));
             return view;
         }
 
@@ -120,11 +137,28 @@ namespace GoodEnoughRepairs.Tests
             return (bool)p.GetValue(view);
         }
 
+        private static string MechanicLineOf(object view)
+        {
+            PropertyInfo p = ViewType().GetProperty("MechanicLine", BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(p, "MechanicLine not found");
+            return (string)p.GetValue(view);
+        }
+
+        private static bool OpenAnyBuy(object view, Ship ship)
+        {
+            PartType[] types = PartTypes.All;
+            for (int i = 0; i < types.Length; i++)
+            {
+                if ((bool)Call(view, "OpenBuy", ship, types[i])) return true;
+            }
+            return false;
+        }
+
         [Test]
         public void OpenReleaseShowsReleaseLinesAndCloseHidesThem()
         {
             Ship ship;
-            object view = MakeView(out ship);
+            object view = MakeView(out ship, true);
 
             Assert.IsTrue((bool)Call(view, "OpenRelease", ship));
             Assert.IsTrue(Shown(view, "ReleasePayment"));
@@ -141,20 +175,121 @@ namespace GoodEnoughRepairs.Tests
         public void OpenBuyShowsPriceAndNotReleaseLines()
         {
             Ship ship;
-            object view = MakeView(out ship);
+            object view = MakeView(out ship, true);
 
-            bool opened = false;
-            PartType[] types = PartTypes.All;
-            for (int i = 0; i < types.Length && !opened; i++)
-            {
-                opened = (bool)Call(view, "OpenBuy", ship, types[i]);
-            }
-            Assert.IsTrue(opened);
+            Assert.IsTrue(OpenAnyBuy(view, ship));
             Assert.IsTrue(Shown(view, "BuyPrice"));
             Assert.IsFalse(Shown(view, "BuyBinned"));
             Assert.IsFalse(Shown(view, "ReleasePayment"));
             Assert.IsFalse(Shown(view, "ReleaseNet"));
+        }
+
+        [Test]
+        public void BuyWarningShowsTheMechanicLineFromContent()
+        {
+            Ship ship;
+            object view = MakeView(out ship, true);
+
+            Assert.IsTrue(OpenAnyBuy(view, ship));
+            Assert.AreEqual(BuyLine, MechanicLineOf(view));
+            Assert.IsTrue(Shown(view, "Mechanic"));
+        }
+
+        [Test]
+        public void BuyWarningHasNoMechanicLineWhenContentHasNone()
+        {
+            Ship ship;
+            object view = MakeView(out ship, false);
+
+            Assert.IsTrue(OpenAnyBuy(view, ship));
+            Assert.AreEqual("", MechanicLineOf(view));
             Assert.IsFalse(Shown(view, "Mechanic"));
+        }
+
+        [Test]
+        public void ReleaseWarningShowsTheReleaseLineFromContent()
+        {
+            Ship ship;
+            object view = MakeView(out ship, true);
+
+            Assert.IsTrue((bool)Call(view, "OpenRelease", ship));
+            Assert.AreEqual(ReleaseLine, MechanicLineOf(view));
+        }
+
+        [Test]
+        public void ClosedWarningHasNoMechanicLine()
+        {
+            Ship ship;
+            object view = MakeView(out ship, true);
+
+            Assert.IsTrue(OpenAnyBuy(view, ship));
+            Call(view, "Cancel");
+            Assert.AreEqual("", MechanicLineOf(view));
+        }
+
+        [Test]
+        public void ReleaseOfWeakShipWaitsForConfirm()
+        {
+            Ship ship;
+            object view = MakeView(out ship, true);
+            Assert.Greater(commands.PreviewRelease(ship).PenaltyFills, 0, "sample ship must be weak");
+
+            Call(view, "RequestRelease", ship);
+
+            Assert.IsTrue(IsOpen(view));
+            Assert.AreEqual(0, bays.GetBay(ship), "the ship stays docked until Confirm");
+        }
+
+        [Test]
+        public void CancelKeepsTheShipDocked()
+        {
+            Ship ship;
+            object view = MakeView(out ship, true);
+            Call(view, "RequestRelease", ship);
+
+            Call(view, "Cancel");
+
+            Assert.IsFalse(IsOpen(view));
+            Assert.AreEqual(0, bays.GetBay(ship));
+            Assert.Greater(commands.PreviewRelease(ship).PenaltyFills, 0);
+        }
+
+        [Test]
+        public void ConfirmReleasesThroughTheReleaseCommand()
+        {
+            Ship ship;
+            object view = MakeView(out ship, true);
+            ReleaseResult seen = null;
+            commands.ShipReleased += r => seen = r;
+            ReleasePreview preview = commands.PreviewRelease(ship);
+            Call(view, "RequestRelease", ship);
+
+            Call(view, "Confirm");
+
+            Assert.IsFalse(IsOpen(view));
+            Assert.IsNotNull(seen, "the release command ran");
+            Assert.AreEqual(preview.NetResult, seen.NetResult);
+            Assert.AreEqual(preview.PenaltyFills, seen.PenaltyFills);
+            Assert.AreEqual(-1, bays.GetBay(ship));
+        }
+
+        [Test]
+        public void RepairedShipReleasesAtOnceThroughTheCommand()
+        {
+            Ship ship;
+            object view = MakeView(out ship, true);
+            PartType[] types = PartTypes.All;
+            for (int i = 0; i < types.Length; i++) commands.Buy(ship, types[i]);
+            Assert.AreEqual(0, commands.PreviewRelease(ship).PenaltyFills);
+            ReleaseResult seen = null;
+            commands.ShipReleased += r => seen = r;
+
+            Call(view, "RequestRelease", ship);
+
+            Assert.IsFalse(IsOpen(view));
+            Assert.IsNotNull(seen);
+            Assert.AreEqual(ship.Payment, seen.NetResult);
+            Assert.AreEqual(-1, bays.GetBay(ship));
         }
     }
 }

@@ -35,7 +35,7 @@ namespace GoodEnoughRepairs
         /// <summary>
         /// Optional warning dialog prefab instance. When assigned, it gets the buy
         /// and release commands and the mechanic's lines, and the ship view buy and
-        /// release buttons use it.
+        /// release buttons use it. Every release goes through it.
         /// </summary>
         public WarningView warningView;
 
@@ -174,9 +174,12 @@ namespace GoodEnoughRepairs
             for (int bay = 0; bay < views.Length; bay++)
             {
                 if (views[bay] == null) continue;
+                Ship ship = views[bay].Ship;
                 if (views[bay].Draw(ViewRect(bay)))
                 {
-                    bays.Remove(bay);
+                    // The only release path: the warning dialog and the release
+                    // command. With no dialog connected, the button does nothing.
+                    if (warningView != null) warningView.RequestRelease(ship);
                 }
             }
         }
