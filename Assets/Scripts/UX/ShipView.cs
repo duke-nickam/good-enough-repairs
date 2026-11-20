@@ -144,6 +144,9 @@ namespace GoodEnoughRepairs
     /// buy buttons are active when the #101 buy preview says CanBuy, and a click
     /// asks the WarningView to show the warning.
     ///
+    /// All words come from ui_text.json. Text elements on the prefab (TextKeyView)
+    /// get their numbers from here; a label with no text element is drawn with OnGUI.
+    ///
     /// Each bar fill is a SpriteRenderer whose sprite pivot is on the left edge.
     /// Its X scale at start is the full bar (100%); Show scales it to the part's
     /// condition and colors it.
@@ -182,11 +185,21 @@ namespace GoodEnoughRepairs
         public Color buyActiveColor = Color.white;
         public Color buyInactiveColor = new Color(0.45f, 0.45f, 0.45f, 0.6f);
 
-        [Tooltip("Text on a buy button. {0} is the price.")]
-        public string buyLabel = "Buy {0}";
+        [Header("Text elements (optional)")]
+        [Tooltip("Five text elements for the buy buttons, same order. Key buy_button, {0} is the price.")]
+        public TextKeyView[] buyTexts = new TextKeyView[GameRules.PartSlotsPerShip];
 
-        [Tooltip("Text on the release button.")]
-        public string releaseLabel = "Release";
+        [Tooltip("Text on the release button (key release_button). Without it the label is drawn with OnGUI.")]
+        public TextKeyView releaseText;
+
+        [Tooltip("Ship type name. This view sets its key (type_fighter or type_freighter).")]
+        public TextKeyView typeText;
+
+        [Tooltip("Payment. Key payment, {0} is the payment. This view sets the number.")]
+        public TextKeyView paymentText;
+
+        [Tooltip("Required level. Key needs, {0} is the level. This view sets the number.")]
+        public TextKeyView requiredText;
 
         [Header("Colors")]
         public Color belowColor = BarColors.Below;
@@ -197,10 +210,16 @@ namespace GoodEnoughRepairs
         private Vector3[] fullScales;
         private BuyRelease buyRelease;
         private WarningView warning;
+        private ContentData content;
         private GUIStyle labelStyle;
 
         /// <summary>The ship shown now, or null for an empty bay.</summary>
         public Ship CurrentShip { get; private set; }
+
+        private ContentData Content
+        {
+            get { return content ?? TextKeyView.Shared; }
+        }
 
         private void OnEnable()
         {
@@ -218,8 +237,18 @@ namespace GoodEnoughRepairs
         /// </summary>
         public void Bind(BuyRelease commands, WarningView warningView)
         {
+            Bind(commands, warningView, null);
+        }
+
+        /// <summary>
+        /// Like Bind, and also sets the text. With null content the shared text of
+        /// TextKeyView is used.
+        /// </summary>
+        public void Bind(BuyRelease commands, WarningView warningView, ContentData contentData)
+        {
             buyRelease = commands;
             warning = warningView;
+            content = contentData;
             RefreshButtons();
         }
 
@@ -238,13 +267,33 @@ namespace GoodEnoughRepairs
 
         private void RefreshButtons()
         {
-            if (buyRelease == null || CurrentShip == null || buyButtons == null) return;
+            if (buyRelease == null || CurrentShip == null) return;
+
+            if (buyTexts != null)
+            {
+                for (int i = 0; i < buyTexts.Length && i < GameRules.PartSlotsPerShip; i++)
+                {
+                    if (buyTexts[i] == null) continue;
+                    BuyPreview p = buyRelease.PreviewBuy(CurrentShip, PartTypes.All[i]);
+                    buyTexts[i].SetArgs(p.Price);
+                }
+            }
+
+            if (buyButtons == null) return;
             for (int i = 0; i < buyButtons.Length && i < GameRules.PartSlotsPerShip; i++)
             {
                 SpriteRenderer b = buyButtons[i];
                 if (b == null) continue;
                 b.color = IsBuyActive(i) ? buyActiveColor : buyInactiveColor;
             }
+        }
+
+        // Sets the keys and numbers of the optional text elements.
+        private void UpdateTexts(Ship ship)
+        {
+            if (typeText != null) typeText.SetKey(UiKeys.ShipTypeKey(ship.Type));
+            if (paymentText != null) paymentText.SetArgs(ship.Payment);
+            if (requiredText != null) requiredText.SetArgs(ship.RequiredLevel);
         }
 
         // Clicks come from IMGUI like the drag and drop. This runs early (execution
@@ -292,17 +341,23 @@ namespace GoodEnoughRepairs
                 labelStyle.alignment = TextAnchor.MiddleCenter;
             }
 
+            ContentData text = Content;
             int count = buyButtons == null ? 0 : buyButtons.Length;
             for (int i = 0; i < count && i < GameRules.PartSlotsPerShip; i++)
             {
+                // A text element on the prefab shows this label instead.
+                if (buyTexts != null && i < buyTexts.Length && buyTexts[i] != null) continue;
                 Rect r;
                 if (!SpriteScreen.TryRect(buyButtons[i], out r)) continue;
                 BuyPreview p = buyRelease.PreviewBuy(CurrentShip, PartTypes.All[i]);
-                GUI.Label(r, string.Format(buyLabel, p.Price), labelStyle);
+                GUI.Label(r, text.Text(UiKeys.BuyButton, p.Price), labelStyle);
             }
 
             Rect rr;
-            if (SpriteScreen.TryRect(releaseButton, out rr)) GUI.Label(rr, releaseLabel, labelStyle);
+            if (releaseText == null && SpriteScreen.TryRect(releaseButton, out rr))
+            {
+                GUI.Label(rr, text.Text(UiKeys.ReleaseButton), labelStyle);
+            }
         }
 
         /// <summary>Index (PartTypes.All order) of the slot under a world point, or -1.</summary>
@@ -342,6 +397,7 @@ namespace GoodEnoughRepairs
             if (!gameObject.activeSelf) gameObject.SetActive(true);
 
             CaptureScales();
+            UpdateTexts(ship);
 
             PartType[] types = PartTypes.All;
             int count = barFills == null ? 0 : barFills.Length;
@@ -458,7 +514,7 @@ namespace GoodEnoughRepairs
     /// <summary>
     /// The open ship view drawn with OnGUI: five part slots, each with a condition
     /// bar, and a release button. Drawn over its bay. It reads the Ship it was
-    /// given and decides nothing.
+    /// given and decides nothing. All words come from ui_text.json.
     /// </summary>
     public sealed class ShipPanel
     {
@@ -472,11 +528,13 @@ namespace GoodEnoughRepairs
 
         private readonly Ship ship;
         private readonly int surplusMargin;
+        private readonly ContentData content;
 
-        public ShipPanel(Ship ship, int surplusMargin)
+        public ShipPanel(Ship ship, int surplusMargin, ContentData content)
         {
             this.ship = ship;
             this.surplusMargin = surplusMargin;
+            this.content = content ?? TextKeyView.Shared;
         }
 
         public Ship Ship
@@ -492,7 +550,7 @@ namespace GoodEnoughRepairs
             float x = rect.x + Pad;
             float w = rect.width - 2f * Pad;
             GUI.Label(new Rect(x, rect.y + Pad, w, 18f),
-                ShipTypeName(ship.Type) + ", needs " + ship.RequiredLevel + "%");
+                ShipTypeName(content, ship.Type) + " " + content.Text(UiKeys.Needs, ship.RequiredLevel));
 
             PartType[] types = PartTypes.All;
             float y = rect.y + HeaderHeight;
@@ -500,8 +558,8 @@ namespace GoodEnoughRepairs
             {
                 PartType type = types[i];
                 Part part = ship.GetPart(type);
-                string value = part == null ? "empty" : part.Condition + "%";
-                GUI.Label(new Rect(x, y, w, 16f), PartName(type) + "  " + value);
+                string value = part == null ? content.Text(UiKeys.PartEmpty) : part.Condition.ToString();
+                GUI.Label(new Rect(x, y, w, 16f), PartName(content, type) + "  " + value);
                 DrawBar(new Rect(x, y + 17f, w, 10f),
                     part == null ? 0 : part.Condition,
                     BarColors.ColorFor(part, ship.RequiredLevel, surplusMargin),
@@ -509,7 +567,7 @@ namespace GoodEnoughRepairs
                 y += RowHeight;
             }
 
-            return GUI.Button(new Rect(x, y + 2f, w, ButtonHeight), "Release ship");
+            return GUI.Button(new Rect(x, y + 2f, w, ButtonHeight), content.Text(UiKeys.ReleaseButton));
         }
 
         /// <summary>Draws a bar filled to percent (0-100), with a marker at the required level.</summary>
@@ -534,22 +592,16 @@ namespace GoodEnoughRepairs
             GUI.color = Color.white;
         }
 
-        public static string ShipTypeName(ShipType type)
+        /// <summary>Name of a ship type, from ui_text.json.</summary>
+        public static string ShipTypeName(ContentData content, ShipType type)
         {
-            return type == ShipType.Fighter ? "Fighter" : "Freighter";
+            return (content ?? TextKeyView.Shared).Text(UiKeys.ShipTypeKey(type));
         }
 
-        public static string PartName(PartType type)
+        /// <summary>Name of a part type, from ui_text.json.</summary>
+        public static string PartName(ContentData content, PartType type)
         {
-            switch (type)
-            {
-                case PartType.Engine: return "Engine";
-                case PartType.HullPlate: return "Hull plate";
-                case PartType.ShieldGenerator: return "Shield generator";
-                case PartType.Thruster: return "Thruster";
-                case PartType.PowerCore: return "Power core";
-                default: return "Part";
-            }
+            return (content ?? TextKeyView.Shared).Text(UiKeys.PartKey(type));
         }
     }
 }

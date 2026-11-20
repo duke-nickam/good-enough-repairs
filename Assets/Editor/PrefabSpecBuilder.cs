@@ -46,21 +46,40 @@
  *       parent         name of the parent object; empty means the root
  *       sprite         a sprite key from "sprites"; adds a SpriteRenderer with it
  *       color          SpriteRenderer color (only when "sprite" is set)
- *       sortingOrder   SpriteRenderer sorting order (only when "sprite" is set)
+ *       sortingOrder   SpriteRenderer sorting order (only when "sprite" is set);
+ *                      also the sorting order of a text element
  *       posX, posY, posZ     local position
  *       scaleX, scaleY, scaleZ   local scale; 0 or left out means 1
  *       components[]   extra components to attach, from this fixed list:
  *                        "ShipView"        the ship view (UX assembly)
  *                        "InventoryView"   the inventory panel with drag and drop
  *                        "WarningView"     the buy and release warning dialog
+ *                        "TextKeyView"     a text element component (not needed
+ *                                          when "textKey" is set)
  *                        "SpriteRenderer"  an empty SpriteRenderer (not needed
  *                                          when "sprite" is set)
  *                      An unknown name stops the build. A new type needs one line
  *                      in the builder's code.
+ *       textKey        key in ui_text.json. Makes the object a text element: the
+ *                      builder adds a TextMesh with a built-in font and a
+ *                      TextKeyView that fills it from the key at start and when
+ *                      the numbers change. Leave it out for no text. Keep the
+ *                      object's scale at 1 (use textSize to size the text).
+ *                      The player's words never go in the spec, only the key.
+ *       textSize       text height in prefab units, about; 0 or left out means 0.3
+ *       textColor      color of the text (same color rules as "color"); empty
+ *                      means white
+ *       textAlign      "left", "center" or "right": which point of the text sits
+ *                      at the object's position. Empty means "center".
+ *       Example: { "name": "PaymentText", "textKey": "payment", "sortingOrder": 6,
+ *                  "posX": 0, "posY": 1.8, "textSize": 0.3, "textAlign": "center" }
+ *       Which keys exist and what {0}, {1} mean is in
+ *       Assets/StreamingAssets/content/ui_text.json. A ShipView fills the numbers
+ *       of its own text elements once they are linked (see TEXT ON A SHIP).
  *   links[]       sets a reference field on a component to another object:
  *       owner          name of the object that holds the component
- *       component      "ShipView", "InventoryView", "WarningView", "SpriteRenderer"
- *                      or "Transform"
+ *       component      "ShipView", "InventoryView", "WarningView", "TextKeyView",
+ *                      "SpriteRenderer" or "Transform"
  *       field          the serialized field name, for example "body" or "barFills"
  *       index          -1 for a single field (default is 0, so write -1); 0 or more
  *                      for an element of an array field (the array grows if needed)
@@ -70,7 +89,7 @@
  *                      arrays of plain references (barFills, slotAreas, buyButtons).
  *       target         name of the object to point at
  *       targetType     what to point at on the target: "GameObject",
- *                      "SpriteRenderer" or "Transform"
+ *                      "SpriteRenderer", "Transform" or "TextKeyView"
  *   scene         optional. Leave it out to only build the prefab.
  *       path           scene file, for example "Assets/Scenes/Main.unity". It must
  *                      exist (the builder never creates scenes).
@@ -113,7 +132,8 @@
  *                      the scene is saved, so the shown bar sizes and colors do not
  *                      end up in the scene file. With option A the shot has the
  *                      reference width and height. Text drawn with OnGUI (button
- *                      labels, the dialog message) is not in the screenshot.
+ *                      labels, the dialog message) is not in the screenshot; text
+ *                      elements (textKey) are.
  *       sampleDialog   only for a WarningView prefab: "release" (default) or "buy".
  *                      Which warning the screenshot shows.
  *       sampleConditions[]   optional. Sets the condition of sample ship parts
@@ -178,6 +198,21 @@
  *     "index": -1, "target": "ReleaseButton", "targetType": "SpriteRenderer" }
  *   Without these links the ship view still works, it just has no buttons.
  *
+ * TEXT ON A SHIP (ShipView)
+ *   Add text elements (objects with "textKey") and link them with targetType
+ *   "TextKeyView". Fields, all optional:
+ *     buyTexts       array of five, part order, index 0 to 4: key "buy_button",
+ *                    the view fills {0} with the price. Without one, the label is
+ *                    drawn with OnGUI.
+ *     releaseText    index -1: key "release_button". Without it, drawn with OnGUI.
+ *     typeText       index -1: the view sets the key (type_fighter or type_freighter).
+ *                    Give it any textKey, for example "type_fighter".
+ *     paymentText    index -1: key "payment", the view fills {0}.
+ *     requiredText   index -1: key "needs", the view fills {0}.
+ *   Example link: { "owner": "ShipInBay", "component": "ShipView",
+ *     "field": "paymentText", "index": -1, "target": "PaymentText",
+ *     "targetType": "TextKeyView" }
+ *
  * WARNING DIALOG (WarningView)
  *   Put "WarningView" on the root of its own prefab. One dialog serves all bays.
  *   Fields to link, all with "index": -1:
@@ -189,6 +224,11 @@
  *                     panel is used when empty)
  *     confirmButton   SpriteRenderer: click area of Confirm
  *     cancelButton    SpriteRenderer: click area of Cancel
+ *     titleText       TextKeyView, optional: the title. The view sets its key.
+ *     confirmText     TextKeyView, optional: the Confirm label. The view sets its key.
+ *     cancelText      TextKeyView, optional: the Cancel label. The view sets its key.
+ *                     (Give these any textKey, for example "buy_title",
+ *                     "confirm_release" and "cancel_release".)
  *   Example link: { "owner": "WarningDialog", "component": "WarningView",
  *     "field": "dialogRoot", "index": -1, "target": "DialogRoot",
  *     "targetType": "GameObject" }
@@ -196,7 +236,9 @@
  *   Give the sprites a high sortingOrder so the dialog is above the ships.
  *
  * INVENTORY PANEL (InventoryView)
- *   Put "InventoryView" on the root. Fields to link:
+ *   Put "InventoryView" on the root. Its labels (keys "inventory_title",
+ *   "bin_label", "bin_hint") are plain text elements with "textKey" and need no
+ *   link. Fields to link:
  *     slots   array of 10 records, slot 1 is index 0. Link each field with
  *             "field": "slots", "index": <slot>, "subField": <name below>:
  *               area          SpriteRenderer: drag handle and drop target of the slot
@@ -293,6 +335,10 @@ namespace GoodEnoughRepairs.EditorTools
         public float scaleY;
         public float scaleZ;
         public string[] components;
+        public string textKey;
+        public float textSize;
+        public string textColor;
+        public string textAlign;
     }
 
     [Serializable]
@@ -367,6 +413,11 @@ namespace GoodEnoughRepairs.EditorTools
     {
         private const string SpecSuffix = ".spec.json";
         private const string BaySuffix = "_Bay";
+        private const float DefaultTextSize = 0.3f;
+
+        // TextMesh: line height in world units is about fontSize * characterSize * 0.1.
+        private const int TextFontSize = 64;
+        private const float TextSizeDivisor = 6.4f;
 
         /// <summary>Name of the scene instance for a bay entry of a spec.</summary>
         public static string InstanceName(string rootName, int bay)
@@ -623,6 +674,11 @@ namespace GoodEnoughRepairs.EditorTools
                 sr.sortingOrder = o.sortingOrder;
             }
 
+            if (!string.IsNullOrEmpty(o.textKey))
+            {
+                AddText(go, o, specPath);
+            }
+
             if (o.components != null)
             {
                 for (int i = 0; i < o.components.Length; i++)
@@ -631,6 +687,55 @@ namespace GoodEnoughRepairs.EditorTools
                 }
             }
             return go;
+        }
+
+        // A text element: a TextMesh with a built-in font, and a TextKeyView that
+        // fills it from the text key.
+        private static void AddText(GameObject go, SpecObject o, string specPath)
+        {
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (font == null) throw Fail(specPath, o.name + ": the built-in font could not be loaded");
+
+            TextAnchor anchor;
+            TextAlignment alignment;
+            switch (string.IsNullOrEmpty(o.textAlign) ? "center" : o.textAlign)
+            {
+                case "left":
+                    anchor = TextAnchor.MiddleLeft;
+                    alignment = TextAlignment.Left;
+                    break;
+                case "center":
+                    anchor = TextAnchor.MiddleCenter;
+                    alignment = TextAlignment.Center;
+                    break;
+                case "right":
+                    anchor = TextAnchor.MiddleRight;
+                    alignment = TextAlignment.Right;
+                    break;
+                default:
+                    throw Fail(specPath, o.name + ": textAlign must be left, center or right");
+            }
+            if (o.textSize < 0f) throw Fail(specPath, o.name + ": textSize must not be negative");
+
+            TextMesh tm = go.AddComponent<TextMesh>();
+            tm.font = font;
+            tm.fontSize = TextFontSize;
+            tm.characterSize = (o.textSize > 0f ? o.textSize : DefaultTextSize) / TextSizeDivisor;
+            tm.anchor = anchor;
+            tm.alignment = alignment;
+            tm.color = ParseColor(o.textColor, specPath, o.name);
+
+            MeshRenderer mr = go.GetComponent<MeshRenderer>();
+            if (mr != null)
+            {
+                mr.sharedMaterial = font.material;
+                mr.sortingOrder = o.sortingOrder;
+            }
+
+            TextKeyView view = go.AddComponent<TextKeyView>();
+            view.textKey = o.textKey;
+            view.textMesh = tm;
+            view.Refresh();
         }
 
         // The fixed list of components a spec may attach. Each name is one direct,
@@ -647,6 +752,9 @@ namespace GoodEnoughRepairs.EditorTools
                     return;
                 case "WarningView":
                     go.AddComponent<WarningView>();
+                    return;
+                case "TextKeyView":
+                    if (go.GetComponent<TextKeyView>() == null) go.AddComponent<TextKeyView>();
                     return;
                 case "SpriteRenderer":
                     if (go.GetComponent<SpriteRenderer>() == null) go.AddComponent<SpriteRenderer>();
@@ -669,6 +777,9 @@ namespace GoodEnoughRepairs.EditorTools
                     break;
                 case "WarningView":
                     c = go.GetComponent<WarningView>();
+                    break;
+                case "TextKeyView":
+                    c = go.GetComponent<TextKeyView>();
                     break;
                 case "SpriteRenderer":
                     c = go.GetComponent<SpriteRenderer>();
@@ -695,6 +806,10 @@ namespace GoodEnoughRepairs.EditorTools
                     SpriteRenderer sr = go.GetComponent<SpriteRenderer>();
                     if (sr == null) throw Fail(specPath, go.name + " has no SpriteRenderer");
                     return sr;
+                case "TextKeyView":
+                    TextKeyView tv = go.GetComponent<TextKeyView>();
+                    if (tv == null) throw Fail(specPath, go.name + " has no TextKeyView (give it a textKey)");
+                    return tv;
                 default:
                     throw Fail(specPath, "unknown targetType " + type);
             }

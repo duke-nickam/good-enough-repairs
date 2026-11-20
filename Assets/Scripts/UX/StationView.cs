@@ -4,9 +4,10 @@ namespace GoodEnoughRepairs
 {
     /// <summary>
     /// Entry point of the show layer. Add this component to Main.unity by hand.
-    /// Loads the balance, builds the station with its 3 bays, docks ships on a
-    /// timer and draws everything in OnGUI. It reacts to the bays' events and
-    /// decides no rules: every ship and number comes from Logic.
+    /// Loads the balance and the text, builds the station with its 3 bays, docks
+    /// ships on a timer and draws everything in OnGUI. It reacts to the bays' events
+    /// and decides no rules: every ship and number comes from Logic, every word
+    /// from ui_text.json.
     /// </summary>
     public sealed class StationView : MonoBehaviour
     {
@@ -43,6 +44,7 @@ namespace GoodEnoughRepairs
         private const float BayHeight = 150f;
 
         private BalanceData balance;
+        private ContentData content;
         private DockingBays bays;
         private BuyRelease buyRelease;
         private System.Random shipRandom;
@@ -67,6 +69,10 @@ namespace GoodEnoughRepairs
 
         private void Awake()
         {
+            // The text is loaded once and shared with every view.
+            content = ContentLoader.Load();
+            TextKeyView.SetShared(content);
+
             balance = BalanceLoader.Load();
             if (balance == null)
             {
@@ -92,11 +98,11 @@ namespace GoodEnoughRepairs
             buyRelease.PartBought += OnPartBought;
 
             if (inventoryView != null) inventoryView.Bind(new PartMoves(inventory, balance), balance);
-            if (warningView != null) warningView.Bind(buyRelease, ContentLoader.Load());
+            if (warningView != null) warningView.Bind(buyRelease, content);
             for (int bay = 0; bay < bays.BayCount; bay++)
             {
                 ShipView v = ViewOf(bay);
-                if (v != null) v.Bind(buyRelease, warningView);
+                if (v != null) v.Bind(buyRelease, warningView, content);
             }
         }
 
@@ -161,7 +167,7 @@ namespace GoodEnoughRepairs
                 Rect rect = BayRect(bay);
                 if (!hasView && shown[bay] != null && GUI.Button(rect, GUIContent.none, GUIStyle.none))
                 {
-                    views[bay] = views[bay] == null ? new ShipPanel(shown[bay], surplusMargin) : null;
+                    views[bay] = views[bay] == null ? new ShipPanel(shown[bay], surplusMargin, content) : null;
                 }
             }
 
@@ -211,7 +217,8 @@ namespace GoodEnoughRepairs
 
             if (ship == null)
             {
-                GUI.Label(new Rect(x, rect.y + rect.height / 2f - 9f, w, 18f), "Bay " + (bay + 1) + ": empty");
+                GUI.Label(new Rect(x, rect.y + rect.height / 2f - 9f, w, 18f),
+                    content.Text(UiKeys.BayEmpty, bay + 1));
                 return;
             }
 
@@ -225,15 +232,15 @@ namespace GoodEnoughRepairs
             float top = rect.y + shift;
 
             GUI.Label(new Rect(x, top + ShipPanel.Pad, w, 18f),
-                "Bay " + (bay + 1) + ": " + ShipPanel.ShipTypeName(ship.Type), style);
-            GUI.Label(new Rect(x, top + 32f, w, 18f), "Payment " + ship.Payment, style);
-            GUI.Label(new Rect(x, top + 52f, w, 18f), "Needs " + ship.RequiredLevel + "%", style);
+                content.Text(UiKeys.BayLabel, bay + 1) + " " + ShipPanel.ShipTypeName(content, ship.Type), style);
+            GUI.Label(new Rect(x, top + 32f, w, 18f), content.Text(UiKeys.Payment, ship.Payment), style);
+            GUI.Label(new Rect(x, top + 52f, w, 18f), content.Text(UiKeys.Needs, ship.RequiredLevel), style);
 
             Part weakest = ship.WeakestPart;
             if (weakest != null)
             {
                 GUI.Label(new Rect(x, top + 72f, w, 18f),
-                    "Weakest: " + ShipPanel.PartName(weakest.Type) + " " + weakest.Condition + "%", style);
+                    content.Text(UiKeys.Weakest, ShipPanel.PartName(content, weakest.Type), weakest.Condition), style);
                 ShipPanel.DrawBar(new Rect(x, top + 96f, w, 12f),
                     weakest.Condition,
                     BarColors.ColorFor(weakest, ship.RequiredLevel, surplusMargin),

@@ -8,12 +8,16 @@ namespace GoodEnoughRepairs
     /// previews and holds no rules. Confirm calls BuyRelease.Buy or
     /// BuyRelease.Release; Cancel closes the dialog and changes nothing.
     ///
+    /// All words come from ui_text.json. The title and the two button labels can be
+    /// text elements on the prefab (TextKeyView); this view sets their keys when a
+    /// warning opens. Without them they are drawn with OnGUI.
+    ///
     /// While it is open it uses every mouse event, so nothing else can be clicked.
     /// If the ship leaves, or the slot is no longer buyable, it closes by itself
     /// and nothing is bought.
     ///
     /// The sprites are on the prefab (dialogRoot is the object that is shown and
-    /// hidden). The text is drawn with OnGUI over the text area sprite.
+    /// hidden). The message is drawn with OnGUI over the text area sprite.
     /// </summary>
     [DefaultExecutionOrder(-200)]
     public sealed class WarningView : MonoBehaviour
@@ -41,21 +45,15 @@ namespace GoodEnoughRepairs
         [Tooltip("Cancel button. Its bounds are the click area.")]
         public SpriteRenderer cancelButton;
 
-        [Header("Text templates")]
-        public string buyTitle = "Buy a new part?";
-        [Tooltip("{0} is the price of the new part.")]
-        public string buyPriceText = "Price: {0}";
-        [Tooltip("{0} is the scrap paid for the binned old part.")]
-        public string buyBinnedText = "Inventory is full: the old part will be binned (scrap {0}).";
-        public string releaseTitle = "Release this ship?";
-        [Tooltip("{0} is the payment.")]
-        public string releasePaymentText = "Payment: {0}";
-        [Tooltip("{0} is the number of slots filled, {1} the price of one, {2} the total.")]
-        public string releasePenaltyText = "{0} slot(s) filled at {1} each: {2}";
-        [Tooltip("{0} is payment minus penalty parts.")]
-        public string releaseNetText = "Net result: {0}";
-        public string confirmLabel = "Confirm";
-        public string cancelLabel = "Cancel";
+        [Header("Text elements (optional)")]
+        [Tooltip("Dialog title. This view sets its key (buy_title or release_title).")]
+        public TextKeyView titleText;
+
+        [Tooltip("Confirm label. This view sets its key (confirm_buy or confirm_release).")]
+        public TextKeyView confirmText;
+
+        [Tooltip("Cancel label. This view sets its key (cancel_buy or cancel_release).")]
+        public TextKeyView cancelText;
 
         private BuyRelease buyRelease;
         private ContentData content;
@@ -74,12 +72,17 @@ namespace GoodEnoughRepairs
             get { return kind != Kind.None; }
         }
 
+        private ContentData Text
+        {
+            get { return content ?? TextKeyView.Shared; }
+        }
+
         private void Awake()
         {
             if (dialogRoot != null) dialogRoot.SetActive(false);
         }
 
-        /// <summary>Connects the dialog to the commands and the mechanic's lines.</summary>
+        /// <summary>Connects the dialog to the commands and the text and mechanic's lines.</summary>
         public void Bind(BuyRelease commands, ContentData contentData)
         {
             Close();
@@ -168,7 +171,25 @@ namespace GoodEnoughRepairs
         private void SetOpen(Kind k)
         {
             kind = k;
+            if (titleText != null) titleText.SetKey(TitleKey());
+            if (confirmText != null) confirmText.SetKey(ConfirmKey());
+            if (cancelText != null) cancelText.SetKey(CancelKey());
             if (dialogRoot != null) dialogRoot.SetActive(true);
+        }
+
+        private string TitleKey()
+        {
+            return kind == Kind.Buy ? UiKeys.BuyTitle : UiKeys.ReleaseTitle;
+        }
+
+        private string ConfirmKey()
+        {
+            return kind == Kind.Buy ? UiKeys.ConfirmBuy : UiKeys.ConfirmRelease;
+        }
+
+        private string CancelKey()
+        {
+            return kind == Kind.Buy ? UiKeys.CancelBuy : UiKeys.CancelRelease;
         }
 
         // Keeps the numbers current, and closes when the warning is no longer valid.
@@ -239,28 +260,45 @@ namespace GoodEnoughRepairs
                 GUI.Label(new Rect(r.x + pad, r.y + pad, r.width - 2f * pad, r.height - 2f * pad),
                     Message(), textStyle);
             }
-            if (SpriteScreen.TryRect(confirmButton, out r)) GUI.Label(r, confirmLabel, buttonStyle);
-            if (SpriteScreen.TryRect(cancelButton, out r)) GUI.Label(r, cancelLabel, buttonStyle);
+            if (confirmText == null && SpriteScreen.TryRect(confirmButton, out r))
+            {
+                GUI.Label(r, Text.Text(ConfirmKey()), buttonStyle);
+            }
+            if (cancelText == null && SpriteScreen.TryRect(cancelButton, out r))
+            {
+                GUI.Label(r, Text.Text(CancelKey()), buttonStyle);
+            }
         }
 
-        // Only puts the preview's numbers into the text templates.
+        private static string AddLine(string text, string line)
+        {
+            if (string.IsNullOrEmpty(line)) return text;
+            return text.Length == 0 ? line : text + "\n" + line;
+        }
+
+        // Only puts the preview's numbers into the texts from ui_text.json.
         private string Message()
         {
+            ContentData t = Text;
+            string text = "";
             if (kind == Kind.Buy && buyPreview != null)
             {
-                string text = buyTitle + "\n" + string.Format(buyPriceText, buyPreview.Price);
-                if (buyPreview.OldPartBinned) text += "\n" + string.Format(buyBinnedText, buyPreview.ScrapAmount);
+                if (titleText == null) text = AddLine(text, t.Text(UiKeys.BuyTitle));
+                text = AddLine(text, t.Text(UiKeys.BuyPrice, buyPreview.Price));
+                if (buyPreview.OldPartBinned) text = AddLine(text, t.Text(UiKeys.BuyBinned, buyPreview.ScrapAmount));
                 return text;
             }
             if (kind == Kind.Release && releasePreview != null)
             {
-                string text = "";
-                if (!string.IsNullOrEmpty(mechanicLine)) text += mechanicLine + "\n";
-                text += releaseTitle;
-                text += "\n" + string.Format(releasePaymentText, releasePreview.Payment);
-                text += "\n" + string.Format(releasePenaltyText, releasePreview.PenaltyFills,
-                    releasePreview.PenaltyPrice, releasePreview.PenaltyTotal);
-                text += "\n" + string.Format(releaseNetText, releasePreview.NetResult);
+                text = AddLine(text, mechanicLine);
+                if (titleText == null) text = AddLine(text, t.Text(UiKeys.ReleaseTitle));
+                text = AddLine(text, t.Text(UiKeys.ReleasePayment, releasePreview.Payment));
+                if (releasePreview.PenaltyFills > 0)
+                {
+                    text = AddLine(text, t.Text(UiKeys.ReleasePenalty, releasePreview.PenaltyFills,
+                        releasePreview.PenaltyTotal));
+                }
+                text = AddLine(text, t.Text(UiKeys.ReleaseNet, releasePreview.NetResult));
                 return text;
             }
             return "";
