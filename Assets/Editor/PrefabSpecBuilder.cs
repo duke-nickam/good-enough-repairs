@@ -15,11 +15,23 @@
  *                                         The path may be a changed copy of a spec.
  *   PrefabSpecBuilder.Build(specPath)     the same as BuildSpecAt (kept for old callers)
  *
- * The builder prints "MADE: <path>" for every file Unity made or updated (sprite
- * PNG, prefab, scene) and "SCREENSHOT: <absolute path>" for every screenshot. A bad
- * spec stops the build with an error that names the spec file. It never saves a
- * half prefab. Every build reads the spec file from disk and refreshes the asset
- * database first, so a shot always comes from the current specs.
+ * The builder prints "MADE: <path>" for every sprite PNG, prefab and scene it
+ * handled and "SCREENSHOT: <absolute path>" for every screenshot. A prefab or scene
+ * that needed no change is also reported with "UNCHANGED: <path>" and its file is
+ * not written. A bad spec stops the build with an error that names the spec file.
+ * It never saves a half prefab. Every build reads the spec file from disk and
+ * refreshes the asset database first, so a shot always comes from the current specs.
+ *
+ * UNCHANGED BUILD WRITES NOTHING
+ *   A build with a spec that has not changed leaves the prefab files, the scene
+ *   file and the sprite import settings (.meta) as they are, byte for byte:
+ *   - A prefab is saved only when the patch really changed it (the content is
+ *     compared before and after the patch).
+ *   - The scene is saved only when an instance was added, removed, moved or
+ *     scaled, or a StationView link, the camera or the event system changed.
+ *   - A sprite is re-imported only when an import setting differs.
+ *   The screenshot step still runs. It shows sample data in the open scene and
+ *   then loads the scene again from disk without saving.
  *
  * UPDATE, NOT REBUILD
  *   The builder works like a person editing the prefab:
@@ -373,7 +385,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -480,6 +494,7 @@ namespace GoodEnoughRepairs.EditorTools
     /// the top of this file. No reflection and no type names as text: components
     /// are attached through direct references in the switches below.
     /// An existing prefab or scene instance is updated in place, never rebuilt.
+    /// A build that changes nothing writes no prefab and no scene.
     /// </summary>
     public static class PrefabSpecBuilder
     {
@@ -739,19 +754,52 @@ namespace GoodEnoughRepairs.EditorTools
 
             TextureImporter importer = AssetImporter.GetAtPath(s.path) as TextureImporter;
             if (importer == null) throw Fail(specPath, "sprite file is not a texture: " + s.path);
-            importer.textureType = TextureImporterType.Sprite;
-            importer.spriteImportMode = SpriteImportMode.Single;
-            importer.spritePixelsPerUnit = s.pixelsPerUnit;
-            importer.filterMode = FilterMode.Point;
-            importer.mipmapEnabled = false;
-            importer.alphaIsTransparency = true;
+
+            // Only touch the importer (and so the .meta file) when a setting differs.
+            bool dirty = false;
+            if (importer.textureType != TextureImporterType.Sprite)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                dirty = true;
+            }
+            if (importer.spriteImportMode != SpriteImportMode.Single)
+            {
+                importer.spriteImportMode = SpriteImportMode.Single;
+                dirty = true;
+            }
+            if (!Mathf.Approximately(importer.spritePixelsPerUnit, s.pixelsPerUnit))
+            {
+                importer.spritePixelsPerUnit = s.pixelsPerUnit;
+                dirty = true;
+            }
+            if (importer.filterMode != FilterMode.Point)
+            {
+                importer.filterMode = FilterMode.Point;
+                dirty = true;
+            }
+            if (importer.mipmapEnabled)
+            {
+                importer.mipmapEnabled = false;
+                dirty = true;
+            }
+            if (!importer.alphaIsTransparency)
+            {
+                importer.alphaIsTransparency = true;
+                dirty = true;
+            }
 
             TextureImporterSettings settings = new TextureImporterSettings();
             importer.ReadTextureSettings(settings);
-            settings.spriteAlignment = (int)SpriteAlignment.Custom;
-            settings.spritePivot = new Vector2(s.pivotX, s.pivotY);
-            importer.SetTextureSettings(settings);
-            importer.SaveAndReimport();
+            if (settings.spriteAlignment != (int)SpriteAlignment.Custom ||
+                !Mathf.Approximately(settings.spritePivot.x, s.pivotX) ||
+                !Mathf.Approximately(settings.spritePivot.y, s.pivotY))
+            {
+                settings.spriteAlignment = (int)SpriteAlignment.Custom;
+                settings.spritePivot = new Vector2(s.pivotX, s.pivotY);
+                importer.SetTextureSettings(settings);
+                dirty = true;
+            }
+            if (dirty) importer.SaveAndReimport();
 
             Sprite loaded = AssetDatabase.LoadAssetAtPath<Sprite>(s.path);
             if (loaded == null) throw Fail(specPath, "sprite could not be loaded: " + s.path);
@@ -1087,19 +1135,136 @@ namespace GoodEnoughRepairs.EditorTools
         }
 
         // Opens the existing prefab, patches it to match the spec and saves it back
-        // to the same asset. On an error nothing is saved.
+        // to the same asset, but only when the patch really changed something. On an
+        // error nothing is saved.
         private static void PatchPrefab(PrefabSpec spec, Dictionary<string, Sprite> sprites, string specPath)
         {
             GameObject root = PrefabUtility.LoadPrefabContents(spec.prefabPath);
             try
             {
+                string before = Signature(root);
                 PatchContent(spec, root, sprites, specPath);
+                string after = Signature(root);
+                if (before == after)
+                {
+                    Debug.Log("UNCHANGED: " + spec.prefabPath);
+                    return;
+                }
                 PrefabUtility.SaveAsPrefabAsset(root, spec.prefabPath);
             }
             finally
             {
                 PrefabUtility.UnloadPrefabContents(root);
             }
+        }
+
+        // ---- content signature: a text that changes when anything saved in the
+        // prefab changes (objects, order, active flag, components, every property).
+
+        private static string Signature(GameObject root)
+        {
+            StringBuilder sb = new StringBuilder();
+            SignatureWalk(root.transform, root.transform, sb);
+            return sb.ToString();
+        }
+
+        private static string PathIn(Transform t, Transform root)
+        {
+            if (t == root) return "<root>";
+            string path = t.name;
+            Transform p = t.parent;
+            while (p != null && p != root)
+            {
+                path = p.name + "/" + path;
+                p = p.parent;
+            }
+            return path;
+        }
+
+        private static void SignatureWalk(Transform t, Transform root, StringBuilder sb)
+        {
+            GameObject go = t.gameObject;
+            sb.Append('[').Append(PathIn(t, root)).Append('|').Append(go.activeSelf ? '1' : '0').Append('\n');
+            Component[] comps = go.GetComponents<Component>();
+            for (int i = 0; i < comps.Length; i++)
+            {
+                Component c = comps[i];
+                if (c == null) continue;
+                sb.Append('<').Append(c.GetType().FullName).Append('\n');
+                SerializedObject so = new SerializedObject(c);
+                SerializedProperty p = so.GetIterator();
+                bool enter = true;
+                while (p.Next(enter))
+                {
+                    enter = true;
+                    if (p.propertyType == SerializedPropertyType.Generic) continue;
+                    sb.Append(p.propertyPath).Append('=').Append(ValueText(p, root)).Append('\n');
+                }
+            }
+            for (int i = 0; i < t.childCount; i++) SignatureWalk(t.GetChild(i), root, sb);
+        }
+
+        private static string Num(float v)
+        {
+            return v.ToString("R", CultureInfo.InvariantCulture);
+        }
+
+        private static string ValueText(SerializedProperty p, Transform root)
+        {
+            switch (p.propertyType)
+            {
+                case SerializedPropertyType.Integer:
+                case SerializedPropertyType.LayerMask:
+                case SerializedPropertyType.ArraySize:
+                case SerializedPropertyType.Enum:
+                case SerializedPropertyType.Character:
+                    return p.longValue.ToString(CultureInfo.InvariantCulture);
+                case SerializedPropertyType.Boolean:
+                    return p.boolValue ? "true" : "false";
+                case SerializedPropertyType.Float:
+                    return Num(p.floatValue);
+                case SerializedPropertyType.String:
+                    return p.stringValue;
+                case SerializedPropertyType.Color:
+                    Color col = p.colorValue;
+                    return Num(col.r) + "," + Num(col.g) + "," + Num(col.b) + "," + Num(col.a);
+                case SerializedPropertyType.Vector2:
+                    Vector2 v2 = p.vector2Value;
+                    return Num(v2.x) + "," + Num(v2.y);
+                case SerializedPropertyType.Vector3:
+                    Vector3 v3 = p.vector3Value;
+                    return Num(v3.x) + "," + Num(v3.y) + "," + Num(v3.z);
+                case SerializedPropertyType.Vector4:
+                    Vector4 v4 = p.vector4Value;
+                    return Num(v4.x) + "," + Num(v4.y) + "," + Num(v4.z) + "," + Num(v4.w);
+                case SerializedPropertyType.Quaternion:
+                    Quaternion q = p.quaternionValue;
+                    return Num(q.x) + "," + Num(q.y) + "," + Num(q.z) + "," + Num(q.w);
+                case SerializedPropertyType.Rect:
+                    Rect r = p.rectValue;
+                    return Num(r.x) + "," + Num(r.y) + "," + Num(r.width) + "," + Num(r.height);
+                case SerializedPropertyType.Bounds:
+                    Bounds bd = p.boundsValue;
+                    return Num(bd.center.x) + "," + Num(bd.center.y) + "," + Num(bd.center.z) + "," +
+                        Num(bd.size.x) + "," + Num(bd.size.y) + "," + Num(bd.size.z);
+                case SerializedPropertyType.ObjectReference:
+                    return RefText(p.objectReferenceValue, root);
+                default:
+                    return p.propertyType.ToString();
+            }
+        }
+
+        private static string RefText(UnityEngine.Object o, Transform root)
+        {
+            if (o == null) return "null";
+            GameObject go = o as GameObject;
+            Component comp = o as Component;
+            if (comp != null) go = comp.gameObject;
+            if (go != null && go.transform.root == root)
+            {
+                return "in:" + PathIn(go.transform, root) + ":" + o.GetType().Name;
+            }
+            return "asset:" + AssetDatabase.GetAssetPath(o) + ":" + o.name;
         }
 
         private static void CollectStale(Transform parent, string parentPath, HashSet<string> wanted,
@@ -1233,13 +1398,18 @@ namespace GoodEnoughRepairs.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        private static bool SameExact(Vector3 a, Vector3 b)
+        {
+            return a.x == b.x && a.y == b.y && a.z == b.z;
+        }
+
         // Puts one instance of the prefab in the open scene, or updates the existing
         // one. With screen set, the rectangle (reference pixels) decides the position
         // and scale, and the ship's content is centered with the same ShipView code
         // StationView uses. An existing instance is kept: only position and scale
-        // are set, and only when they differ.
+        // are set, and only when they differ. changed tells if the scene was changed.
         private static GameObject PlaceOne(GameObject prefab, GameObject existing, string name, Camera cam,
-            SpecScene sc, float rx, float ry, float rw, float rh, bool screen)
+            SpecScene sc, float rx, float ry, float rw, float rh, bool screen, out bool changed)
         {
             GameObject instance = existing;
             if (instance == null)
@@ -1269,6 +1439,7 @@ namespace GoodEnoughRepairs.EditorTools
             }
 
             Vector3 oldPos = instance.transform.position;
+            Vector3 oldScale = instance.transform.localScale;
             Vector3 newScale = new Vector3(scale, scale, 1f);
             if (existing == null || instance.transform.localScale != newScale)
             {
@@ -1284,6 +1455,10 @@ namespace GoodEnoughRepairs.EditorTools
             {
                 instance.transform.position = oldPos;
             }
+
+            changed = existing == null ||
+                !SameExact(instance.transform.position, oldPos) ||
+                !SameExact(instance.transform.localScale, oldScale);
             return instance;
         }
 
@@ -1292,8 +1467,9 @@ namespace GoodEnoughRepairs.EditorTools
         // wanted name and removes every other matching object (a bay that is gone, a
         // repeated name, or an object that is not an instance of this prefab).
         private static Dictionary<string, GameObject> SelectInstances(string rootName, string prefabPath,
-            HashSet<string> desired)
+            HashSet<string> desired, out bool removed)
         {
+            removed = false;
             string bayPrefix = rootName + BaySuffix;
             GameObject[] all = UnityEngine.Object.FindObjectsByType<GameObject>(
                 FindObjectsInactive.Include, FindObjectsSortMode.InstanceID);
@@ -1314,23 +1490,30 @@ namespace GoodEnoughRepairs.EditorTools
             }
             for (int i = 0; i < matching.Count; i++)
             {
-                if (!kept.ContainsValue(matching[i])) UnityEngine.Object.DestroyImmediate(matching[i]);
+                if (!kept.ContainsValue(matching[i]))
+                {
+                    UnityEngine.Object.DestroyImmediate(matching[i]);
+                    removed = true;
+                }
             }
             return kept;
         }
 
-        private static StationView GetStation()
+        private static StationView GetStation(out bool created)
         {
+            created = false;
             StationView station = UnityEngine.Object.FindFirstObjectByType<StationView>();
             if (station == null)
             {
                 GameObject st = new GameObject("Station");
                 station = st.AddComponent<StationView>();
+                created = true;
             }
             return station;
         }
 
-        private static void ConnectStation(StationView station, string field, GameObject instance, string specPath)
+        // Returns true when the StationView field was changed.
+        private static bool ConnectStation(StationView station, string field, GameObject instance, string specPath)
         {
             SerializedObject so = new SerializedObject(station);
             SerializedProperty prop = so.FindProperty(field);
@@ -1363,7 +1546,15 @@ namespace GoodEnoughRepairs.EditorTools
                 prop.objectReferenceValue = component;
                 so.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(station);
+                return true;
             }
+            return false;
+        }
+
+        private static int CountSceneObjects()
+        {
+            return UnityEngine.Object.FindObjectsByType<GameObject>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None).Length;
         }
 
         private static void PlaceInScene(PrefabSpec spec, string specPath)
@@ -1372,6 +1563,7 @@ namespace GoodEnoughRepairs.EditorTools
             if (!File.Exists(sc.path)) throw Fail(specPath, "scene not found: " + sc.path);
 
             EditorSceneManager.OpenScene(sc.path, OpenSceneMode.Single);
+            bool sceneChanged = false;
 
             Camera cam = Camera.main;
             if (cam == null) cam = UnityEngine.Object.FindFirstObjectByType<Camera>();
@@ -1383,11 +1575,13 @@ namespace GoodEnoughRepairs.EditorTools
                 cam = camGo.AddComponent<Camera>();
                 cam.clearFlags = CameraClearFlags.SolidColor;
                 cam.backgroundColor = new Color(0.08f, 0.09f, 0.11f);
+                sceneChanged = true;
             }
             if (!cam.orthographic)
             {
                 cam.orthographic = true;
                 cam.orthographicSize = 5f;
+                sceneChanged = true;
             }
 
             bool hasBays = sc.bays != null && sc.bays.Length > 0;
@@ -1417,10 +1611,14 @@ namespace GoodEnoughRepairs.EditorTools
             {
                 desired.Add(spec.root.name);
             }
-            Dictionary<string, GameObject> kept = SelectInstances(spec.root.name, spec.prefabPath, desired);
+            bool removedAny;
+            Dictionary<string, GameObject> kept = SelectInstances(spec.root.name, spec.prefabPath, desired,
+                out removedAny);
+            if (removedAny) sceneChanged = true;
 
             List<GameObject> instances = new List<GameObject>();
             List<string> fields = new List<string>();
+            bool placedChanged;
             if (hasBays)
             {
                 for (int i = 0; i < sc.bays.Length; i++)
@@ -1430,7 +1628,8 @@ namespace GoodEnoughRepairs.EditorTools
                     GameObject existing;
                     kept.TryGetValue(instanceName, out existing);
                     instances.Add(PlaceOne(prefab, existing, instanceName, cam, sc,
-                        b.rectX, b.rectY, b.rectW, b.rectH, true));
+                        b.rectX, b.rectY, b.rectW, b.rectH, true, out placedChanged));
+                    if (placedChanged) sceneChanged = true;
                     fields.Add(string.IsNullOrEmpty(b.stationField) ? "bay" + b.bay + "View" : b.stationField);
                 }
             }
@@ -1439,7 +1638,8 @@ namespace GoodEnoughRepairs.EditorTools
                 GameObject existing;
                 kept.TryGetValue(spec.root.name, out existing);
                 instances.Add(PlaceOne(prefab, existing, spec.root.name, cam, sc,
-                    sc.rectX, sc.rectY, sc.rectW, sc.rectH, sc.rectW > 0f));
+                    sc.rectX, sc.rectY, sc.rectW, sc.rectH, sc.rectW > 0f, out placedChanged));
+                if (placedChanged) sceneChanged = true;
                 fields.Add(sc.stationField);
             }
 
@@ -1447,8 +1647,13 @@ namespace GoodEnoughRepairs.EditorTools
             for (int i = 0; i < instances.Count; i++)
             {
                 if (string.IsNullOrEmpty(fields[i])) continue;
-                if (station == null) station = GetStation();
-                ConnectStation(station, fields[i], instances[i], specPath);
+                if (station == null)
+                {
+                    bool created;
+                    station = GetStation(out created);
+                    if (created) sceneChanged = true;
+                }
+                if (ConnectStation(station, fields[i], instances[i], specPath)) sceneChanged = true;
             }
 
             GameObject first = instances[0];
@@ -1457,10 +1662,22 @@ namespace GoodEnoughRepairs.EditorTools
             WarningView warnView = first.GetComponent<WarningView>();
 
             // The warning's UI buttons need an event system in the scene.
-            if (warnView != null) UiParts.EnsureEventSystem();
+            if (warnView != null)
+            {
+                int objectsBefore = CountSceneObjects();
+                UiParts.EnsureEventSystem();
+                if (CountSceneObjects() != objectsBefore) sceneChanged = true;
+            }
 
-            EditorSceneManager.MarkSceneDirty(first.scene);
-            EditorSceneManager.SaveScene(first.scene);
+            if (sceneChanged)
+            {
+                EditorSceneManager.MarkSceneDirty(first.scene);
+                EditorSceneManager.SaveScene(first.scene);
+            }
+            else
+            {
+                Debug.Log("UNCHANGED: " + sc.path);
+            }
             Debug.Log("MADE: " + sc.path);
 
             if (!string.IsNullOrEmpty(sc.screenshot))
