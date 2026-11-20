@@ -376,12 +376,14 @@ def file_dependency_problems(keys):
             if not [a for a in c.split()[2:] if "/" in a or "." in a]:
                 problems.append(f"{k}: the check '{c}' names no files. Give every check the files it checks as "
                                 f"arguments; a check script checks only the files it is given")
-        mine, before = set(t.get("files") or []), deps(k)
+        mine, before, reads = set(t.get("files") or []), deps(k), set(t.get("reads") or [])
         for path in touched_paths(t):
             folder = path.rstrip("/") + "/"
             for w, other in keys.items():
                 if w == k or w in before:
                     continue
+                if path in reads and k in deps(w):
+                    continue  # a Read of the file as it is now, before the later task w changes it
                 hit = [f for f in other.get("files") or [] if f not in mine and (f == path or f.startswith(folder))]
                 if hit:
                     problems.append(f"{k}: its checks or Reads use {', '.join(hit)}, written by {w}, but {k} does not "
