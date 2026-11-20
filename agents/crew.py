@@ -11,6 +11,8 @@ Usage (from the project root):
   python agents/crew.py --mock    a scripted demo on a local stand-in board: no GitHub, no Claude
   python agents/crew.py todo 65 66   the designer's move: tasks from Backlog or Needs designer to Todo
   python agents/crew.py done 65      the designer's move: accept a task waiting in Needs designer
+  python agents/crew.py triage 115  send a task in Needs designer to the Director: its last review is
+                                    blocked outside its files, so the Director plans the missing piece
 """
 import argparse
 import json
@@ -154,6 +156,27 @@ def check(settings):
 MOVES = {"todo": ("Todo", ("Backlog", "Needs designer")), "done": ("Done", ("Needs designer",))}
 
 
+def send_to_director(board, numbers):
+    """The designer hands a task in Needs designer to the Director: its last review is blocked outside the task's
+    files. The next run lets the Director plan the missing piece (no AI here, only a marker)."""
+    from board.model import crew_comment
+    items = {i.number: i for i in board.items()}
+    ok = True
+    for n in numbers or []:
+        i = items.get(n)
+        if not i or i.kind != "task" or i.status != "Needs designer":
+            print(f"  #{n}: not a task in Needs designer, skipped")
+            ok = False
+            continue
+        board.comment(n, crew_comment("Runner", "The designer sent this task to the Director: its last review is "
+                                                "blocked by work outside the task's files.", "needs_designer",
+                                      outside=True))
+        print(f"  #{n} {i.title}: sent to the Director (next run)")
+    if not numbers:
+        print("Name the tasks, e.g.: python agents/crew.py triage 115")
+    return ok and bool(numbers)
+
+
 def move(board, command, numbers):
     """The designer's card moves from the command line: no AI, only the GitHub CLI."""
     to, allowed = MOVES[command]
@@ -178,8 +201,8 @@ def move(board, command, numbers):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", nargs="?", choices=["run", "setup", "check", "todo", "done"], default="run")
-    ap.add_argument("numbers", nargs="*", type=int, help="task numbers, for todo and done")
+    ap.add_argument("command", nargs="?", choices=["run", "setup", "check", "todo", "done", "triage"], default="run")
+    ap.add_argument("numbers", nargs="*", type=int, help="task numbers, for todo, done and triage")
     ap.add_argument("--watch", action="store_true", help="keep running; check the board every few minutes")
     ap.add_argument("--mock", action="store_true", help="scripted demo, no GitHub and no Claude")
     args = ap.parse_args()
@@ -197,6 +220,8 @@ def main():
         sys.exit(0 if check(settings) else 1)
     if args.command in ("todo", "done"):
         sys.exit(0 if move(board, args.command, args.numbers) else 1)
+    if args.command == "triage":
+        sys.exit(0 if send_to_director(board, args.numbers) else 1)
 
     ws = GitWorkspace(ROOT, settings["repo"])
     agents = ClaudeAgents(settings, "")

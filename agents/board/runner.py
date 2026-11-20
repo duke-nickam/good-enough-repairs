@@ -94,6 +94,7 @@ class Runner:
         self.cards = {}
         self.dep_states = {}
         self.sync()
+        self.triage_waiting()
         self.handle_requests()
         self.sync()
         while True:
@@ -699,8 +700,13 @@ class Runner:
             if not checks_ok and verdict.get("verdict") == "approve":
                 reason = "The reviewer approved, but a check failed, so it is rejected. " + reason
             stuck = bool(verdict.get("repeat")) and rejected_before  # same problem twice: the agent cannot fix it
+            outside = bool(verdict.get("outside"))  # blocked by files outside the task: the agent cannot fix it
+            if outside and self.s.get("director_triage", True) and self.triage(
+                    t, card, issue, f"The review rejected this attempt for work outside this task's files:\n\n"
+                                    f"{reason}\n\n{lines}", usages, reviewer, attempt):
+                return
             self.reject(t, attempt, f"{reason}\n\n{lines}\n\nChecks:\n{checks_text}\n\n{review_used}".rstrip(),
-                        usages, reviewer, failed=failed, stuck=stuck)
+                        usages, reviewer, failed=failed, stuck=stuck or outside, outside=outside)
 
     def note_done(self, issue):
         """May the Programmer write code? Yes after the Director approved the note, or after designer input on it."""
@@ -884,6 +890,31 @@ class Runner:
         log("Director", f"#{n}: planned #{m} for the missing piece; #{n} waits for it")
         return True
 
+    def triage_waiting(self):
+        """Tasks in Needs designer whose last rejection was blocked outside their files go to the Director once."""
+        if not self.s.get("director_triage", True):
+            return
+        for t in self.board.items():
+            if t.kind != "task" or t.state != "OPEN" or t.status != "Needs designer":
+                continue
+            issue = self.board.issue(t.number)
+            last = issue.last_marker() or {}
+            if not last.get("outside") or last.get("triaged"):
+                continue
+            card = self.card(t.number)
+            review = next((c.body for c in reversed(issue.comments) if c.marker and
+                           c.marker.get("event") in ("rejected", "needs_designer") and "Rejected on attempt" in c.body),
+                          "")
+            if not card or not review:
+                continue
+            question = ("The review rejected this task for work outside its files:\n\n" +
+                        re.sub(r"<!-- crew:.*?-->", "", review).strip())
+            log("Director", f"#{t.number}: the last review is blocked outside the task's files, deciding")
+            if not self.triage(t, card, issue, question, [], AGENTS[card.reviewer], t.attempt):
+                self.board.comment(t.number, crew_comment(
+                    "Director", "I could not plan the missing piece within this epic's goal, so the designer decides.",
+                    "needs_designer", outside=True, triaged=True))
+
     def block_on(self, t, card, m, attempt, who, question, total, text):
         """The blocked task depends on #m (a task or a tool request) and starts again with fresh attempts."""
         n = t.number
@@ -914,17 +945,19 @@ class Runner:
             epic_number = blocked.epic if blocked else None
         return depth
 
-    def reject(self, t, attempt, text, usages, who, failed=None, stuck=False):
+    def reject(self, t, attempt, text, usages, who, failed=None, stuck=False, outside=False):
         n = t.number
         total = self.add_tokens(t, usages)
         if stuck and attempt < self.max:
+            why = ("The fix lies outside this task's files and the Director could not plan it" if outside else
+                   "This is the same problem as the last rejection")
             self.board.set_status(n, "Needs designer")
             alert(self.s, "needs_designer")
-            self.board.comment(n, crew_comment(who, f"Rejected on attempt {attempt}/{self.max}: {text}\n\nThis is the "
-                                                    "same problem as the last rejection, so the agent cannot fix it by "
-                                                    "itself: Needs designer. Answer or change the task, then move it to "
-                                                    f"Todo. Task total: {total:,} tokens.", "needs_designer",
-                                               attempt=attempt))
+            self.board.comment(n, crew_comment(who, f"Rejected on attempt {attempt}/{self.max}: {text}\n\n{why}, so "
+                                                    "the agent cannot fix it by itself: Needs designer. Answer or "
+                                                    "change the task, then move it to Todo. Task total: "
+                                                    f"{total:,} tokens.", "needs_designer", attempt=attempt,
+                                               outside=outside, triaged=outside))
             log(who, f"#{n}: rejected twice for the same problem, Needs designer")
         elif attempt >= self.max:
             self.board.set_status(n, "Needs designer")

@@ -157,8 +157,10 @@ REVIEW_FORMAT = """Reply with one JSON object only, no other text:
 {"verdict": "approve" or "reject", "summary": "<one sentence>",
  "issues": [{"where": "<file and place>", "problem": "<what is wrong, and the GDD rule or criterion it breaks>",
              "fix": "<concrete fix>"}],
- "repeat": true or false}
+ "repeat": true or false, "outside": true or false}
 repeat: true when you reject for the same main problem as the last rejection in "Earlier in this task".
+outside: true when the main problem can only be fixed in files outside this task's Files (another agent's code, a
+tool, a view script): the agent cannot fix it, so the Director plans the missing piece instead of a new attempt.
 Reject only for real problems: a broken acceptance criterion, a GDD contradiction, a failed check, wrong format.
 Taste alone is not a reason to reject; mention it as an issue on an approval. At most 6 issues.
 The check results above come from the runner, which ran the checks on exactly the files shown: take them as given.
