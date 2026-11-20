@@ -3,7 +3,9 @@
     "rootNamespace": "GoodEnoughRepairs",
     "references": [
         "GoodEnoughRepairs.Logic",
-        "GoodEnoughRepairs.Data"
+        "GoodEnoughRepairs.Data",
+        "UnityEngine.UI",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

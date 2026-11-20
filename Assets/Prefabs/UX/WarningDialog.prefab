@@ -260,9 +260,18 @@ MonoBehaviour:
   textArea: {fileID: 2538403323856719596}
   confirmButton: {fileID: 5534052022369525707}
   cancelButton: {fileID: 4402146187801570579}
+  confirmUiButton: {fileID: 0}
+  cancelUiButton: {fileID: 0}
+  clickBlocker: {fileID: 0}
   titleText: {fileID: 2939793008533153029}
   confirmText: {fileID: 4253921210643066655}
   cancelText: {fileID: 6911224255613588515}
+  mechanicText: {fileID: 0}
+  buyPriceText: {fileID: 0}
+  buyBinnedText: {fileID: 0}
+  releasePaymentText: {fileID: 0}
+  releasePenaltyText: {fileID: 0}
+  releaseNetText: {fileID: 0}
 --- !u!1 &2771037280856127566
 GameObject:
   m_ObjectHideFlags: 0
