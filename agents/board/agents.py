@@ -62,14 +62,20 @@ Reply with one JSON object only, no other text. One of:
  "task": {"title": "<what the agent does>", "agent": "<agent key>", "reviewer": "<agent key>", "what": "<instructions>",
    "acceptance": ["<criterion>"], "files": ["<repo path>"], "reads": ["<repo path>"],
    "checks": ["python agents/checks/<name>.py <args>"]}}
+{"verdict": "tool", "summary": "<one sentence>", "title": "<the tool, e.g. Builder can save objects hidden>",
+ "goal": "<what the tool lets the crew do, one sentence>", "done_when": ["<a fact the designer can check>"]}
 {"verdict": "ask", "summary": "<one sentence>", "questions": ["<a question only the designer can decide>"]}
 answer: the GDD, docs/crew/ or the card already answer the question.
+plan or tool: something outside the agent's files is missing. Choose plan for a small piece only this epic needs,
+one task in size. Choose tool for a general tool other epics will use too, or anything bigger than one task: it
+becomes its own request with its own epic, done first; the blocked task waits until that request is closed.
 plan: the agent cannot finish because something outside its own files is missing (a tool feature, a view field,
 code), and another agent can build it within this epic's goal. Plan exactly that one task; the blocked task then
 waits for it and starts again. Never widen the epic's goal, and never plan work that belongs to another epic on the
 board. Parts the blocked agent can still do itself stay with it. The new task follows these plan rules:
 """ + PLAN_FORMAT[PLAN_FORMAT.index("Rules:"):] + """
-ask: only the designer can decide it (taste, scope, a gap in the GDD), or the missing piece belongs to another epic."""
+ask: only the designer can decide it (taste, scope, a gap in the GDD), or the missing piece belongs to another epic
+on the board."""
 
 WORK_FORMAT = """Reply in exactly this format, nothing before it:
 === FILE: <path from your task's Files> ===
