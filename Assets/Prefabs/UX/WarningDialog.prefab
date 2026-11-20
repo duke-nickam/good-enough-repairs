@@ -932,7 +932,7 @@ TextMesh:
   m_GameObject: {fileID: 3936028111971105996}
   m_Text: Repair station
   m_OffsetZ: 0
-  m_CharacterSize: 0.0203125
+  m_CharacterSize: 0.018749999
   m_LineSpacing: 1
   m_Anchor: 3
   m_Alignment: 0
