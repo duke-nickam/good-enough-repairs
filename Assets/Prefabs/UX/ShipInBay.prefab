@@ -4928,7 +4928,7 @@ TextMesh:
   m_GameObject: {fileID: 8418390773331182395}
   m_Text: Release ship
   m_OffsetZ: 0
-  m_CharacterSize: 0.03125
+  m_CharacterSize: 0.0234375
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
