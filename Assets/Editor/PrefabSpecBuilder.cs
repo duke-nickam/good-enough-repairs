@@ -17,7 +17,9 @@
  * scene) and "SCREENSHOT: <absolute path>" for every screenshot. A bad spec stops
  * the build with an error that names the spec file. It never saves a half prefab.
  * Running a spec twice gives the same result: the prefab is overwritten and older
- * instances in the scene are replaced.
+ * instances in the scene are replaced. Every build reads the spec file from disk
+ * and refreshes the asset database first, so a shot always comes from the
+ * current specs.
  *
  * SPEC FILE RULES
  *   - File name ends with ".spec.json", anywhere under Assets/.
@@ -145,9 +147,10 @@
  *                      The inventory shot is taken with the warning dialog hidden.
  *                      All of this is done after the scene is saved, so the shown
  *                      bar sizes, colors and the open dialog do not end up in the
- *                      scene file. With option A the shot has the
- *                      reference width and height. Text elements (textKey) are in
- *                      the screenshot.
+ *                      scene file. After the shot the scene is loaded again from
+ *                      disk, which drops the shown state. With option A the shot has
+ *                      the reference width and height. Text elements (textKey) are
+ *                      in the screenshot.
  *       sampleDialog   only for a WarningView prefab: "release" (default) or "buy".
  *                      Which warning the screenshot shows.
  *       sampleConditions[]   optional. Sets the condition of sample ship parts
@@ -455,6 +458,7 @@ namespace GoodEnoughRepairs.EditorTools
         /// <summary>Builds every *.spec.json under Assets/.</summary>
         public static void BuildAll()
         {
+            AssetDatabase.Refresh();
             string[] files = Directory.GetFiles("Assets", "*" + SpecSuffix, SearchOption.AllDirectories);
             if (files.Length == 0) throw new InvalidOperationException("No " + SpecSuffix + " files found under Assets.");
             Array.Sort(files, StringComparer.Ordinal);
@@ -472,6 +476,8 @@ namespace GoodEnoughRepairs.EditorTools
                 throw new InvalidOperationException("Spec file not found: " + specPath);
             }
 
+            // Always read the spec from disk, and pick up changed assets first.
+            AssetDatabase.Refresh();
             PrefabSpec spec = JsonUtility.FromJson<PrefabSpec>(File.ReadAllText(specPath));
             if (spec == null) throw Fail(specPath, "the file could not be read as a spec");
             Validate(spec, specPath);
@@ -1142,6 +1148,10 @@ namespace GoodEnoughRepairs.EditorTools
             }
 
             if (screenPlacement) cam.ResetAspect();
+
+            // Load the saved scene again, so the shown sample state (bars, text, the
+            // open dialog) is dropped and never carried into the next build.
+            EditorSceneManager.OpenScene(sc.path, OpenSceneMode.Single);
         }
 
         // Gives every ShipView in the open scene its own sample ship (seeds from
@@ -1210,6 +1220,8 @@ namespace GoodEnoughRepairs.EditorTools
                 }
                 else
                 {
+                    // Opens the release warning: the mechanic's line, payment,
+                    // penalty and net lines are filled from the sample ship.
                     if (!warnView.OpenRelease(ship)) throw Fail(specPath, "the sample ship cannot be released");
                 }
             }
@@ -1248,17 +1260,14 @@ namespace GoodEnoughRepairs.EditorTools
 
             cam.targetTexture = oldTarget;
             RenderTexture.active = oldActive;
+            UnityEngine.Object.DestroyImmediate(rt);
 
             string dir = Path.Combine(Path.GetTempPath(), "ger_shots");
             Directory.CreateDirectory(dir);
-            string file = Path.GetFullPath(Path.Combine(dir, Path.GetFileName(fileName)));
-            File.WriteAllBytes(file, tex.EncodeToPNG());
-
+            string full = Path.GetFullPath(Path.Combine(dir, fileName));
+            File.WriteAllBytes(full, tex.EncodeToPNG());
             UnityEngine.Object.DestroyImmediate(tex);
-            rt.Release();
-            UnityEngine.Object.DestroyImmediate(rt);
-
-            Debug.Log("SCREENSHOT: " + file);
+            Debug.Log("SCREENSHOT: " + full);
         }
     }
 }
