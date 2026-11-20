@@ -13,6 +13,7 @@ namespace GoodEnoughRepairs
         public const string LinesFileName = "mechanic_lines.json";
         public const string BriefsFileName = "day_briefs.json";
         public const string PartsFileName = "part_catalog.json";
+        public const string UiTextFileName = "ui_text.json";
 
         // Always returns a usable ContentData, never null.
         public static ContentData Load()
@@ -20,7 +21,8 @@ namespace GoodEnoughRepairs
             MechanicLinesFile lines = LoadFile<MechanicLinesFile>(LinesFileName, ParseLines);
             DayBriefsFile briefs = LoadFile<DayBriefsFile>(BriefsFileName, ParseBriefs);
             PartCatalogFile parts = LoadFile<PartCatalogFile>(PartsFileName, ParseParts);
-            return new ContentData(lines, briefs, parts);
+            UiTextFile ui = LoadFile<UiTextFile>(UiTextFileName, ParseUiText);
+            return new ContentData(lines, briefs, parts, null, ui);
         }
 
         private delegate T ParseFunc<T>(string json, out string error) where T : class;
@@ -78,6 +80,14 @@ namespace GoodEnoughRepairs
             PartCatalogFile data = ParseJson<PartCatalogFile>(json, out error);
             if (data == null) return null;
             if (data.parts == null || data.parts.Length == 0) { error = "missing or empty key: parts"; return null; }
+            return data;
+        }
+
+        public static UiTextFile ParseUiText(string json, out string error)
+        {
+            UiTextFile data = ParseJson<UiTextFile>(json, out error);
+            if (data == null) return null;
+            if (data.entries == null || data.entries.Length == 0) { error = "missing or empty key: entries"; return null; }
             return data;
         }
 

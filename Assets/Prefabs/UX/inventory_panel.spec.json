@@ -13,6 +13,13 @@
     { "name": "Bin", "sprite": "box", "color": "#7A3B33", "sortingOrder": 1,
       "posY": -2.7, "scaleX": 7.0, "scaleY": 0.7 },
 
+    { "name": "TitleText", "textKey": "inventory_title", "sortingOrder": 6,
+      "posX": 0, "posY": 2.18, "textSize": 0.3, "textAlign": "center" },
+    { "name": "BinLabelText", "textKey": "bin_label", "sortingOrder": 6,
+      "posX": -3.4, "posY": -2.7, "textSize": 0.3, "textAlign": "left" },
+    { "name": "BinHintText", "textKey": "bin_hint", "sortingOrder": 6,
+      "posX": -2.6, "posY": -2.7, "textSize": 0.2, "textAlign": "left" },
+
     { "name": "Slot1", "posX": -1.9, "posY": 1.6 },
     { "name": "Slot1_Area", "parent": "Slot1", "sprite": "box", "color": "#3A3D45", "sortingOrder": 1, "scaleX": 3.4, "scaleY": 0.7 },
     { "name": "Slot1_Track", "parent": "Slot1", "sprite": "barLeft", "color": "track", "sortingOrder": 2, "posX": -1.5, "scaleX": 3.0, "scaleY": 0.3 },

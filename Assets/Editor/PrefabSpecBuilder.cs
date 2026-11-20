@@ -17,7 +17,9 @@
  * scene) and "SCREENSHOT: <absolute path>" for every screenshot. A bad spec stops
  * the build with an error that names the spec file. It never saves a half prefab.
  * Running a spec twice gives the same result: the prefab is overwritten and older
- * instances in the scene are replaced.
+ * instances in the scene are replaced. Every build reads the spec file from disk
+ * and refreshes the asset database first, so a shot always comes from the
+ * current specs.
  *
  * SPEC FILE RULES
  *   - File name ends with ".spec.json", anywhere under Assets/.
@@ -46,21 +48,51 @@
  *       parent         name of the parent object; empty means the root
  *       sprite         a sprite key from "sprites"; adds a SpriteRenderer with it
  *       color          SpriteRenderer color (only when "sprite" is set)
- *       sortingOrder   SpriteRenderer sorting order (only when "sprite" is set)
+ *       sortingOrder   SpriteRenderer sorting order (only when "sprite" is set);
+ *                      also the sorting order of a text element and of a "Canvas"
  *       posX, posY, posZ     local position
  *       scaleX, scaleY, scaleZ   local scale; 0 or left out means 1
  *       components[]   extra components to attach, from this fixed list:
  *                        "ShipView"        the ship view (UX assembly)
  *                        "InventoryView"   the inventory panel with drag and drop
  *                        "WarningView"     the buy and release warning dialog
+ *                        "TextKeyView"     a text element component (not needed
+ *                                          when "textKey" is set)
  *                        "SpriteRenderer"  an empty SpriteRenderer (not needed
  *                                          when "sprite" is set)
+ *                        "Canvas"          a world-space UI canvas (with a
+ *                                          raycaster) at the object's sortingOrder.
+ *                                          UI objects below it are placed in prefab
+ *                                          units, like any other object.
+ *                        "Image"           a see-through image that blocks clicks.
+ *                                          Its size is 1 unit times the object's
+ *                                          scale (use scaleX and scaleY). It must
+ *                                          be under an object with "Canvas".
+ *                        "Button"          a see-through UI button (it has an
+ *                                          Image too). Same size rule as "Image".
+ *                                          Under an object with "Canvas".
  *                      An unknown name stops the build. A new type needs one line
  *                      in the builder's code.
+ *       textKey        key in ui_text.json. Makes the object a text element: the
+ *                      builder adds a TextMesh with a built-in font and a
+ *                      TextKeyView that fills it from the key at start and when
+ *                      the numbers change. Leave it out for no text. Keep the
+ *                      object's scale at 1 (use textSize to size the text).
+ *                      The player's words never go in the spec, only the key.
+ *       textSize       text height in prefab units, about; 0 or left out means 0.3
+ *       textColor      color of the text (same color rules as "color"); empty
+ *                      means white
+ *       textAlign      "left", "center" or "right": which point of the text sits
+ *                      at the object's position. Empty means "center".
+ *       Example: { "name": "PaymentText", "textKey": "payment", "sortingOrder": 6,
+ *                  "posX": 0, "posY": 1.8, "textSize": 0.3, "textAlign": "center" }
+ *       Which keys exist and what {0}, {1} mean is in
+ *       Assets/StreamingAssets/content/ui_text.json. A ShipView fills the numbers
+ *       of its own text elements once they are linked (see TEXT ON A SHIP).
  *   links[]       sets a reference field on a component to another object:
  *       owner          name of the object that holds the component
- *       component      "ShipView", "InventoryView", "WarningView", "SpriteRenderer"
- *                      or "Transform"
+ *       component      "ShipView", "InventoryView", "WarningView", "TextKeyView",
+ *                      "SpriteRenderer" or "Transform"
  *       field          the serialized field name, for example "body" or "barFills"
  *       index          -1 for a single field (default is 0, so write -1); 0 or more
  *                      for an element of an array field (the array grows if needed)
@@ -70,7 +102,7 @@
  *                      arrays of plain references (barFills, slotAreas, buyButtons).
  *       target         name of the object to point at
  *       targetType     what to point at on the target: "GameObject",
- *                      "SpriteRenderer" or "Transform"
+ *                      "SpriteRenderer", "Transform", "TextKeyView" or "Button"
  *   scene         optional. Leave it out to only build the prefab.
  *       path           scene file, for example "Assets/Scenes/Main.unity". It must
  *                      exist (the builder never creates scenes).
@@ -107,13 +139,19 @@
  *                      the builder shows a docked sample ship (day 1, seed 1) on the
  *                      instance, or, for an InventoryView, the sample ship's five
  *                      parts in inventory slots 1-5, or, for a WarningView, the
- *                      warning dialog open on the sample ship. With "bays", the
- *                      first instance gets the seed 1 ship and every other instance
- *                      its own sample ship (seed 2, 3). This is done after
- *                      the scene is saved, so the shown bar sizes and colors do not
- *                      end up in the scene file. With option A the shot has the
- *                      reference width and height. Text drawn with OnGUI (button
- *                      labels, the dialog message) is not in the screenshot.
+ *                      warning dialog open on the sample ship with its message
+ *                      lines filled. With "bays", the first instance gets the seed 1
+ *                      ship and every other instance its own sample ship (seed 2,
+ *                      3). For the inventory and warning shots, every ShipView in
+ *                      the scene gets its own sample ship too, so no '{' text shows.
+ *                      Every shot except the warning shot is taken with the warning
+ *                      dialog hidden.
+ *                      All of this is done after the scene is saved, so the shown
+ *                      bar sizes, colors and the open dialog do not end up in the
+ *                      scene file. After the shot the scene is loaded again from
+ *                      disk, which drops the shown state. With option A the shot has
+ *                      the reference width and height. Text elements (textKey) are
+ *                      in the screenshot.
  *       sampleDialog   only for a WarningView prefab: "release" (default) or "buy".
  *                      Which warning the screenshot shows.
  *       sampleConditions[]   optional. Sets the condition of sample ship parts
@@ -178,25 +216,60 @@
  *     "index": -1, "target": "ReleaseButton", "targetType": "SpriteRenderer" }
  *   Without these links the ship view still works, it just has no buttons.
  *
+ * TEXT ON A SHIP (ShipView)
+ *   Add text elements (objects with "textKey") and link them with targetType
+ *   "TextKeyView". Fields, all optional:
+ *     buyTexts       array of five, part order, index 0 to 4: key "buy_button",
+ *                    the view fills {0} with the price. Without one, the label is
+ *                    drawn with OnGUI.
+ *     releaseText    index -1: key "release_button". Without it, drawn with OnGUI.
+ *     typeText       index -1: the view sets the key (type_fighter or type_freighter).
+ *                    Give it any textKey, for example "type_fighter".
+ *     paymentText    index -1: key "payment", the view fills {0}.
+ *     requiredText   index -1: key "needs", the view fills {0}.
+ *   Example link: { "owner": "ShipInBay", "component": "ShipView",
+ *     "field": "paymentText", "index": -1, "target": "PaymentText",
+ *     "targetType": "TextKeyView" }
+ *
  * WARNING DIALOG (WarningView)
  *   Put "WarningView" on the root of its own prefab. One dialog serves all bays.
  *   Fields to link, all with "index": -1:
- *     dialogRoot      GameObject: a child that holds all the dialog sprites. It is
+ *     dialogRoot      GameObject: a child that holds all the dialog objects. It is
  *                     hidden when the game starts and shown while a warning is open.
  *                     The WarningView must not be on this object.
  *     panel           SpriteRenderer: dialog background
- *     textArea        SpriteRenderer, optional: where the message is written (the
- *                     panel is used when empty)
- *     confirmButton   SpriteRenderer: click area of Confirm
- *     cancelButton    SpriteRenderer: click area of Cancel
+ *     textArea        SpriteRenderer, optional
+ *     confirmButton   SpriteRenderer: the Confirm button sprite (the look)
+ *     cancelButton    SpriteRenderer: the Cancel button sprite (the look)
+ *     confirmUiButton Button: a "Button" object over the Confirm sprite
+ *     cancelUiButton  Button: a "Button" object over the Cancel sprite
+ *     clickBlocker    GameObject: an "Image" object, big enough to cover the
+ *                     screen, below the buttons in the same "Canvas". It is shown
+ *                     and hidden with the dialog and blocks UI clicks behind it.
+ *     titleText       TextKeyView, optional: the title. The view sets its key.
+ *     confirmText     TextKeyView, optional: the Confirm label. The view sets its key.
+ *     cancelText      TextKeyView, optional: the Cancel label. The view sets its key.
+ *     Message lines, TextKeyView, each optional (a line with no link is not shown).
+ *     The view shows only the lines that apply and fills their {0}, {1}:
+ *     mechanicText        release: the mechanic's line (give any textKey)
+ *     buyPriceText        buy: key buy_price
+ *     buyBinnedText       buy, when the old part is binned: key buy_binned
+ *     releasePaymentText  release: key release_payment
+ *     releasePenaltyText  release, when parts are fitted: key release_penalty
+ *     releaseNetText      release: key release_net
  *   Example link: { "owner": "WarningDialog", "component": "WarningView",
  *     "field": "dialogRoot", "index": -1, "target": "DialogRoot",
  *     "targetType": "GameObject" }
- *   Connect it to the station with "stationField": "warningView".
- *   Give the sprites a high sortingOrder so the dialog is above the ships.
+ *   Connect it to the station with "stationField": "warningView". When a scene
+ *   gets a WarningView, the builder also adds an EventSystem (Input System UI
+ *   module) if the scene has none, so the UI buttons work.
+ *   Give the sprites and the "Canvas" a high sortingOrder so the dialog is above
+ *   the ships.
  *
  * INVENTORY PANEL (InventoryView)
- *   Put "InventoryView" on the root. Fields to link:
+ *   Put "InventoryView" on the root. Its labels (keys "inventory_title",
+ *   "bin_label", "bin_hint") are plain text elements with "textKey" and need no
+ *   link. Fields to link:
  *     slots   array of 10 records, slot 1 is index 0. Link each field with
  *             "field": "slots", "index": <slot>, "subField": <name below>:
  *               area          SpriteRenderer: drag handle and drop target of the slot
@@ -293,6 +366,10 @@ namespace GoodEnoughRepairs.EditorTools
         public float scaleY;
         public float scaleZ;
         public string[] components;
+        public string textKey;
+        public float textSize;
+        public string textColor;
+        public string textAlign;
     }
 
     [Serializable]
@@ -367,6 +444,11 @@ namespace GoodEnoughRepairs.EditorTools
     {
         private const string SpecSuffix = ".spec.json";
         private const string BaySuffix = "_Bay";
+        private const float DefaultTextSize = 0.3f;
+
+        // TextMesh: line height in world units is about fontSize * characterSize * 0.1.
+        private const int TextFontSize = 64;
+        private const float TextSizeDivisor = 6.4f;
 
         /// <summary>Name of the scene instance for a bay entry of a spec.</summary>
         public static string InstanceName(string rootName, int bay)
@@ -377,6 +459,7 @@ namespace GoodEnoughRepairs.EditorTools
         /// <summary>Builds every *.spec.json under Assets/.</summary>
         public static void BuildAll()
         {
+            AssetDatabase.Refresh();
             string[] files = Directory.GetFiles("Assets", "*" + SpecSuffix, SearchOption.AllDirectories);
             if (files.Length == 0) throw new InvalidOperationException("No " + SpecSuffix + " files found under Assets.");
             Array.Sort(files, StringComparer.Ordinal);
@@ -394,6 +477,8 @@ namespace GoodEnoughRepairs.EditorTools
                 throw new InvalidOperationException("Spec file not found: " + specPath);
             }
 
+            // Always read the spec from disk, and pick up changed assets first.
+            AssetDatabase.Refresh();
             PrefabSpec spec = JsonUtility.FromJson<PrefabSpec>(File.ReadAllText(specPath));
             if (spec == null) throw Fail(specPath, "the file could not be read as a spec");
             Validate(spec, specPath);
@@ -623,19 +708,73 @@ namespace GoodEnoughRepairs.EditorTools
                 sr.sortingOrder = o.sortingOrder;
             }
 
+            if (!string.IsNullOrEmpty(o.textKey))
+            {
+                AddText(go, o, specPath);
+            }
+
             if (o.components != null)
             {
                 for (int i = 0; i < o.components.Length; i++)
                 {
-                    AddComponentByName(go, o.components[i], specPath);
+                    AddComponentByName(go, o.components[i], o, specPath);
                 }
             }
             return go;
         }
 
+        // A text element: a TextMesh with a built-in font, and a TextKeyView that
+        // fills it from the text key.
+        private static void AddText(GameObject go, SpecObject o, string specPath)
+        {
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (font == null) throw Fail(specPath, o.name + ": the built-in font could not be loaded");
+
+            TextAnchor anchor;
+            TextAlignment alignment;
+            switch (string.IsNullOrEmpty(o.textAlign) ? "center" : o.textAlign)
+            {
+                case "left":
+                    anchor = TextAnchor.MiddleLeft;
+                    alignment = TextAlignment.Left;
+                    break;
+                case "center":
+                    anchor = TextAnchor.MiddleCenter;
+                    alignment = TextAlignment.Center;
+                    break;
+                case "right":
+                    anchor = TextAnchor.MiddleRight;
+                    alignment = TextAlignment.Right;
+                    break;
+                default:
+                    throw Fail(specPath, o.name + ": textAlign must be left, center or right");
+            }
+            if (o.textSize < 0f) throw Fail(specPath, o.name + ": textSize must not be negative");
+
+            TextMesh tm = go.AddComponent<TextMesh>();
+            tm.font = font;
+            tm.fontSize = TextFontSize;
+            tm.characterSize = (o.textSize > 0f ? o.textSize : DefaultTextSize) / TextSizeDivisor;
+            tm.anchor = anchor;
+            tm.alignment = alignment;
+            tm.color = ParseColor(o.textColor, specPath, o.name);
+
+            MeshRenderer mr = go.GetComponent<MeshRenderer>();
+            if (mr != null)
+            {
+                mr.sharedMaterial = font.material;
+                mr.sortingOrder = o.sortingOrder;
+            }
+
+            TextKeyView view = go.AddComponent<TextKeyView>();
+            view.textKey = o.textKey;
+            view.textMesh = tm;
+            view.Refresh();
+        }
+
         // The fixed list of components a spec may attach. Each name is one direct,
         // compile-time reference. To allow a new type, add one case here.
-        private static void AddComponentByName(GameObject go, string name, string specPath)
+        private static void AddComponentByName(GameObject go, string name, SpecObject o, string specPath)
         {
             switch (name)
             {
@@ -648,8 +787,20 @@ namespace GoodEnoughRepairs.EditorTools
                 case "WarningView":
                     go.AddComponent<WarningView>();
                     return;
+                case "TextKeyView":
+                    if (go.GetComponent<TextKeyView>() == null) go.AddComponent<TextKeyView>();
+                    return;
                 case "SpriteRenderer":
                     if (go.GetComponent<SpriteRenderer>() == null) go.AddComponent<SpriteRenderer>();
+                    return;
+                case "Canvas":
+                    UiParts.MakeCanvas(go, o.sortingOrder);
+                    return;
+                case "Image":
+                    UiParts.MakeImage(go);
+                    return;
+                case "Button":
+                    UiParts.MakeButton(go);
                     return;
                 default:
                     throw Fail(specPath, go.name + ": unknown component " + name);
@@ -669,6 +820,9 @@ namespace GoodEnoughRepairs.EditorTools
                     break;
                 case "WarningView":
                     c = go.GetComponent<WarningView>();
+                    break;
+                case "TextKeyView":
+                    c = go.GetComponent<TextKeyView>();
                     break;
                 case "SpriteRenderer":
                     c = go.GetComponent<SpriteRenderer>();
@@ -695,6 +849,14 @@ namespace GoodEnoughRepairs.EditorTools
                     SpriteRenderer sr = go.GetComponent<SpriteRenderer>();
                     if (sr == null) throw Fail(specPath, go.name + " has no SpriteRenderer");
                     return sr;
+                case "TextKeyView":
+                    TextKeyView tv = go.GetComponent<TextKeyView>();
+                    if (tv == null) throw Fail(specPath, go.name + " has no TextKeyView (give it a textKey)");
+                    return tv;
+                case "Button":
+                    Component button = UiParts.GetButton(go);
+                    if (button == null) throw Fail(specPath, go.name + " has no Button (add the \"Button\" component)");
+                    return button;
                 default:
                     throw Fail(specPath, "unknown targetType " + type);
             }
@@ -960,6 +1122,9 @@ namespace GoodEnoughRepairs.EditorTools
             InventoryView invView = first.GetComponent<InventoryView>();
             WarningView warnView = first.GetComponent<WarningView>();
 
+            // The warning's UI buttons need an event system in the scene.
+            if (warnView != null) UiParts.EnsureEventSystem();
+
             EditorSceneManager.MarkSceneDirty(first.scene);
             EditorSceneManager.SaveScene(first.scene);
             Debug.Log("MADE: " + sc.path);
@@ -984,6 +1149,27 @@ namespace GoodEnoughRepairs.EditorTools
             }
 
             if (screenPlacement) cam.ResetAspect();
+
+            // Load the saved scene again, so the shown sample state (bars, text, the
+            // open dialog) is dropped and never carried into the next build.
+            EditorSceneManager.OpenScene(sc.path, OpenSceneMode.Single);
+        }
+
+        // Gives every ShipView in the open scene its own sample ship (seeds from
+        // firstSeed), so no '{' text shows. Not saved: done after the scene is saved.
+        private static void FillSampleShips(BalanceData balance, int surplusMargin, int firstSeed)
+        {
+            ShipView[] views = UnityEngine.Object.FindObjectsByType<ShipView>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Array.Sort(views, (a, b) => string.CompareOrdinal(a.name, b.name));
+            for (int i = 0; i < views.Length; i++)
+            {
+                Ship s = ShipFactory.Create(balance, balance.days[0], new System.Random(firstSeed + i));
+                DockingBays db = new DockingBays();
+                db.TryDock(s);
+                views[i].Bind(new BuyRelease(db, new Inventory(), balance), null);
+                views[i].Show(s, surplusMargin, null);
+            }
         }
 
         // Done after the scene is saved: showing the sample changes bar scales and
@@ -994,6 +1180,16 @@ namespace GoodEnoughRepairs.EditorTools
         {
             BalanceData balance = BalanceLoader.Load();
             if (balance == null) throw Fail(specPath, "the balance could not be loaded for the sample ship");
+
+            // Every shot except the warning shot is taken with the warning dialog
+            // closed. In edit mode WarningView.Awake does not run, so the dialog
+            // would stay open (with raw text) in the scene.
+            if (warnView == null)
+            {
+                WarningView sceneWarning = UnityEngine.Object.FindFirstObjectByType<WarningView>(
+                    FindObjectsInactive.Include);
+                if (sceneWarning != null) sceneWarning.Close();
+            }
 
             int surplusMargin = BarBand.SurplusMargin(balance.requiredFighterPercent, balance.requiredFreighterPercent);
             Ship ship = ShipFactory.Create(balance, balance.days[0], new System.Random(1));
@@ -1018,6 +1214,9 @@ namespace GoodEnoughRepairs.EditorTools
             }
             else if (warnView != null)
             {
+                // Every bay ship view in the scene gets its own sample ship.
+                FillSampleShips(balance, surplusMargin, 2);
+
                 BuyRelease commands = new BuyRelease(bays, inventory, balance);
                 warnView.Bind(commands, ContentLoader.Load());
                 if (dialog == "buy")
@@ -1032,11 +1231,16 @@ namespace GoodEnoughRepairs.EditorTools
                 }
                 else
                 {
-                    warnView.OpenRelease(ship);
+                    // Opens the release warning: the mechanic's line, payment,
+                    // penalty and net lines are filled from the sample ship.
+                    if (!warnView.OpenRelease(ship)) throw Fail(specPath, "the sample ship cannot be released");
                 }
             }
             else
             {
+                // Every bay ship view in the scene gets its own sample ship.
+                FillSampleShips(balance, surplusMargin, 2);
+
                 // The sample ship's five parts go into inventory slots 1-5.
                 PartType[] types = PartTypes.All;
                 for (int i = 0; i < types.Length; i++)
@@ -1062,17 +1266,14 @@ namespace GoodEnoughRepairs.EditorTools
 
             cam.targetTexture = oldTarget;
             RenderTexture.active = oldActive;
+            UnityEngine.Object.DestroyImmediate(rt);
 
             string dir = Path.Combine(Path.GetTempPath(), "ger_shots");
             Directory.CreateDirectory(dir);
-            string file = Path.GetFullPath(Path.Combine(dir, Path.GetFileName(fileName)));
-            File.WriteAllBytes(file, tex.EncodeToPNG());
-
+            string full = Path.GetFullPath(Path.Combine(dir, fileName));
+            File.WriteAllBytes(full, tex.EncodeToPNG());
             UnityEngine.Object.DestroyImmediate(tex);
-            rt.Release();
-            UnityEngine.Object.DestroyImmediate(rt);
-
-            Debug.Log("SCREENSHOT: " + file);
+            Debug.Log("SCREENSHOT: " + full);
         }
     }
 }
