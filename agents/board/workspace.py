@@ -18,6 +18,10 @@ class WorkspaceError(RuntimeError):
     pass
 
 
+class MergeConflict(WorkspaceError):
+    pass
+
+
 class GitWorkspace:
     def __init__(self, root, repo):
         self.root = pathlib.Path(root)
@@ -58,10 +62,25 @@ class GitWorkspace:
             self.git("checkout", branch)
             if remote:
                 self.git("pull", "--ff-only", "origin", branch)
+            self.update_from_base(branch)
         elif remote:
             self.git("checkout", "-b", branch, f"origin/{branch}")
+            self.update_from_base(branch)
         else:
             self.git("checkout", "-b", branch, f"origin/{self.base}")
+
+    def update_from_base(self, branch):
+        """Merge main into the epic branch when main moved on (a runner fix, a merged tool), as the designer's
+        "Update from main" would. A conflict is undone and reported: the designer decides."""
+        self.git("fetch", "origin", self.base)
+        if self.git("rev-list", "--count", f"HEAD..origin/{self.base}", check=False) in ("", "0"):
+            return
+        res = subprocess.run(["git", "merge", "--no-edit", f"origin/{self.base}"], cwd=self.root,
+                             capture_output=True, text=True, encoding="utf-8")
+        if res.returncode != 0:
+            self.git("merge", "--abort", check=False)
+            raise MergeConflict(f"{branch} conflicts with {self.base}: {(res.stdout or res.stderr).strip()[-400:]}")
+        self.git("push", "-u", "origin", branch)
 
     def read(self, path):
         p = self.root / path

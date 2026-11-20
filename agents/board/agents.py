@@ -54,6 +54,29 @@ says so. If a task needs a fact the GDD leaves open (a list, a name, a value two
 designer instead of choosing it. Formats that the plan's own tasks create are theirs to define. Keep the plan as small as the request
 allows: every task costs tokens."""
 
+TRIAGE_FORMAT = """A task's agent stopped with a question instead of finishing. Decide it like a producer.
+Reply with one JSON object only, no other text. One of:
+{"verdict": "answer", "summary": "<one sentence>", "answer": "<the answer, naming where the GDD, docs/crew/ or the
+  card gives it>"}
+{"verdict": "plan", "summary": "<one sentence: what is missing and who builds it>",
+ "task": {"title": "<what the agent does>", "agent": "<agent key>", "reviewer": "<agent key>", "what": "<instructions>",
+   "acceptance": ["<criterion>"], "files": ["<repo path>"], "reads": ["<repo path>"],
+   "checks": ["python agents/checks/<name>.py <args>"]}}
+{"verdict": "tool", "summary": "<one sentence>", "title": "<the tool, e.g. Builder can save objects hidden>",
+ "goal": "<what the tool lets the crew do, one sentence>", "done_when": ["<a fact the designer can check>"]}
+{"verdict": "ask", "summary": "<one sentence>", "questions": ["<a question only the designer can decide>"]}
+answer: the GDD, docs/crew/ or the card already answer the question.
+plan or tool: something outside the agent's files is missing. Choose plan for a small piece only this epic needs,
+one task in size. Choose tool for a general tool other epics will use too, or anything bigger than one task: it
+becomes its own request with its own epic, done first; the blocked task waits until that request is closed.
+plan: the agent cannot finish because something outside its own files is missing (a tool feature, a view field,
+code), and another agent can build it within this epic's goal. Plan exactly that one task; the blocked task then
+waits for it and starts again. Never widen the epic's goal, and never plan work that belongs to another epic on the
+board. Parts the blocked agent can still do itself stay with it. The new task follows these plan rules:
+""" + PLAN_FORMAT[PLAN_FORMAT.index("Rules:"):] + """
+ask: only the designer can decide it (taste, scope, a gap in the GDD), or the missing piece belongs to another epic
+on the board."""
+
 WORK_FORMAT = """Reply in exactly this format, nothing before it:
 === FILE: <path from your task's Files> ===
 <the complete new content of the file>
@@ -503,6 +526,20 @@ class ClaudeAgents:
         if problems:
             prompt += "\n\nYour last plan broke these rules; send a corrected one:\n" + "\n".join(f"- {x}" for x in problems)
         text, usage, model = self._call("director", "Task: plan the tasks.\n\n" + PLAN_FORMAT, prompt)
+        return extract_json(text), usage, model
+
+    def triage(self, card_md, question, thread, board_summary, repo_files, problems=None):
+        """The Director reads a task's question first: answers it, plans the one missing task, or asks the designer."""
+        prompt = (f"GDD:\n\n{gdd_sections(self.gdd, ['*'])}\n\n---\n\nThe blocked task's card:\n\n{card_md}\n\n---\n\n"
+                  f"Its agent's question:\n\n{question}\n\n---\n\nEarlier in this task:\n\n{thread or 'nothing yet'}"
+                  f"\n\n---\n\nThe board now:\n{board_summary or 'empty'}\n\nFiles in the repo:\n{repo_files}")
+        if self.crew_docs:
+            prompt += f"\n\n---\n\nThe crew's documents (docs/crew/), approved by the designer:\n\n{self.crew_docs}"
+        if self.check_usage:
+            prompt += f"\n\n---\n\nThe check scripts and how to call them:\n\n{self.check_usage}"
+        if problems:
+            prompt += "\n\nYour last task broke these rules; send a corrected one:\n" + "\n".join(f"- {x}" for x in problems)
+        text, usage, model = self._call("director", "Task: decide this question.\n\n" + TRIAGE_FORMAT, prompt)
         return extract_json(text), usage, model
 
     def work(self, agent, card_md, thread, files, reads, attempt, check_feedback=None, design_note=False):

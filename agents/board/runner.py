@@ -16,6 +16,7 @@ from .agents import (AgentError, added_file_problems, describe_tokens, parse_des
                      validate_gaps, validate_plan)
 from .model import AGENTS, STANDING_GOAL, Card, crew_comment, slug
 from .priority import rank
+from .workspace import MergeConflict
 
 ACTIVE = ("In progress", "Waiting for review", "In review")
 ASCII_ONLY = (".cs", ".py", ".asmdef", ".asmref", ".json")  # code and data; player text in content/ is exempt
@@ -91,6 +92,7 @@ class Runner:
 
     def run_once(self):
         self.cards = {}
+        self.dep_states = {}
         self.sync()
         self.handle_requests()
         self.sync()
@@ -485,16 +487,31 @@ class Runner:
         for t in tasks:  # interrupted work first
             if t.status in ACTIVE:
                 return t
+        ready = []
         for t in tasks:
             if t.status != "Todo":
                 continue
             card = self.card(t.number)
             if not card:
                 continue
-            deps = [by_number.get(d) for d in card.depends_on]
-            if all(d and (d.status == "Done" or d.state == "CLOSED") for d in deps):
-                return t
-        return None
+            if all(self.dep_done(d, by_number) for d in card.depends_on):
+                ready.append((t, card))
+        here = [t for t, c in ready if c.epic == getattr(self, "current_epic", None)]
+        return (here or [t for t, _ in ready] or [None])[0]  # stay in the current epic: no needless branch switch
+
+    def dep_done(self, d, by_number):
+        """A dependency is a task on the board, or a tool request (closed when its goal is met)."""
+        i = by_number.get(d)
+        if i:
+            return i.status == "Done" or i.state == "CLOSED"
+        if not hasattr(self, "dep_states"):
+            self.dep_states = {}
+        if d not in self.dep_states:
+            try:
+                self.dep_states[d] = self.board.issue(d).state
+            except Exception:
+                self.dep_states[d] = "OPEN"
+        return self.dep_states[d] == "CLOSED"
 
     def work(self, t, items):
         n = t.number
@@ -509,7 +526,18 @@ class Runner:
             log("Runner", f"#{n}: unreadable card, Needs designer")
             return
         agent, who = card.agent, AGENTS[card.agent]
-        self.ws.use_branch(self.branch(epic.number, epic.title))
+        try:
+            self.ws.use_branch(self.branch(epic.number, epic.title))
+        except MergeConflict as e:
+            self.board.set_status(n, "Needs designer")
+            alert(self.s, "needs_designer")
+            self.board.comment(n, crew_comment(
+                "Runner", f"The epic branch could not take the newest main: {e}\n\nNothing was changed. In GitHub "
+                          "Desktop, switch to the epic branch, run Branch > Update from main, solve the conflict, "
+                          "push, then move this task to Todo.", "needs_designer"))
+            log("Runner", f"#{n}: merge conflict with main, Needs designer")
+            return
+        self.current_epic = epic.number
         resume_review = t.status in ("Waiting for review", "In review")
         usages = []
         if resume_review:
@@ -554,6 +582,8 @@ class Runner:
                     return
                 if question:
                     keep_tries("failed checks, then a question")
+                    if self.s.get("director_triage", True) and self.triage(t, card, issue, question, usages, who, attempt):
+                        return
                     total = self.add_tokens(t, usages)
                     self.board.set_status(n, "Needs designer")
                     alert(self.s, "needs_designer")
@@ -771,6 +801,118 @@ class Runner:
                             f"follows the note and your answers.\n\nTask total: {total:,} tokens.",
                 "needs_designer", attempt=attempt))
             log("Director", f"#{n}: design note has open questions, Needs designer")
+
+    def triage(self, t, card, issue, question, usages, who, attempt):
+        """A task's question goes to the Director first, as to a producer. It answers what the GDD, docs/crew/ or the
+        card already answer, plans the one missing task another agent builds (the blocked task then waits for it),
+        or leaves it to the designer. Returns True when handled without the designer."""
+        n = t.number
+        items = {i.number: i for i in self.board.items()}
+        repo = self.ws.list_files()
+        problems, verdict, used = None, None, []
+        for _ in range(2):  # one retry if the planned task breaks the plan rules
+            try:
+                verdict, usage, _ = self.agents.triage(card.to_markdown(), question, self.thread_text(issue),
+                                                       self.board_summary(items), repo, problems)
+                used.append(usage)
+            except (AgentError, ValueError) as e:
+                log("Director", f"#{n}: triage reply unusable ({e})")
+                return False
+            if verdict.get("verdict") != "plan":
+                break
+            task = dict(verdict.get("task") or {}, key="t1", depends_on=[])
+            problems = validate_plan({"epics": [{"title": "triage", "tasks": [task]}]}, set(repo.splitlines()))
+            others = {}
+            for i in items.values():
+                c = self.card(i.number) if i.kind == "task" and i.state == "OPEN" else None
+                for f in (c.files if c else []):
+                    others[f] = f"#{i.number}"
+            problems += [f"{f}: another open task ({others[f]}) writes it" for f in task.get("files") or [] if f in others]
+            if not problems:
+                break
+        kind = (verdict or {}).get("verdict")
+        if kind == "plan" and problems:
+            log("Director", f"#{n}: could not plan the missing task, the designer decides")
+            kind = "ask"
+        if kind == "answer" and attempt >= self.max:
+            kind = "ask"  # no attempt left to follow the answer: the designer decides
+        if kind == "tool":
+            depth = self.tool_depth(card.epic) + 1
+            if depth > int(self.s.get("tool_depth", 2)):
+                log("Director", f"#{n}: a tool {depth} levels deep, the designer decides")
+                kind = "ask"
+        if kind not in ("answer", "plan", "tool"):
+            self.add_tokens(t, used)
+            return False
+        total = self.add_tokens(t, usages + used)
+        if kind == "answer":
+            self.board.set_status(n, "Todo")
+            self.board.comment(n, crew_comment(
+                who, f"Question (attempt {attempt}):\n\n{question}", "question_asked", attempt=attempt))
+            self.board.comment(n, crew_comment(
+                "Director", f"Answer: {verdict.get('answer', '')}\n\nBack to Todo; the next attempt follows this "
+                            f"answer.\n\nTask total: {total:,} tokens.", "triage_answer"))
+            log("Director", f"#{n}: answered the agent's question, back to Todo")
+            return True
+        if kind == "tool":
+            done_when = "\n".join(verdict.get("done_when") or [])
+            m = self.board.create_issue(verdict.get("title", "Tool"), (
+                f"**Goal:** {verdict.get('goal', '')}\n**Done when:** The epic is merged.\n{done_when}\n\n"
+                f"**Needed by:** #{n}\n\nOpened by the Director: #{n} ({who}) needs this tool. It counts as confirmed; "
+                "close it to stop it."), ["request"])
+            self.block_on(t, card, m, attempt, who, question, total,
+                          f"{verdict.get('summary', '')}\n\nThis needs a tool other work will use too, so I opened "
+                          f"request #{m} {verdict.get('title', '')}. It gets its own epic and runs first. This task "
+                          f"depends on it and starts again, with fresh attempts, when #{m} is closed.")
+            log("Director", f"#{n}: opened tool request #{m}; #{n} waits for it")
+            return True
+        task = verdict["task"]
+        m = self.board.create_issue(task["title"], "(The task card follows.)", ["task"])
+        new = Card(agent=task["agent"], reviewer=task["reviewer"], epic=card.epic, what=task.get("what", ""),
+                   acceptance=task["acceptance"], files=task["files"], reads=task.get("reads") or [],
+                   checks=task.get("checks") or [], depends_on=[])
+        self.board.set_body(m, new.to_markdown())
+        self.cards[m] = new
+        self.board.add_item(m, "Todo", attempt=0)
+        self.board.add_sub_issue(card.epic, m)
+        self.block_on(t, card, m, attempt, who, question, total,
+                      f"{verdict.get('summary', '')}\n\nI planned #{m} {task['title']} ({AGENTS[task['agent']]}, "
+                      f"reviewed by {AGENTS[task['reviewer']]}). This task now depends on it and starts again, with "
+                      f"fresh attempts, when #{m} is Done.")
+        self.board.comment(card.epic, crew_comment(
+            "Director", f"Added #{m} {task['title']} ({AGENTS[task['agent']]}): #{n} needs it.", "triage_plan", task=m))
+        log("Director", f"#{n}: planned #{m} for the missing piece; #{n} waits for it")
+        return True
+
+    def block_on(self, t, card, m, attempt, who, question, total, text):
+        """The blocked task depends on #m (a task or a tool request) and starts again with fresh attempts."""
+        n = t.number
+        body = self.board.issue(n).body
+        card.depends_on = card.depends_on + [m]
+        line = "**Depends on:** " + ", ".join(f"#{d}" for d in card.depends_on)
+        self.board.set_body(n, re.sub(r"^\*\*Depends on:\*\*.*$", lambda _: line, body, count=1, flags=re.M))
+        self.cards[n] = card
+        self.board.set_attempt(n, 0)
+        self.board.set_status(n, "Todo")
+        self.board.comment(n, crew_comment(
+            who, f"Question (attempt {attempt}):\n\n{question}", "question_asked", attempt=attempt))
+        self.board.comment(n, crew_comment("Director", f"{text}\n\nTask total: {total:,} tokens.", "triage_plan",
+                                           task=m))
+
+    def tool_depth(self, epic_number):
+        """How many tool requests deep an epic is: 0 for normal work, 1 for a tool, 2 for a tool's tool."""
+        depth, seen = 0, set()
+        while epic_number and epic_number not in seen:
+            seen.add(epic_number)
+            m = re.search(r"\*\*Request:\*\* #(\d+)", self.board.issue(epic_number).body or "")
+            req = self.board.issue(int(m.group(1))) if m else None
+            need = re.search(r"\*\*Needed by:\*\* #(\d+)", (req.body if req else "") or "")
+            if not need:
+                return depth
+            depth += 1
+            blocked = self.card(int(need.group(1)))
+            epic_number = blocked.epic if blocked else None
+        return depth
 
     def reject(self, t, attempt, text, usages, who, failed=None, stuck=False):
         n = t.number
