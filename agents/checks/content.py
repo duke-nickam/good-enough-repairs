@@ -29,7 +29,7 @@ LONG_DASHES = {
 }
 
 MOMENTS = [
-    "day_start", "release_warning", "penalty_fill", "day_end", "bankruptcy",
+    "day_start", "release_warning", "buy_warning", "penalty_fill", "day_end", "bankruptcy",
     "run_end_win", "run_end_bankrupt", "tutorial_hint", "fallback_hint",
 ]
 PART_TYPES = ["engine", "hull_plate", "shield_generator", "thruster", "power_core"]
