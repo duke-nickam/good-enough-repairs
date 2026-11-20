@@ -667,7 +667,7 @@ TextMesh:
   m_GameObject: {fileID: 758182096870128681}
   m_Text: Buy {0}
   m_OffsetZ: 0
-  m_CharacterSize: 0.03125
+  m_CharacterSize: 0.034375
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -996,7 +996,7 @@ TextMesh:
   m_GameObject: {fileID: 1492624068443245829}
   m_Text: Buy {0}
   m_OffsetZ: 0
-  m_CharacterSize: 0.03125
+  m_CharacterSize: 0.034375
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -2319,7 +2319,7 @@ TextMesh:
   m_GameObject: {fileID: 3374863881444380394}
   m_Text: Buy {0}
   m_OffsetZ: 0
-  m_CharacterSize: 0.03125
+  m_CharacterSize: 0.034375
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -2802,7 +2802,7 @@ TextMesh:
   m_GameObject: {fileID: 3911730537336255084}
   m_Text: Buy {0}
   m_OffsetZ: 0
-  m_CharacterSize: 0.03125
+  m_CharacterSize: 0.034375
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -3012,7 +3012,7 @@ TextMesh:
   m_GameObject: {fileID: 4574520365963888756}
   m_Text: Buy {0}
   m_OffsetZ: 0
-  m_CharacterSize: 0.03125
+  m_CharacterSize: 0.034375
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -4928,7 +4928,7 @@ TextMesh:
   m_GameObject: {fileID: 8418390773331182395}
   m_Text: Release ship
   m_OffsetZ: 0
-  m_CharacterSize: 0.0265625
+  m_CharacterSize: 0.03125
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1

@@ -106,17 +106,17 @@
       "posX": -1.15, "posY": -1.9, "textSize": 0.18, "textAlign": "left" },
 
     { "name": "BuyText_Engine", "textKey": "buy_button", "sortingOrder": 7, "textColor": "#FFFFFF",
-      "posX": 2.3, "posY": -0.1, "textSize": 0.2, "textAlign": "center" },
+      "posX": 2.3, "posY": -0.1, "textSize": 0.22, "textAlign": "center" },
     { "name": "BuyText_HullPlate", "textKey": "buy_button", "sortingOrder": 7, "textColor": "#FFFFFF",
-      "posX": 2.3, "posY": -0.55, "textSize": 0.2, "textAlign": "center" },
+      "posX": 2.3, "posY": -0.55, "textSize": 0.22, "textAlign": "center" },
     { "name": "BuyText_ShieldGenerator", "textKey": "buy_button", "sortingOrder": 7, "textColor": "#FFFFFF",
-      "posX": 2.3, "posY": -1.0, "textSize": 0.2, "textAlign": "center" },
+      "posX": 2.3, "posY": -1.0, "textSize": 0.22, "textAlign": "center" },
     { "name": "BuyText_Thruster", "textKey": "buy_button", "sortingOrder": 7, "textColor": "#FFFFFF",
-      "posX": 2.3, "posY": -1.45, "textSize": 0.2, "textAlign": "center" },
+      "posX": 2.3, "posY": -1.45, "textSize": 0.22, "textAlign": "center" },
     { "name": "BuyText_PowerCore", "textKey": "buy_button", "sortingOrder": 7, "textColor": "#FFFFFF",
-      "posX": 2.3, "posY": -1.9, "textSize": 0.2, "textAlign": "center" },
+      "posX": 2.3, "posY": -1.9, "textSize": 0.22, "textAlign": "center" },
     { "name": "ReleaseText", "textKey": "release_button", "sortingOrder": 7, "textColor": "#000000",
-      "posX": 2.3, "posY": 0.9, "textSize": 0.17, "textAlign": "center" }
+      "posX": 2.3, "posY": 0.9, "textSize": 0.2, "textAlign": "center" }
   ],
   "links": [
     { "owner": "ShipInBay", "component": "ShipView", "field": "body", "index": -1,
