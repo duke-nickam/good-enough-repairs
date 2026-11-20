@@ -554,6 +554,8 @@ class Runner:
                     return
                 if question:
                     keep_tries("failed checks, then a question")
+                    if self.s.get("director_triage", True) and self.triage(t, card, issue, question, usages, who, attempt):
+                        return
                     total = self.add_tokens(t, usages)
                     self.board.set_status(n, "Needs designer")
                     alert(self.s, "needs_designer")
@@ -771,6 +773,80 @@ class Runner:
                             f"follows the note and your answers.\n\nTask total: {total:,} tokens.",
                 "needs_designer", attempt=attempt))
             log("Director", f"#{n}: design note has open questions, Needs designer")
+
+    def triage(self, t, card, issue, question, usages, who, attempt):
+        """A task's question goes to the Director first, as to a producer. It answers what the GDD, docs/crew/ or the
+        card already answer, plans the one missing task another agent builds (the blocked task then waits for it),
+        or leaves it to the designer. Returns True when handled without the designer."""
+        n = t.number
+        items = {i.number: i for i in self.board.items()}
+        repo = self.ws.list_files()
+        problems, verdict, used = None, None, []
+        for _ in range(2):  # one retry if the planned task breaks the plan rules
+            try:
+                verdict, usage, _ = self.agents.triage(card.to_markdown(), question, self.thread_text(issue),
+                                                       self.board_summary(items), repo, problems)
+                used.append(usage)
+            except (AgentError, ValueError) as e:
+                log("Director", f"#{n}: triage reply unusable ({e})")
+                return False
+            if verdict.get("verdict") != "plan":
+                break
+            task = dict(verdict.get("task") or {}, key="t1", depends_on=[])
+            problems = validate_plan({"epics": [{"title": "triage", "tasks": [task]}]}, set(repo.splitlines()))
+            others = {}
+            for i in items.values():
+                c = self.card(i.number) if i.kind == "task" and i.state == "OPEN" else None
+                for f in (c.files if c else []):
+                    others[f] = f"#{i.number}"
+            problems += [f"{f}: another open task ({others[f]}) writes it" for f in task.get("files") or [] if f in others]
+            if not problems:
+                break
+        kind = (verdict or {}).get("verdict")
+        if kind == "plan" and problems:
+            log("Director", f"#{n}: could not plan the missing task, the designer decides")
+            kind = "ask"
+        if kind == "answer" and attempt >= self.max:
+            kind = "ask"  # no attempt left to follow the answer: the designer decides
+        if kind not in ("answer", "plan"):
+            self.add_tokens(t, used)
+            return False
+        total = self.add_tokens(t, usages + used)
+        if kind == "answer":
+            self.board.set_status(n, "Todo")
+            self.board.comment(n, crew_comment(
+                who, f"Question (attempt {attempt}):\n\n{question}", "question_asked", attempt=attempt))
+            self.board.comment(n, crew_comment(
+                "Director", f"Answer: {verdict.get('answer', '')}\n\nBack to Todo; the next attempt follows this "
+                            f"answer.\n\nTask total: {total:,} tokens.", "triage_answer"))
+            log("Director", f"#{n}: answered the agent's question, back to Todo")
+            return True
+        task = verdict["task"]
+        m = self.board.create_issue(task["title"], "(The task card follows.)", ["task"])
+        new = Card(agent=task["agent"], reviewer=task["reviewer"], epic=card.epic, what=task.get("what", ""),
+                   acceptance=task["acceptance"], files=task["files"], reads=task.get("reads") or [],
+                   checks=task.get("checks") or [], depends_on=[])
+        self.board.set_body(m, new.to_markdown())
+        self.cards[m] = new
+        self.board.add_item(m, "Todo", attempt=0)
+        self.board.add_sub_issue(card.epic, m)
+        body = self.board.issue(n).body
+        card.depends_on = card.depends_on + [m]
+        line = "**Depends on:** " + ", ".join(f"#{d}" for d in card.depends_on)
+        self.board.set_body(n, re.sub(r"^\*\*Depends on:\*\*.*$", lambda _: line, body, count=1, flags=re.M))
+        self.cards[n] = card
+        self.board.set_attempt(n, 0)
+        self.board.set_status(n, "Todo")
+        self.board.comment(n, crew_comment(
+            who, f"Question (attempt {attempt}):\n\n{question}", "question_asked", attempt=attempt))
+        self.board.comment(n, crew_comment(
+            "Director", f"{verdict.get('summary', '')}\n\nI planned #{m} {task['title']} ({AGENTS[task['agent']]}, "
+                        f"reviewed by {AGENTS[task['reviewer']]}). This task now depends on it and starts again, with "
+                        f"fresh attempts, when #{m} is Done.\n\nTask total: {total:,} tokens.", "triage_plan", task=m))
+        self.board.comment(card.epic, crew_comment(
+            "Director", f"Added #{m} {task['title']} ({AGENTS[task['agent']]}): #{n} needs it.", "triage_plan", task=m))
+        log("Director", f"#{n}: planned #{m} for the missing piece; #{n} waits for it")
+        return True
 
     def reject(self, t, attempt, text, usages, who, failed=None, stuck=False):
         n = t.number
