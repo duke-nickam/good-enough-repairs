@@ -28,7 +28,7 @@ Transform:
   m_GameObject: {fileID: 23766602460712886}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.1, y: 0.15, z: 0}
+  m_LocalPosition: {x: -3.2, y: 0.25, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -93,7 +93,7 @@ TextMesh:
   m_GameObject: {fileID: 23766602460712886}
   m_Text: Inventory is full, so the old part gets binned for scrap {0}.
   m_OffsetZ: 0
-  m_CharacterSize: 0.0265625
+  m_CharacterSize: 0.0234375
   m_LineSpacing: 1
   m_Anchor: 3
   m_Alignment: 0
@@ -357,7 +357,7 @@ Transform:
   m_GameObject: {fileID: 2258670637781682964}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.1, y: 0.15, z: 0}
+  m_LocalPosition: {x: -3.2, y: 0.25, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -422,7 +422,7 @@ TextMesh:
   m_GameObject: {fileID: 2258670637781682964}
   m_Text: 'Parts fitted from my shelf: {0}, cost {1}.'
   m_OffsetZ: 0
-  m_CharacterSize: 0.03125
+  m_CharacterSize: 0.028125001
   m_LineSpacing: 1
   m_Anchor: 3
   m_Alignment: 0
@@ -629,7 +629,7 @@ Transform:
   m_GameObject: {fileID: 2944782930205356243}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.1, y: 0.6, z: 0}
+  m_LocalPosition: {x: -3.2, y: 0.7, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -867,7 +867,7 @@ Transform:
   m_GameObject: {fileID: 3936028111971105996}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.1, y: 1.1, z: 0}
+  m_LocalPosition: {x: -3.2, y: 1.15, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -930,9 +930,9 @@ TextMesh:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3936028111971105996}
-  m_Text: Release this ship?
+  m_Text: Drop a part here to bin it for scrap
   m_OffsetZ: 0
-  m_CharacterSize: 0.024999999
+  m_CharacterSize: 0.0234375
   m_LineSpacing: 1
   m_Anchor: 3
   m_Alignment: 0
@@ -956,7 +956,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 78551cb0268a90e47a794ff4200894a4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GoodEnoughRepairs.UX::GoodEnoughRepairs.TextKeyView
-  textKey: release_title
+  textKey: bin_hint
   textMesh: {fileID: 2110348358645790335}
 --- !u!1 &4387483707903863887
 GameObject:
@@ -986,7 +986,7 @@ Transform:
   m_GameObject: {fileID: 4387483707903863887}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.1, y: -0.3, z: 0}
+  m_LocalPosition: {x: -3.2, y: -0.2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1105,7 +1105,7 @@ Transform:
   m_GameObject: {fileID: 5159463832969811271}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.1, y: 0.6, z: 0}
+  m_LocalPosition: {x: -3.2, y: 0.7, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
