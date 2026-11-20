@@ -5,14 +5,17 @@ Usage:
     python content.py FILE [FILE ...]
 
 Files are recognised by name:
-    mechanic_lines.json, day_briefs.json, part_catalog.json, balance.json
+    mechanic_lines.json, day_briefs.json, part_catalog.json, balance.json, ui_text.json
 
 balance.json is only used to cross-check the day types in day_briefs.json.
+ui_text.json: an object with one array of entries, each with a unique "key" and a "text";
+numbers the code fills in are written as numbered placeholders {0}, {1}.
 Only the files given as arguments are read.
 Prints each failure and exits 1 on any failure, 0 when all pass.
 """
 import json
 import os
+import re
 import sys
 
 LONG_DASHES = {
@@ -79,7 +82,7 @@ def check_text(name, data):
     for where, s in walk_strings(data, "$"):
         if not s.strip():
             fail(name, "empty string at %s" % where)
-        if any(c.isdigit() for c in s):
+        if any(c.isdigit() for c in re.sub(r"\{\d+\}", "", s)):  # numbered placeholders like {0} are fine
             fail(name, "digit in text at %s: %r" % (where, s))
         for c, label in LONG_DASHES.items():
             if c in s:
@@ -178,6 +181,33 @@ def check_parts(name, data):
             fail(name, "unknown part type '%s'" % t)
 
 
+def check_ui_text(name, data):
+    """One array of {key, text} entries; unique keys; placeholders only as {0}, {1}, ..."""
+    lists = [v for v in data.values() if isinstance(v, list)] if isinstance(data, dict) else []
+    if len(lists) != 1:
+        fail(name, "must be an object with exactly one array of entries (key and text)")
+        return
+    keys = set()
+    for i, e in enumerate(lists[0]):
+        if not isinstance(e, dict) or not isinstance(e.get("key"), str) or not isinstance(e.get("text"), str):
+            fail(name, "entry %d needs a string 'key' and a string 'text'" % i)
+            continue
+        k, text = e["key"].strip(), e["text"]
+        if not k:
+            fail(name, "entry %d has an empty key" % i)
+        elif k in keys:
+            fail(name, "key '%s' appears more than once" % k)
+        keys.add(k)
+        if not text.strip():
+            fail(name, "key '%s' has no text" % k)
+        rest = re.sub(r"\{\d+\}", "", text)
+        if "{" in rest or "}" in rest:
+            fail(name, "key '%s': placeholders must be numbered like {0}, {1}" % k)
+        nums = sorted({int(n) for n in re.findall(r"\{(\d+)\}", text)})
+        if nums and nums != list(range(len(nums))):
+            fail(name, "key '%s': placeholders must count up from {0} without gaps" % k)
+
+
 def main(argv):
     if not argv:
         print("usage: content.py FILE [FILE ...]")
@@ -186,7 +216,7 @@ def main(argv):
     for path in argv:
         name = os.path.basename(path)
         if name not in ("mechanic_lines.json", "day_briefs.json",
-                        "part_catalog.json", "balance.json"):
+                        "part_catalog.json", "balance.json", "ui_text.json"):
             fail(name, "unknown file name; cannot decide what to check")
             continue
         loaded[name] = load(path)
@@ -200,6 +230,8 @@ def main(argv):
             check_briefs(name, data, loaded.get("balance.json"))
         elif name == "part_catalog.json":
             check_parts(name, data)
+        elif name == "ui_text.json":
+            check_ui_text(name, data)
     if failures:
         for f in failures:
             print("FAIL " + f)
