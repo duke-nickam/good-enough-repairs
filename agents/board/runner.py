@@ -572,10 +572,12 @@ class Runner:
                 """Files from earlier failed tries are committed, so an attempt never leaves the repo dirty."""
                 if check_log:
                     self.ws.commit(list(card.files), f"#{n} {t.title} - {who}, attempt {attempt} ({why})")
+            seen = self.last_review_shots(issue)  # after a rejection: the screenshots the reviewer judged
             for k in range(1, tries + 1):  # self-check: the agent sees failed checks and fixes them in this attempt
                 try:
                     text, usage, model = self.agents.work(agent, card.to_markdown(), self.thread_text(issue), files,
-                                                          reads, attempt, feedback)
+                                                          reads, attempt, feedback,
+                                                          images=seen if k == 1 and not feedback else None)
                     usages.append(usage)
                     written, summary, question = parse_work(text)
                 except (AgentError, ValueError) as e:
@@ -618,6 +620,27 @@ class Runner:
                 log(who, f"#{n}: checks failed, self-check try {k + 1}/{tries}")
                 files = {p: self.ws.read(p) for p in card.files}
                 feedback = checks_text
+            if checks_ok and shots and self.s.get("self_look", True):  # an artist looks at the work before handing it over
+                try:
+                    text, usage, model = self.agents.work(agent, card.to_markdown(), self.thread_text(issue),
+                                                          {p: self.ws.read(p) for p in card.files}, reads, attempt,
+                                                          images=list(dict.fromkeys(shots)), look=True)
+                    usages.append(usage)
+                    if text.strip().upper().startswith("LOOKS RIGHT"):
+                        check_log.append("looked at its screenshots: right")
+                    else:
+                        fixed, new_summary, question = parse_work(text)
+                        if fixed and not question and all(p in card.files for p in fixed):
+                            for p, c in fixed.items():
+                                self.ws.delete(p) if c is None else self.ws.write(p, c)
+                            attempt_files.update(fixed)
+                            summary = new_summary or summary
+                            checks_ok, checks_text, made, shots = self.run_checks(card, attempt_files)
+                            check_log.append(f"looked at its screenshots, adjusted: {'pass' if checks_ok else 'FAIL'}")
+                        else:
+                            check_log.append("looked at its screenshots: no usable change")
+                except (AgentError, ValueError) as e:
+                    check_log.append(f"look at its screenshots failed ({str(e)[:80]})")
             written = attempt_files  # checks, commit and review all see every file of the attempt
             # every file on the card, so nothing the agent wrote is ever left out of the commit
             paths = list(card.files) + [p + ".meta" for p, c in written.items() if c is None]
@@ -981,6 +1004,15 @@ class Runner:
             log(who, f"#{n}: rejected, back to Todo")
 
     # ------------------------------------------------------------ checks
+
+    def last_review_shots(self, issue):
+        """The screenshots of the last review, when the newest event is a rejection and the files still exist."""
+        last = next((c for c in reversed(issue.comments) if c.marker), None)
+        if not last or last.marker.get("event") != "rejected":
+            return None
+        shots = [p.strip() for p in re.findall(r"SCREENSHOT: (.+?\.png)", last.body)]
+        shots = [p for p in dict.fromkeys(shots) if pathlib.Path(p).is_file()]
+        return shots or None
 
     def shots_file(self):
         """Fingerprints of approved screenshots, kept in .git (never committed, survives between runs)."""

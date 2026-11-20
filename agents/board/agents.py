@@ -277,7 +277,8 @@ def validate_plan(plan, repo_files):
                 p.append(f"{k}: needs at least one file to write")
             for f in files:
                 p += [f"{k}: {x}" for x in file_rule_problems(f)]
-                if repo_files is not None and f not in repo_files:  # a new file: at most one new folder level
+                if f.startswith("Assets/") and f not in (repo_files or ()) and \
+                        any(x.endswith(".asmdef") for x in repo_files or ()):  # new file: one new folder level at most
                     parent = f.rsplit("/", 1)[0] if "/" in f else ""
                     grand = parent.rsplit("/", 1)[0] if "/" in parent else ""
                     known = {x.rsplit("/", 1)[0] for x in repo_files if "/" in x}
@@ -558,7 +559,8 @@ class ClaudeAgents:
         text, usage, model = self._call("director", "Task: decide this question.\n\n" + TRIAGE_FORMAT, prompt)
         return extract_json(text), usage, model
 
-    def work(self, agent, card_md, thread, files, reads, attempt, check_feedback=None, design_note=False):
+    def work(self, agent, card_md, thread, files, reads, attempt, check_feedback=None, design_note=False,
+             images=None, look=False):
         prompt = (f"GDD sections:\n\n{gdd_sections(self.gdd, self.s['reads'][agent])}\n\n---\n\n"
                   f"The project uses: {self.project_info or 'unknown versions'}\n\n---\n\n"
                   f"Your task card:\n\n{card_md}\n\n---\n\n"
@@ -568,8 +570,17 @@ class ClaudeAgents:
         if check_feedback:
             prompt += ("\n\n---\n\nYour files above are from this attempt, and they failed the checks. Check output:\n"
                        f"{check_feedback}\n\nFix the files and send every file again in full.")
+        if look:
+            prompt += ("\n\n---\n\nYour files above are from this attempt and passed the checks. The screenshots of "
+                       "your build follow. Look at them against the card's acceptance criteria, as the reviewer will. "
+                       "If they show what the card asks, reply with exactly LOOKS RIGHT and nothing else. Otherwise "
+                       "send the corrected files in full, in the usual format.")
+        elif images:
+            prompt += ("\n\n---\n\nThe screenshots the reviewer judged in the last attempt follow. Look at them "
+                       "before you change anything.")
         kind = DESIGN_FORMAT if design_note else WORK_FORMAT
-        text, usage, model = self._call(agent, f"Task: attempt {attempt} of your task.\n\n" + kind, prompt, attempt)
+        text, usage, model = self._call(agent, f"Task: attempt {attempt} of your task.\n\n" + kind, prompt, attempt,
+                                        images=images)
         return text, usage, model
 
     def review(self, reviewer, card_md, summary, files, checks, thread, reads=None, images=None):

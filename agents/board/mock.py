@@ -74,7 +74,8 @@ class MockAgents:
         return {"type": "plan", "summary": f"Tasks for {epic['title']}.",
                 "epics": [{"title": epic["title"], "goal": epic["goal"], "tasks": TASKS[epic["title"]]}]}, USAGE, "mock"
 
-    def work(self, agent, card_md, thread, files, reads, attempt, check_feedback=None, design_note=False):
+    def work(self, agent, card_md, thread, files, reads, attempt, check_feedback=None, design_note=False,
+             images=None, look=False):
         if design_note:
             if "inventory" in card_md.lower():
                 return ("DESIGN NOTE:\nWhat I will build: a shared inventory the player fills from any ship.\n"
