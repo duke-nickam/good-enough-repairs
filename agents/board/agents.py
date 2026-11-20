@@ -207,6 +207,19 @@ def gdd_sections(text, names):
     return "\n".join(keep).strip()
 
 
+def cli_error(res):
+    """The CLI's own message (e.g. a usage limit), not the start of its JSON."""
+    raw = (res.stderr or res.stdout or "").strip()
+    try:
+        data = json.loads(res.stdout)
+        msg = str(data.get("result") or data.get("error") or "").strip()
+        if msg:
+            return msg[:500]
+    except (ValueError, AttributeError):
+        pass
+    return raw[-500:]
+
+
 def extract_json(text):
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
@@ -476,7 +489,7 @@ class ClaudeAgents:
                 if res.returncode == 0:
                     break
         if res.returncode != 0:
-            raise AgentError(f"{AGENTS[agent]} call failed: {(res.stderr or res.stdout).strip()[:500]}")
+            raise AgentError(f"{AGENTS[agent]} call failed: {cli_error(res)}")
         data = json.loads(res.stdout)
         if data.get("is_error"):
             raise AgentError(f"{AGENTS[agent]}: {data.get('result', '')[:500]}")
