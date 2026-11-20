@@ -12,11 +12,17 @@
     { "name": "Panel", "parent": "DialogRoot", "sprite": "box", "color": "panel",
       "sortingOrder": 101, "posX": 0, "posY": 0, "scaleX": 7, "scaleY": 4 },
     { "name": "TextArea", "parent": "DialogRoot", "sprite": "box", "color": "#FFFFFF14",
-      "sortingOrder": 102, "posX": 0, "posY": 0.6, "scaleX": 6.6, "scaleY": 2.6 },
+      "sortingOrder": 102, "posX": 0, "posY": 0.35, "scaleX": 6.6, "scaleY": 2.1 },
     { "name": "ConfirmButton", "parent": "DialogRoot", "sprite": "box", "color": "passes",
       "sortingOrder": 103, "posX": -1.6, "posY": -1.35, "scaleX": 2.6, "scaleY": 0.7 },
     { "name": "CancelButton", "parent": "DialogRoot", "sprite": "box", "color": "#8A8F99",
-      "sortingOrder": 103, "posX": 1.6, "posY": -1.35, "scaleX": 2.6, "scaleY": 0.7 }
+      "sortingOrder": 103, "posX": 1.6, "posY": -1.35, "scaleX": 2.6, "scaleY": 0.7 },
+    { "name": "TitleText", "parent": "DialogRoot", "textKey": "release_title", "sortingOrder": 104,
+      "posX": 0, "posY": 1.7, "textSize": 0.32, "textAlign": "center" },
+    { "name": "ConfirmText", "parent": "DialogRoot", "textKey": "confirm_release", "sortingOrder": 104,
+      "textColor": "#101216", "posX": -1.6, "posY": -1.35, "textSize": 0.3, "textAlign": "center" },
+    { "name": "CancelText", "parent": "DialogRoot", "textKey": "cancel_release", "sortingOrder": 104,
+      "textColor": "#101216", "posX": 1.6, "posY": -1.35, "textSize": 0.3, "textAlign": "center" }
   ],
   "links": [
     { "owner": "WarningDialog", "component": "WarningView", "field": "dialogRoot", "index": -1,
@@ -28,7 +34,13 @@
     { "owner": "WarningDialog", "component": "WarningView", "field": "confirmButton", "index": -1,
       "target": "ConfirmButton", "targetType": "SpriteRenderer" },
     { "owner": "WarningDialog", "component": "WarningView", "field": "cancelButton", "index": -1,
-      "target": "CancelButton", "targetType": "SpriteRenderer" }
+      "target": "CancelButton", "targetType": "SpriteRenderer" },
+    { "owner": "WarningDialog", "component": "WarningView", "field": "titleText", "index": -1,
+      "target": "TitleText", "targetType": "TextKeyView" },
+    { "owner": "WarningDialog", "component": "WarningView", "field": "confirmText", "index": -1,
+      "target": "ConfirmText", "targetType": "TextKeyView" },
+    { "owner": "WarningDialog", "component": "WarningView", "field": "cancelText", "index": -1,
+      "target": "CancelText", "targetType": "TextKeyView" }
   ],
   "scene": {
     "path": "Assets/Scenes/Main.unity",
