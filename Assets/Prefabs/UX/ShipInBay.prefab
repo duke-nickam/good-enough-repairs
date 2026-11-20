@@ -4928,7 +4928,7 @@ TextMesh:
   m_GameObject: {fileID: 8418390773331182395}
   m_Text: Release ship
   m_OffsetZ: 0
-  m_CharacterSize: 0.0234375
+  m_CharacterSize: 0.0265625
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -4939,7 +4939,7 @@ TextMesh:
   m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
   m_Color:
     serializedVersion: 2
-    rgba: 4279636496
+    rgba: 4278190080
 --- !u!114 &8754198983888123388
 MonoBehaviour:
   m_ObjectHideFlags: 0
