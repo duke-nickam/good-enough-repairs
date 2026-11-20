@@ -7,6 +7,7 @@ import datetime
 import hashlib
 import json
 import os
+import pathlib
 import re
 import shlex
 import subprocess
@@ -656,13 +657,17 @@ class Runner:
             log("Runner", f"#{n}: same check failure as the last attempt, Needs designer")
             return
         self.board.set_status(n, "In review")
+        shots, unchanged = self.split_shots(shots)  # an image identical to an approved one is named, not sent
+        review_checks = checks_text + ("\n\nScreenshots identical to ones an earlier review approved (not shown): "
+                                       + "; ".join(unchanged) if unchanged else "")
         log(reviewer, f"#{n}: reviewing (checks {'pass' if checks_ok else 'FAIL'}"
-                      f"{f', {len(shots)} screenshot(s)' if shots else ''})")
+                      f"{f', {len(shots)} screenshot(s)' if shots else ''}"
+                      f"{f', {len(unchanged)} unchanged' if unchanged else ''})")
         review_used, review_usages = "", []
         for k in (1, 2):  # one retry if the review reply is unusable: the agent's work is not at fault
             try:
                 verdict, usage, _ = self.agents.review(card.reviewer, card.to_markdown(), summary, written,
-                                                       checks_text, self.thread_text(self.board.issue(n)),
+                                                       review_checks, self.thread_text(self.board.issue(n)),
                                                        reads={p: c for p, c in reads.items() if p not in written},
                                                        images=shots)
                 review_usages.append(usage)
@@ -677,6 +682,8 @@ class Runner:
         issues = verdict.get("issues") or []
         lines = "\n".join(f"- {i.get('where', '')}: {i.get('problem', '')} Fix: {i.get('fix', '')}" for i in issues)
         approve = verdict.get("verdict") == "approve" and checks_ok
+        if approve:
+            self.remember_shots(shots, n)
         if approve and any(p.startswith("docs/crew/") for p in card.files):
             total = self.add_tokens(t, usages)
             self.board.set_status(n, "Needs designer")
@@ -974,6 +981,42 @@ class Runner:
             log(who, f"#{n}: rejected, back to Todo")
 
     # ------------------------------------------------------------ checks
+
+    def shots_file(self):
+        """Fingerprints of approved screenshots, kept in .git (never committed, survives between runs)."""
+        git = pathlib.Path(getattr(self.ws, "root", ".")) / ".git"
+        return git / "crew_shots.json" if git.is_dir() else None
+
+    def split_shots(self, shots):
+        """-> (screenshots to send, notes for the ones identical to an approved screenshot). Duplicates go once."""
+        f = self.shots_file()
+        known = json.loads(f.read_text(encoding="utf-8")) if f and f.is_file() else {}
+        send, unchanged = [], []
+        for p in dict.fromkeys(shots):
+            try:
+                digest = hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
+            except OSError:
+                send.append(p)
+                continue
+            seen = known.get(pathlib.Path(p).name) or {}
+            if seen.get("hash") == digest:
+                unchanged.append(f"{pathlib.Path(p).name} (unchanged since #{seen.get('task')} was approved)")
+            else:
+                send.append(p)
+        return send, unchanged
+
+    def remember_shots(self, shots, n):
+        f = self.shots_file()
+        if not f or not shots:
+            return
+        known = json.loads(f.read_text(encoding="utf-8")) if f.is_file() else {}
+        for p in dict.fromkeys(shots):
+            try:
+                known[pathlib.Path(p).name] = {"hash": hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest(),
+                                               "task": n}
+            except OSError:
+                pass
+        f.write_text(json.dumps(known, indent=1), encoding="utf-8")
 
     def run_checks(self, card, written):
         """Code decides these, not an agent: built-in checks on every written file, then the card's scripts.
