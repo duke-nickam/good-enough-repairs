@@ -277,6 +277,18 @@ def validate_plan(plan, repo_files):
                 p.append(f"{k}: needs at least one file to write")
             for f in files:
                 p += [f"{k}: {x}" for x in file_rule_problems(f)]
+                if repo_files is not None and f not in repo_files:  # a new file: at most one new folder level
+                    parent = f.rsplit("/", 1)[0] if "/" in f else ""
+                    grand = parent.rsplit("/", 1)[0] if "/" in parent else ""
+                    known = {x.rsplit("/", 1)[0] for x in repo_files if "/" in x}
+                    while True:  # every folder above a file is a folder too
+                        more = {d.rsplit("/", 1)[0] for d in known if "/" in d} - known
+                        if not more:
+                            break
+                        known |= more
+                    if parent and parent not in known and grand not in known:
+                        p.append(f"{k}: {f} is a new file in a folder that does not exist ({parent}); check the "
+                                 "folder against the repo's file list")
             for f in files:  # a spec with its own measure check must run it, so a change cannot shift the look
                 m = re.search(r"([^/]+)\.spec\.json$", f)
                 script = f"agents/checks/measure_{m.group(1)}.py" if m else None
@@ -312,7 +324,9 @@ CODE_WRITERS = ("programmer", "qa_automation_engineer")
 
 
 def file_rule_problems(f):
-    """Files no agent may write."""
+    """Files no agent may write, and paths that are not plain paths."""
+    if re.search(r"[()\[\]:;,]", f) or f != f.strip():
+        return [f"{f!r} is not a plain file path: write only the path, and put any explanation in 'what'"]
     if f.endswith(UNITY_MADE):
         return [f"may not write {f!r}: Unity scene, prefab, asset and .meta files come from Unity (the editor, an "
                 "editor script or MCP), never from an agent writing them by hand"]
