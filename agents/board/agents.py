@@ -562,7 +562,7 @@ class ClaudeAgents:
         prompt = (f"GDD sections:\n\n{gdd_sections(self.gdd, self.s['reads'][agent])}\n\n---\n\n"
                   f"The project uses: {self.project_info or 'unknown versions'}\n\n---\n\n"
                   f"Your task card:\n\n{card_md}\n\n---\n\n"
-                  f"Current content of your files:\n\n{_files_block(files)}\n\n---\n\n"
+                  f"Current content of your files:\n\n{_files_block(files, cut=False)}\n\n---\n\n"
                   f"Files you need to read:\n\n{_files_block(reads)}\n\n---\n\n"
                   f"Earlier in this task (attempts, reviews, the designer's input):\n\n{thread or 'nothing yet'}")
         if check_feedback:
@@ -576,7 +576,7 @@ class ClaudeAgents:
         prompt = (f"GDD:\n\n{gdd_sections(self.gdd, self.s['reads'][reviewer])}\n\n---\n\n"
                   f"The project uses: {self.project_info or 'unknown versions'}\n\n---\n\n"
                   f"Task card:\n\n{card_md}\n\n---\n\nThe agent's summary: {summary}\n\n"
-                  f"Files it wrote:\n\n{_files_block(files)}\n\n---\n\n"
+                  f"Files it wrote:\n\n{_files_block(files, cut=False)}\n\n---\n\n"
                   f"Files the task read (context, not under review):\n\n{_files_block(reads)}\n\n---\n\n"
                   f"Check results:\n{checks}\n\n---\n\nEarlier in this task:\n\n{thread or 'nothing yet'}")
         if reviewer == "lead_programmer" and self.crew_docs:
@@ -595,7 +595,9 @@ class ClaudeAgents:
         return extract_json(text), usage, model
 
 
-def _files_block(files):
+def _files_block(files, cut=True):
+    """Files for a prompt. Files the agent only reads may be cut; a file it rewrites (always in full) or a reviewer
+    judges is never cut, since half a file cannot be rewritten or judged."""
     if not files:
         return "none"
     out = []
@@ -603,6 +605,6 @@ def _files_block(files):
         if content is None:
             out.append(f"--- {path} (does not exist, or deleted)")
         else:
-            c = content if len(content) <= MAX_FILE_CHARS else content[:MAX_FILE_CHARS] + "\n... (cut)"
+            c = content if not cut or len(content) <= MAX_FILE_CHARS else content[:MAX_FILE_CHARS] + "\n... (cut)"
             out.append(f"--- {path}\n{c}")
     return "\n\n".join(out)
