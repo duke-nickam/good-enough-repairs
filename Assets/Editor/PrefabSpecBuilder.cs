@@ -149,7 +149,7 @@
  *       Example: { "name": "PaymentText", "textKey": "payment", "sortingOrder": 6,
  *                  "posX": 0, "posY": 1.8, "textSize": 0.3, "textAlign": "center" }
  *       Which keys exist and what {0}, {1} mean is in
- *       Assets/StreamingAssets/content/ui_text.json. A ShipView fills the numbers
+ *       Assets/GameData/content/ui_text.json. A ShipView fills the numbers
  *       of its own text elements once they are linked (see TEXT ON A SHIP).
  *   links[]       sets a reference field on a component to another object:
  *       owner          name of the object that holds the component

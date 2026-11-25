@@ -5,7 +5,7 @@ using System.Text;
 
 namespace GoodEnoughRepairs
 {
-    // Mirrors the JSON files in Assets/StreamingAssets/content key for key.
+    // Mirrors the JSON files in Assets/GameData/content key for key.
     // Plain data only: no Unity types, no game rules.
 
     // mechanic_lines.json: "moments" is an object with one array per moment key.

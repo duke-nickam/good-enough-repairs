@@ -2,7 +2,7 @@ using System;
 
 namespace GoodEnoughRepairs
 {
-    // Mirrors Assets/StreamingAssets/balance.json key for key.
+    // Mirrors Assets/GameData/balance.json key for key.
     // Plain data only: no Unity types, no game rules.
 
     [Serializable]

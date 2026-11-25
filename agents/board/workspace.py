@@ -170,5 +170,5 @@ class MockWorkspace:
         return branch in self.branches
 
     def list_files(self):
-        return ("Assets/StreamingAssets/balance.json\nAssets/Scripts/Economy/BalanceData.cs\n"
+        return ("Assets/GameData/balance.json\nAssets/Scripts/Economy/BalanceData.cs\n"
                 "Assets/Scripts/Economy/BalanceLoader.cs\nagents/checks/simulate.py")
