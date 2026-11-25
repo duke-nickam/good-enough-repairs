@@ -22,6 +22,22 @@
  * It never saves a half prefab. Every build reads the spec file from disk and
  * refreshes the asset database first, so a shot always comes from the current specs.
  *
+ * ONE LINE PER SPEC, AND SCREENSHOTS ONLY FOR CHANGED SPECS
+ *   After each spec the builder prints one line:
+ *     "BUILT: <spec path> (screenshot taken)"
+ *     "BUILT: <spec path> (no screenshot)"      changed, but no screenshot asked for
+ *     "SKIPPED (unchanged): <spec path>"        nothing changed, no screenshot taken
+ *   A spec counts as changed when its prefab was made new, the in-place patch
+ *   changed the prefab (a property, an object added or removed, a link), a sprite
+ *   file or its import settings were made or fixed, or the scene changed (an
+ *   instance added, removed, moved or scaled, or a StationView link set).
+ *   A spec with a screenshot is photographed when it changed, or when no earlier
+ *   shot of it exists in the temp folder ger_shots (outside the project). A spec
+ *   that did not change and already has its shot is not photographed. Nothing is
+ *   stored in the project for this, so an unchanged build leaves no Git diff.
+ *   To photograph everything again, delete the ger_shots folder in the system temp
+ *   folder. The decision is ScreenshotDecision.ShouldPhotograph.
+ *
  * UNCHANGED BUILD WRITES NOTHING
  *   A build with a spec that has not changed leaves the prefab files, the scene
  *   file and the sprite import settings (.meta) as they are, byte for byte:
@@ -30,7 +46,7 @@
  *   - The scene is saved only when an instance was added, removed, moved or
  *     scaled, or a StationView link, the camera or the event system changed.
  *   - A sprite is re-imported only when an import setting differs.
- *   The screenshot step still runs. It shows sample data in the open scene and
+ *   When a screenshot is taken, it shows sample data in the open scene and
  *   then loads the scene again from disk without saving.
  *
  * UPDATE, NOT REBUILD
@@ -181,7 +197,9 @@
  *                      warning dialog.
  *       screenshot     file name of the screenshot, for example "ship_in_bay.png".
  *                      Empty means no screenshot. It is saved in the system temp
- *                      folder under ger_shots, outside the project. Before the shot
+ *                      folder under ger_shots, outside the project. It is taken
+ *                      only for a changed spec or one with no earlier shot (see
+ *                      ONE LINE PER SPEC above). Before the shot
  *                      the builder shows a docked sample ship (day 1, seed 1) on the
  *                      instance, or, for an InventoryView, the sample ship's five
  *                      parts in inventory slots 1-5, or, for a WarningView, the
@@ -490,16 +508,44 @@ namespace GoodEnoughRepairs.EditorTools
     }
 
     /// <summary>
+    /// The decision "take a screenshot of this spec or not". Plain logic, no scene
+    /// and no files, so it can be tested alone.
+    /// </summary>
+    public static class ScreenshotDecision
+    {
+        /// <summary>
+        /// True when the spec asks for a screenshot and it is changed (anything: a
+        /// new or changed prefab, a made or fixed sprite, a changed scene) or has no
+        /// earlier shot to look at.
+        /// </summary>
+        public static bool ShouldPhotograph(bool screenshotRequested, bool changed, bool earlierShotExists)
+        {
+            if (!screenshotRequested) return false;
+            return changed || !earlierShotExists;
+        }
+
+        /// <summary>The one plain line printed for a spec after it was handled.</summary>
+        public static string BuildLine(string specPath, bool changed, bool photographed)
+        {
+            if (photographed) return "BUILT: " + specPath + " (screenshot taken)";
+            if (changed) return "BUILT: " + specPath + " (no screenshot)";
+            return "SKIPPED (unchanged): " + specPath;
+        }
+    }
+
+    /// <summary>
     /// Builds prefabs from JSON specs. The format is documented in the comment at
     /// the top of this file. No reflection and no type names as text: components
     /// are attached through direct references in the switches below.
     /// An existing prefab or scene instance is updated in place, never rebuilt.
-    /// A build that changes nothing writes no prefab and no scene.
+    /// A build that changes nothing writes no prefab and no scene, and takes no
+    /// screenshot of a spec that already has one.
     /// </summary>
     public static class PrefabSpecBuilder
     {
         private const string SpecSuffix = ".spec.json";
         private const string BaySuffix = "_Bay";
+        private const string ShotFolder = "ger_shots";
         private const float DefaultTextSize = 0.3f;
 
         // TextMesh: line height in world units is about fontSize * characterSize * 0.1.
@@ -548,7 +594,8 @@ namespace GoodEnoughRepairs.EditorTools
             if (spec == null) throw Fail(specPath, "the file could not be read as a spec");
             Validate(spec, specPath);
 
-            Dictionary<string, Sprite> sprites = MakeSprites(spec, specPath);
+            bool changed = false;
+            Dictionary<string, Sprite> sprites = MakeSprites(spec, specPath, ref changed);
 
             string folder = Path.GetDirectoryName(spec.prefabPath);
             if (!string.IsNullOrEmpty(folder)) Directory.CreateDirectory(folder);
@@ -566,17 +613,20 @@ namespace GoodEnoughRepairs.EditorTools
                 {
                     UnityEngine.Object.DestroyImmediate(root);
                 }
+                changed = true;
             }
             else
             {
-                PatchPrefab(spec, sprites, specPath);
+                if (PatchPrefab(spec, sprites, specPath)) changed = true;
             }
             Debug.Log("MADE: " + spec.prefabPath);
 
+            bool photographed = false;
             if (spec.scene != null && !string.IsNullOrEmpty(spec.scene.path))
             {
-                PlaceInScene(spec, specPath);
+                PlaceInScene(spec, specPath, ref changed, out photographed);
             }
+            Debug.Log(ScreenshotDecision.BuildLine(specPath, changed, photographed));
         }
 
         private static InvalidOperationException Fail(string specPath, string message)
@@ -721,21 +771,22 @@ namespace GoodEnoughRepairs.EditorTools
             return result;
         }
 
-        private static Dictionary<string, Sprite> MakeSprites(PrefabSpec spec, string specPath)
+        private static Dictionary<string, Sprite> MakeSprites(PrefabSpec spec, string specPath, ref bool changed)
         {
             Dictionary<string, Sprite> result = new Dictionary<string, Sprite>();
             if (spec.sprites == null) return result;
             for (int i = 0; i < spec.sprites.Length; i++)
             {
                 SpecSprite s = spec.sprites[i];
-                Sprite sprite = MakeSprite(s, specPath);
+                Sprite sprite = MakeSprite(s, specPath, ref changed);
                 result[s.key] = sprite;
                 Debug.Log("MADE: " + s.path);
             }
             return result;
         }
 
-        private static Sprite MakeSprite(SpecSprite s, string specPath)
+        // changed is set to true when the PNG was made or an import setting was fixed.
+        private static Sprite MakeSprite(SpecSprite s, string specPath, ref bool changed)
         {
             string folder = Path.GetDirectoryName(s.path);
             if (!string.IsNullOrEmpty(folder)) Directory.CreateDirectory(folder);
@@ -750,6 +801,7 @@ namespace GoodEnoughRepairs.EditorTools
                 File.WriteAllBytes(s.path, tex.EncodeToPNG());
                 UnityEngine.Object.DestroyImmediate(tex);
                 AssetDatabase.ImportAsset(s.path, ImportAssetOptions.ForceSynchronousImport);
+                changed = true;
             }
 
             TextureImporter importer = AssetImporter.GetAtPath(s.path) as TextureImporter;
@@ -799,7 +851,11 @@ namespace GoodEnoughRepairs.EditorTools
                 importer.SetTextureSettings(settings);
                 dirty = true;
             }
-            if (dirty) importer.SaveAndReimport();
+            if (dirty)
+            {
+                importer.SaveAndReimport();
+                changed = true;
+            }
 
             Sprite loaded = AssetDatabase.LoadAssetAtPath<Sprite>(s.path);
             if (loaded == null) throw Fail(specPath, "sprite could not be loaded: " + s.path);
@@ -1136,8 +1192,8 @@ namespace GoodEnoughRepairs.EditorTools
 
         // Opens the existing prefab, patches it to match the spec and saves it back
         // to the same asset, but only when the patch really changed something. On an
-        // error nothing is saved.
-        private static void PatchPrefab(PrefabSpec spec, Dictionary<string, Sprite> sprites, string specPath)
+        // error nothing is saved. Returns true when the prefab was changed and saved.
+        private static bool PatchPrefab(PrefabSpec spec, Dictionary<string, Sprite> sprites, string specPath)
         {
             GameObject root = PrefabUtility.LoadPrefabContents(spec.prefabPath);
             try
@@ -1148,9 +1204,10 @@ namespace GoodEnoughRepairs.EditorTools
                 if (before == after)
                 {
                     Debug.Log("UNCHANGED: " + spec.prefabPath);
-                    return;
+                    return false;
                 }
                 PrefabUtility.SaveAsPrefabAsset(root, spec.prefabPath);
+                return true;
             }
             finally
             {
@@ -1557,8 +1614,18 @@ namespace GoodEnoughRepairs.EditorTools
                 FindObjectsInactive.Include, FindObjectsSortMode.None).Length;
         }
 
-        private static void PlaceInScene(PrefabSpec spec, string specPath)
+        // Full path of the screenshot file in the temp folder outside the project.
+        private static string ShotPath(string fileName)
         {
+            string dir = Path.Combine(Path.GetTempPath(), ShotFolder);
+            return Path.GetFullPath(Path.Combine(dir, fileName));
+        }
+
+        // changed comes in as "the prefab or a sprite changed" and goes out as
+        // "anything in this spec changed" (the scene included).
+        private static void PlaceInScene(PrefabSpec spec, string specPath, ref bool changed, out bool photographed)
+        {
+            photographed = false;
             SpecScene sc = spec.scene;
             if (!File.Exists(sc.path)) throw Fail(specPath, "scene not found: " + sc.path);
 
@@ -1673,6 +1740,7 @@ namespace GoodEnoughRepairs.EditorTools
             {
                 EditorSceneManager.MarkSceneDirty(first.scene);
                 EditorSceneManager.SaveScene(first.scene);
+                changed = true;
             }
             else
             {
@@ -1680,7 +1748,9 @@ namespace GoodEnoughRepairs.EditorTools
             }
             Debug.Log("MADE: " + sc.path);
 
-            if (!string.IsNullOrEmpty(sc.screenshot))
+            bool requested = !string.IsNullOrEmpty(sc.screenshot);
+            bool shotExists = requested && File.Exists(ShotPath(sc.screenshot));
+            if (ScreenshotDecision.ShouldPhotograph(requested, changed, shotExists))
             {
                 if (view == null && invView == null && warnView == null)
                 {
@@ -1697,6 +1767,7 @@ namespace GoodEnoughRepairs.EditorTools
                 int h = screenPlacement ? Mathf.RoundToInt(sc.refHeight) : 720;
                 TakeScreenshot(view, others, invView, warnView, sc.sampleDialog, cam, sc.screenshot,
                     SampleOverrides(sc, specPath), w, h, specPath);
+                photographed = true;
             }
 
             if (screenPlacement) cam.ResetAspect();
@@ -1819,9 +1890,8 @@ namespace GoodEnoughRepairs.EditorTools
             RenderTexture.active = oldActive;
             UnityEngine.Object.DestroyImmediate(rt);
 
-            string dir = Path.Combine(Path.GetTempPath(), "ger_shots");
-            Directory.CreateDirectory(dir);
-            string full = Path.GetFullPath(Path.Combine(dir, fileName));
+            string full = ShotPath(fileName);
+            Directory.CreateDirectory(Path.GetDirectoryName(full));
             File.WriteAllBytes(full, tex.EncodeToPNG());
             UnityEngine.Object.DestroyImmediate(tex);
             Debug.Log("SCREENSHOT: " + full);
