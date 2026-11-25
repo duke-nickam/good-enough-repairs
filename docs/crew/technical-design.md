@@ -15,7 +15,7 @@ All code is under `Assets/Scripts`, one subfolder per assembly. Each assembly ha
 | Folder | Assembly | Holds | References |
 |---|---|---|---|
 | `Logic/` | `GoodEnoughRepairs.Logic` (`noEngineReferences` on) | all rules, one subfolder per system (below) | nothing |
-| `Data/` | `GoodEnoughRepairs.Data` | the loaders: `BalanceLoader`, `ContentLoader` | Logic, UnityEngine |
+| `Data/` | `GoodEnoughRepairs.Data` | the data asset `GameDataAsset` and the loaders `BalanceLoader`, `ContentLoader` | Logic, UnityEngine |
 | `UX/` | `GoodEnoughRepairs.UX` | the show layer's view scripts (Programmer) | Logic, Data |
 | `Bots/` | `GoodEnoughRepairs.Bots` | the QA Playtester's buyer and swapper bots | Logic, Data |
 | `Tests/EditMode/` | `GoodEnoughRepairs.Tests.EditMode` | EditMode tests (not in the build) | Logic, Data, Editor (tests of Editor tools need it) |
@@ -27,7 +27,7 @@ The namespace stays `GoodEnoughRepairs` in every folder. `UX/` is outside `Logic
 | Subfolder | Holds | Status |
 |---|---|---|
 | `Logic/Economy/` | `BalanceData`, credits, prices, payments, penalty price, upkeep | `BalanceData.cs` is here; the rest is new |
-| `Logic/Content/` | `ContentData` and its file classes: mechanic lines, day briefs, part catalog | `ContentData.cs` is here |
+| `Logic/Content/` | `ContentData` and its file classes: mechanic lines, day briefs, part catalog, UI text | `ContentData.cs` is here |
 | `Logic/Parts/` | part type, condition, required level check, part generation | new |
 | `Logic/Bays/` | ships, 3 docking bays, arrival schedule, release | new |
 | `Logic/Inventory/` | the 10-slot shared inventory, bin | new |
@@ -35,7 +35,7 @@ The namespace stays `GoodEnoughRepairs` in every folder. `UX/` is outside `Logic
 | `Logic/Run/` | the run, day flow, day types, bankruptcy, player commands, events | new |
 | `Logic/Screens/` | what each screen shows as plain data (for example the release warning's net result) | new |
 
-The loaders `BalanceLoader.cs` and `ContentLoader.cs` live in `Data/`. They are the only code that uses `JsonUtility`, `Application`, `File` and `Debug`. `BalanceData` and `ContentData` are plain `[Serializable]` classes (System only), so they stay in Logic.
+`GameDataAsset.cs`, `BalanceLoader.cs` and `ContentLoader.cs` live in `Data/`. In the game code, they are the only code that reads `TextAsset` data, uses `JsonUtility` on the data files and logs data errors with `Debug`. `BalanceData` and `ContentData` are plain `[Serializable]` classes (System only), so they stay in Logic.
 
 Scenes, prefabs, sprites and sound are not code. They are the show layer. Editor tools, such as the builder tool `Assets/Editor/PrefabSpecBuilder.cs`, are in `Assets/Editor` (Editor assembly, references UX).
 
@@ -73,9 +73,13 @@ A bot loop: create the run, then repeat read state, call commands, `Advance`, un
 
 ## 6. Loading balance.json and content
 
-- Files: `Assets/StreamingAssets/balance.json` and `Assets/StreamingAssets/content/` (`mechanic_lines.json`, `day_briefs.json`, `part_catalog.json`).
-- **Game start:** `BalanceLoader.Load()` and `ContentLoader.Load()` (in Data) read the files. They never throw and log errors. `BalanceLoader.Load()` returns null on a bad file, so the start code must stop with a clear message. `ContentLoader.Load()` always returns usable content (empty text for what is missing).
-- **Tests and bots:** read the file text themselves and call `BalanceLoader.Parse(json, out error)` and `ContentLoader.ParseLines/ParseBriefs/ParseParts`. These do not log and need no `Application` path or scene. A test can also build `BalanceData` or `ContentData` directly in code, with no Data reference needed for that.
+- **Files:** `Assets/GameData/balance.json` and `Assets/GameData/content/` (`mechanic_lines.json`, `day_briefs.json`, `part_catalog.json`, `ui_text.json`). They are normal project assets, imported by Unity as `TextAsset`s.
+- **Data asset:** `GameDataAsset` (a `ScriptableObject` in `Data/`) has one `TextAsset` field per file: `balance`, `dayBriefs`, `mechanicLines`, `partCatalog`, `uiText`. The designer makes it in the editor (Assets > Create > Good Enough Repairs > Game Data) and drops the five files into its fields. Agents never write the asset file by hand.
+- **Why:** the text is packed into the build with the asset, so loading works the same on every platform. No code reads a file path at game start.
+- **Game start:** `StationView` has the field `gameData` (a `GameDataAsset`), set in `Main.unity`. In `Awake` it calls `ContentLoader.Load(gameData)` and `BalanceLoader.Load(gameData)`. The loaders read the `.text` of each `TextAsset` and parse it.
+- **Never throw:** both `Load` methods log errors and never throw, also when the asset or one of its fields is not assigned. `BalanceLoader.Load` returns null on a missing or bad file; `StationView` then logs a clear message and disables itself. `ContentLoader.Load` always returns usable content (empty text for what is missing).
+- **Temporary:** `ContentLoader.Load()` with no argument uses `GameDataAsset.Current` (the last loaded asset), or empty content when there is none. It is kept only because `TextKeyView` still calls it. Both go once `TextKeyView` gets the asset passed in.
+- **Tests, bots and editor tools:** read the file text themselves from `Assets/GameData` (for example `Path.Combine(Application.dataPath, "GameData/balance.json")`) and call `BalanceLoader.Parse(json, out error)` and `ContentLoader.ParseLines/ParseBriefs/ParseParts/ParseUiText`. These do not log and need no data asset or scene. A test can also build `BalanceData` or `ContentData` directly in code, with no Data reference needed for that.
 - **Run creation:** one factory in `Logic/Run/` takes `BalanceData`, `ContentData` and a seed and returns a `Run`. The game start, tests and bots all use it.
 - **Validation:** `BalanceLoader.Parse` only checks that required objects exist. The full balance rules are checked by `agents/checks/simulate.py`. The run does not re-check them.
 - JSON stays readable by `JsonUtility`: `[Serializable]` classes, arrays, no dictionaries, no top-level arrays.

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -27,6 +28,15 @@ namespace GoodEnoughRepairs.Tests
         {
             if (go != null) UnityEngine.Object.DestroyImmediate(go);
             go = null;
+        }
+
+        private static BalanceData LoadBalance()
+        {
+            string path = Path.Combine(Application.dataPath, "GameData/balance.json");
+            string error;
+            BalanceData data = BalanceLoader.Parse(File.ReadAllText(path), out error);
+            Assert.IsNotNull(data, "balance.json must load: " + error);
+            return data;
         }
 
         private static Type ViewType()
@@ -107,7 +117,7 @@ namespace GoodEnoughRepairs.Tests
 
         private object MakeView(out Ship ship, bool withLines)
         {
-            balance = BalanceLoader.Load();
+            balance = LoadBalance();
             ship = ShipFactory.Create(balance, balance.days[0], new System.Random(1));
             bays = new DockingBays();
             bays.TryDock(ship);

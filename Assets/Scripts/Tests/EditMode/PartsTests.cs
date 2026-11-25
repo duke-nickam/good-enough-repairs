@@ -8,7 +8,7 @@ namespace GoodEnoughRepairs
     {
         private static BalanceData LoadBalance()
         {
-            string path = Path.Combine(Path.Combine(UnityEngine.Application.dataPath, "StreamingAssets"), BalanceLoader.FileName);
+            string path = Path.Combine(UnityEngine.Application.dataPath, "GameData/balance.json");
             string json = File.ReadAllText(path);
             string error;
             BalanceData data = BalanceLoader.Parse(json, out error);

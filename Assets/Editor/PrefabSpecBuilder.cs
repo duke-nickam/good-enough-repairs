@@ -15,6 +15,9 @@
  *                                         The path may be a changed copy of a spec.
  *   PrefabSpecBuilder.Build(specPath)     the same as BuildSpecAt (kept for old callers)
  *
+ * The sample ship and the mechanic's lines in screenshots come from the JSON files
+ * in Assets/GameData (balance.json and content/), read as plain files and parsed.
+ *
  * The builder prints "MADE: <path>" for every sprite PNG, prefab and scene it
  * handled and "SCREENSHOT: <absolute path>" for every screenshot. A prefab or scene
  * that needed no change is also reported with "UNCHANGED: <path>" and its file is
@@ -556,6 +559,68 @@ namespace GoodEnoughRepairs.EditorTools
         public static string InstanceName(string rootName, int bay)
         {
             return rootName + BaySuffix + bay;
+        }
+
+        private static string GameDataFile(string relative)
+        {
+            return Path.Combine(Application.dataPath, "GameData/" + relative);
+        }
+
+        /// <summary>
+        /// Reads Assets/GameData/balance.json as a plain file and parses it.
+        /// Logs an error and returns null when it is missing or bad.
+        /// </summary>
+        public static BalanceData LoadBalance()
+        {
+            string path = GameDataFile("balance.json");
+            if (!File.Exists(path))
+            {
+                Debug.LogError("[Builder] File not found: " + path);
+                return null;
+            }
+            string error;
+            BalanceData data = BalanceLoader.Parse(File.ReadAllText(path), out error);
+            if (data == null) Debug.LogError("[Builder] balance.json is not usable: " + error);
+            return data;
+        }
+
+        /// <summary>
+        /// Reads the content JSON files from Assets/GameData/content as plain files
+        /// and parses them. A missing or bad file is logged and left out (empty text).
+        /// </summary>
+        public static ContentData LoadContent()
+        {
+            string error;
+            MechanicLinesFile lines = null;
+            DayBriefsFile briefs = null;
+            PartCatalogFile parts = null;
+            UiTextFile ui = null;
+
+            string p = GameDataFile("content/mechanic_lines.json");
+            if (File.Exists(p))
+            {
+                lines = ContentLoader.ParseLines(File.ReadAllText(p), out error);
+                if (lines == null) Debug.LogError("[Builder] mechanic_lines.json is not usable: " + error);
+            }
+            p = GameDataFile("content/day_briefs.json");
+            if (File.Exists(p))
+            {
+                briefs = ContentLoader.ParseBriefs(File.ReadAllText(p), out error);
+                if (briefs == null) Debug.LogError("[Builder] day_briefs.json is not usable: " + error);
+            }
+            p = GameDataFile("content/part_catalog.json");
+            if (File.Exists(p))
+            {
+                parts = ContentLoader.ParseParts(File.ReadAllText(p), out error);
+                if (parts == null) Debug.LogError("[Builder] part_catalog.json is not usable: " + error);
+            }
+            p = GameDataFile("content/ui_text.json");
+            if (File.Exists(p))
+            {
+                ui = ContentLoader.ParseUiText(File.ReadAllText(p), out error);
+                if (ui == null) Debug.LogError("[Builder] ui_text.json is not usable: " + error);
+            }
+            return new ContentData(lines, briefs, parts, null, ui);
         }
 
         /// <summary>Builds every *.spec.json under Assets/.</summary>
@@ -1800,7 +1865,7 @@ namespace GoodEnoughRepairs.EditorTools
             WarningView warnView, string dialog, Camera cam, string fileName, int[] conditions, int w, int h,
             string specPath)
         {
-            BalanceData balance = BalanceLoader.Load();
+            BalanceData balance = LoadBalance();
             if (balance == null) throw Fail(specPath, "the balance could not be loaded for the sample ship");
 
             // Every shot except the warning shot is taken with the warning dialog
@@ -1840,7 +1905,7 @@ namespace GoodEnoughRepairs.EditorTools
                 FillSampleShips(balance, surplusMargin, 2);
 
                 BuyRelease commands = new BuyRelease(bays, inventory, balance);
-                warnView.Bind(commands, ContentLoader.Load());
+                warnView.Bind(commands, LoadContent());
                 if (dialog == "buy")
                 {
                     bool opened = false;

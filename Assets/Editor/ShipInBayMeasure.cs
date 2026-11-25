@@ -27,7 +27,8 @@
  *      fill color against the band's color.
  *
  * Where values come from: rectangles and sample conditions from the spec, the required
- * level from the generated ship. The scene is not saved after the sample ships are shown.
+ * level from the generated ship. The balance is read from Assets/GameData/balance.json.
+ * The scene is not saved after the sample ships are shown.
  */
 
 using System;
@@ -177,7 +178,7 @@ namespace GoodEnoughRepairs.EditorTools
 
             try
             {
-                BalanceData balance = BalanceLoader.Load();
+                BalanceData balance = PrefabSpecBuilder.LoadBalance();
                 if (balance == null || balance.days == null || balance.days.Length == 0)
                 {
                     MissingAllBays("balance.json");

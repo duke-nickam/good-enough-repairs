@@ -135,7 +135,7 @@ namespace GoodEnoughRepairs.Tests
         [Test]
         public void RealFile_HasEveryKeyTheViewsUse()
         {
-            string path = Path.Combine(Application.dataPath, "StreamingAssets/content/ui_text.json");
+            string path = Path.Combine(Application.dataPath, "GameData/content/ui_text.json");
             Assert.IsTrue(File.Exists(path), path);
             string error;
             UiTextFile f = ContentLoader.ParseUiText(File.ReadAllText(path), out error);
