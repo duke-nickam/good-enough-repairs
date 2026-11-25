@@ -791,25 +791,11 @@ class Runner:
         answers = f"\n\nAnswers to the note's questions:\n{answers}" if answers else ""
         added = []
         if kind == "approve" and verdict.get("add_files"):
-            wanted = [f.strip().strip("`") for f in verdict["add_files"] if f and f.strip().strip("`") not in card.files]
-            others = {}
-            for i in self.board.items():
-                c = self.card(i.number) if i.kind == "task" and i.state == "OPEN" and i.number != n else None
-                for f in (c.files if c else []):
-                    others[f] = f"#{i.number}"
-            problems = [x for f in wanted for x in added_file_problems(card.agent, card.reviewer, f, others)]
+            added, problems = self.add_card_files(n, card, verdict["add_files"])
             if problems:
                 kind = "ask"  # the runner may not add them: the designer decides
                 verdict["questions"] = (verdict.get("questions") or []) + [
                     "The note needs files the card does not list, and they cannot be added: " + "; ".join(problems)]
-            elif wanted:
-                body = self.board.issue(n).body
-                line = "**Files:** " + ", ".join(f"`{f}`" for f in card.files + wanted)
-                self.board.set_body(n, re.sub(r"^\*\*Files:\*\*.*$", lambda _: line, body, count=1, flags=re.M))
-                card.files += wanted
-                self.cards[n] = card
-                added = wanted
-                log("Director", f"#{n}: added to the card: {', '.join(wanted)}")
         if added:
             answers += "\n\nAdded to the card's Files: " + ", ".join(f"`{f}`" for f in added) + "."
         if kind == "approve":
@@ -837,6 +823,25 @@ class Runner:
                             f"follows the note and your answers.\n\nTask total: {total:,} tokens.",
                 "needs_designer", attempt=attempt))
             log("Director", f"#{n}: design note has open questions, Needs designer")
+
+    def add_card_files(self, n, card, files):
+        """Adds files the Director approved to task n's card. Returns (added, problems); nothing is added on problems."""
+        wanted = [f.strip().strip("`") for f in files if f and f.strip().strip("`") not in card.files]
+        others = {}
+        for i in self.board.items():
+            c = self.card(i.number) if i.kind == "task" and i.state == "OPEN" and i.number != n else None
+            for f in (c.files if c else []):
+                others[f] = f"#{i.number}"
+        problems = [x for f in wanted for x in added_file_problems(card.agent, card.reviewer, f, others)]
+        if problems or not wanted:
+            return [], problems
+        body = self.board.issue(n).body
+        line = "**Files:** " + ", ".join(f"`{f}`" for f in card.files + wanted)
+        self.board.set_body(n, re.sub(r"^\*\*Files:\*\*.*$", lambda _: line, body, count=1, flags=re.M))
+        card.files += wanted
+        self.cards[n] = card
+        log("Director", f"#{n}: added to the card: {', '.join(wanted)}")
+        return wanted, []
 
     def triage(self, t, card, issue, question, usages, who, attempt):
         """A task's question goes to the Director first, as to a producer. It answers what the GDD, docs/crew/ or the
@@ -872,6 +877,12 @@ class Runner:
             kind = "ask"
         if kind == "answer" and attempt >= self.max:
             kind = "ask"  # no attempt left to follow the answer: the designer decides
+        added = []
+        if kind == "answer" and verdict.get("add_files"):
+            added, bad = self.add_card_files(n, card, verdict["add_files"])
+            if bad:
+                log("Director", f"#{n}: the answer needs files that cannot join the card, the designer decides")
+                kind = "ask"
         if kind == "tool":
             depth = self.tool_depth(card.epic) + 1
             if depth > int(self.s.get("tool_depth", 2)):
@@ -882,11 +893,12 @@ class Runner:
             return False
         total = self.add_tokens(t, usages + used)
         if kind == "answer":
+            files_note = ("\n\nAdded to the card's Files: " + ", ".join(f"`{f}`" for f in added) + ".") if added else ""
             self.board.set_status(n, "Todo")
             self.board.comment(n, crew_comment(
                 who, f"Question (attempt {attempt}):\n\n{question}", "question_asked", attempt=attempt))
             self.board.comment(n, crew_comment(
-                "Director", f"Answer: {verdict.get('answer', '')}\n\nBack to Todo; the next attempt follows this "
+                "Director", f"Answer: {verdict.get('answer', '')}{files_note}\n\nBack to Todo; the next attempt follows this "
                             f"answer.\n\nTask total: {total:,} tokens.", "triage_answer"))
             log("Director", f"#{n}: answered the agent's question, back to Todo")
             return True
