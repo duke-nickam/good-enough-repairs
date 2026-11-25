@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ee43b207180911459fb789b25ba9a91, type: 3}
+  m_Name: GameData
+  m_EditorClassIdentifier: GoodEnoughRepairs.Data::GoodEnoughRepairs.GameDataAsset
+  balance: {fileID: 4900000, guid: f99990cb4d56c6f4fb4dd60a46db3688, type: 3}
+  dayBriefs: {fileID: 4900000, guid: a74130d09e562d74c92a70cec78befb6, type: 3}
+  mechanicLines: {fileID: 4900000, guid: ad0c2c9ee1194fd44b5dd4692bd2cbbf, type: 3}
+  partCatalog: {fileID: 4900000, guid: 81b6090ab6a58154388a25754cf9f603, type: 3}
+  uiText: {fileID: 4900000, guid: b0df54849db477749b231497226b9266, type: 3}

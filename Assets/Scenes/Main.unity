@@ -593,6 +593,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: GoodEnoughRepairs.UX::GoodEnoughRepairs.StationView
   seed: 1
+  gameData: {fileID: 11400000, guid: 833cb1a031518a1428f331ae9a9e2d39, type: 2}
   bay1View: {fileID: 516385630}
   bay2View: {fileID: 1260487893}
   bay3View: {fileID: 1330613840}
