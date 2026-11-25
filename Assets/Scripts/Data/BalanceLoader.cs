@@ -1,33 +1,44 @@
 using System;
-using System.IO;
 using UnityEngine;
 
 namespace GoodEnoughRepairs
 {
-    // Reads balance.json from StreamingAssets at game start.
+    // Reads the balance text from the game data asset at game start.
     // Never throws: on a missing or bad file it logs an error and returns null.
     public static class BalanceLoader
     {
+        // The name of the data file, used in messages.
         public const string FileName = "balance.json";
 
+        // For callers that were not given the asset (for example editor tools):
+        // uses the most recently loaded game data asset, or returns null and logs.
         public static BalanceData Load()
         {
-            string path = Path.Combine(Application.streamingAssetsPath, FileName);
+            return Load(GameDataAsset.Current);
+        }
 
-            if (!File.Exists(path))
+        public static BalanceData Load(GameDataAsset asset)
+        {
+            if (asset == null)
             {
-                Debug.LogError("[Balance] File not found: " + path);
+                Debug.LogError("[Balance] No game data asset is assigned.");
+                return null;
+            }
+
+            if (asset.balance == null)
+            {
+                Debug.LogError("[Balance] The game data asset has no " + FileName + " assigned.");
                 return null;
             }
 
             string json;
             try
             {
-                json = File.ReadAllText(path);
+                json = asset.balance.text;
             }
             catch (Exception e)
             {
-                Debug.LogError("[Balance] Could not read " + path + ": " + e.Message);
+                Debug.LogError("[Balance] Could not read " + FileName + ": " + e.Message);
                 return null;
             }
 

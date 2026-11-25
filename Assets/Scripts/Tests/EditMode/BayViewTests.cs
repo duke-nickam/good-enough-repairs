@@ -21,7 +21,7 @@ namespace GoodEnoughRepairs.Tests
         [SetUp]
         public void SetUp()
         {
-            string path = Path.Combine(Application.dataPath, "StreamingAssets/balance.json");
+            string path = Path.Combine(Application.dataPath, "GameData/balance.json");
             string error;
             balance = BalanceLoader.Parse(File.ReadAllText(path), out error);
             Assert.IsNotNull(balance, "balance.json must load: " + error);

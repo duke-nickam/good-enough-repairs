@@ -14,6 +14,12 @@ namespace GoodEnoughRepairs
         [SerializeField] private int seed = 1;
 
         /// <summary>
+        /// The game data asset that holds the five JSON files (balance and content).
+        /// It is passed to the loaders at start.
+        /// </summary>
+        [SerializeField] private GameDataAsset gameData;
+
+        /// <summary>
         /// Optional prefab instance for bay 1. When assigned, it shows the bay 1
         /// ship every frame, centered in the bay, and the old OnGUI ship panel is
         /// not used for that bay. An empty bay hides its view.
@@ -70,10 +76,10 @@ namespace GoodEnoughRepairs
         private void Awake()
         {
             // The text is loaded once and shared with every view.
-            content = ContentLoader.Load();
+            content = ContentLoader.Load(gameData);
             TextKeyView.SetShared(content);
 
-            balance = BalanceLoader.Load();
+            balance = BalanceLoader.Load(gameData);
             if (balance == null)
             {
                 Debug.LogError("[Station] Balance could not be loaded. The station will not start.");
