@@ -30,10 +30,10 @@ sys.path.insert(0, str(HERE))
 from board.agents import AgentError, ClaudeAgents, extract_json, gdd_sections, total_tokens  # noqa: E402
 
 GUIDE = ROOT / "docs" / "style-guide.md"
-LINES = ROOT / "Assets" / "StreamingAssets" / "content" / "mechanic_lines.json"
+LINES = ROOT / "Assets" / "GameData" / "content" / "mechanic_lines.json"
 OUT = ROOT / "docs" / "assignment-6"
 SCIFI = ("warp", "hyperdrive", "hyperspace", "laser", "droid", "alien", "empire", "federation", "starfleet", "captain")
-LONG_DASHES = ("—", "–")
+LONG_DASHES = ("\u2014", "\u2013")
 
 
 # ------------------------------------------------------------ the style guide
