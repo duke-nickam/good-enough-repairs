@@ -23,10 +23,9 @@ namespace GoodEnoughRepairs
         [Tooltip("Assets/GameData/content/ui_text.json")]
         public TextAsset uiText;
 
-        /// <summary>
-        /// The most recently loaded game data asset. Used only by the loaders'
-        /// no-argument Load() overloads, for callers that were not given the asset.
-        /// </summary>
+        // TEMPORARY: the last asset that was loaded. Only the no-argument
+        // ContentLoader.Load() uses it, because TextKeyView.cs (not in this task)
+        // still calls that. Remove it with that overload once TextKeyView passes the asset.
         public static GameDataAsset Current { get; private set; }
 
         private void OnEnable()

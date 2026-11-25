@@ -10,13 +10,6 @@ namespace GoodEnoughRepairs
         // The name of the data file, used in messages.
         public const string FileName = "balance.json";
 
-        // For callers that were not given the asset (for example editor tools):
-        // uses the most recently loaded game data asset, or returns null and logs.
-        public static BalanceData Load()
-        {
-            return Load(GameDataAsset.Current);
-        }
-
         public static BalanceData Load(GameDataAsset asset)
         {
             if (asset == null)

@@ -14,11 +14,14 @@ namespace GoodEnoughRepairs
         public const string PartsFileName = "part_catalog.json";
         public const string UiTextFileName = "ui_text.json";
 
-        // For callers that were not given the asset: uses the most recently
-        // loaded game data asset. Without one, returns empty content.
+        // TEMPORARY: kept only because TextKeyView.cs (not in this task) still calls
+        // Load() with no argument. Uses the last loaded GameDataAsset, or empty
+        // content (quietly) when there is none. Remove when TextKeyView passes the asset.
         public static ContentData Load()
         {
-            return Load(GameDataAsset.Current);
+            GameDataAsset current = GameDataAsset.Current;
+            if (current == null) return ContentData.Empty();
+            return Load(current);
         }
 
         // Always returns a usable ContentData, never null.
