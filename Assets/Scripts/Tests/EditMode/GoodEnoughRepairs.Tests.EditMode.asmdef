@@ -5,7 +5,8 @@
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "GoodEnoughRepairs.Logic",
-        "GoodEnoughRepairs.Data"
+        "GoodEnoughRepairs.Data",
+        "GoodEnoughRepairs.Editor"
     ],
     "includePlatforms": [
         "Editor"

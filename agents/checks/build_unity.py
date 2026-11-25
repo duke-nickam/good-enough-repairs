@@ -13,9 +13,17 @@ Unity's executable path comes only from the UNITY_PATH environment variable.
 Unity runs with -executeMethod and -quit, with graphics on (screenshots need
 rendering). The log is written to a temp folder outside the project.
 
-The builder prints one line "MADE: <path>" per file Unity made and one line
-"SCREENSHOT: <absolute path>" per screenshot. These lines are passed through
-unchanged. The check fails when either kind is missing.
+Output, in this order:
+  "MADE: <path>"           one per file Unity made (passed through unchanged)
+  "SCREENSHOT: <path>"     one per screenshot, only for specs the builder photographed
+  "SKIPPED: <spec path>"   one per spec the builder did not photograph because it
+                           was unchanged and already had its shot
+
+The builder tells which is which with one line per spec: "BUILT: <spec> (screenshot
+taken)", "BUILT: <spec> (no screenshot)" or "SKIPPED (unchanged): <spec>". The
+SCREENSHOT lines of a spec come before its BUILT line. The check fails when no MADE
+line is printed, when nothing was photographed and nothing was skipped, or when a
+SCREENSHOT line does not belong to a photographed spec.
 
 Exit 0 when all is fine, exit 1 otherwise.
 """
@@ -36,6 +44,72 @@ EXCEPTION_PATTERNS = [
     re.compile(r"executeMethod method .* could not be found", re.IGNORECASE),
     re.compile(r"Exception:"),
 ]
+
+BUILT_PREFIX = "BUILT: "
+BUILT_SHOT_SUFFIX = " (screenshot taken)"
+BUILT_NO_SHOT_SUFFIX = " (no screenshot)"
+SKIPPED_PREFIX = "SKIPPED (unchanged): "
+SHOT_PREFIX = "SCREENSHOT: "
+
+
+def parse_specs(log_lines):
+    """Read the per-spec lines of a builder log.
+
+    Returns a dict:
+      photographed  list of (spec path, [screenshot paths]) in log order
+      built_no_shot list of spec paths that changed but took no screenshot
+      skipped       list of spec paths that were unchanged and not photographed
+      problems      list of messages about lines that do not fit together
+    """
+    result = {"photographed": [], "built_no_shot": [], "skipped": [], "problems": []}
+    pending = []
+    for raw in log_lines:
+        line = raw.rstrip()
+        if line.startswith(SHOT_PREFIX):
+            pending.append(line[len(SHOT_PREFIX):].strip())
+        elif line.startswith(BUILT_PREFIX):
+            rest = line[len(BUILT_PREFIX):]
+            if rest.endswith(BUILT_SHOT_SUFFIX):
+                spec = rest[:-len(BUILT_SHOT_SUFFIX)].strip()
+                if not pending:
+                    result["problems"].append("spec reported as photographed but no SCREENSHOT line: " + spec)
+                result["photographed"].append((spec, pending))
+                pending = []
+            elif rest.endswith(BUILT_NO_SHOT_SUFFIX):
+                spec = rest[:-len(BUILT_NO_SHOT_SUFFIX)].strip()
+                if pending:
+                    result["problems"].append("SCREENSHOT line for a spec reported without a screenshot: " + spec)
+                    pending = []
+                result["built_no_shot"].append(spec)
+        elif line.startswith(SKIPPED_PREFIX):
+            spec = line[len(SKIPPED_PREFIX):].strip()
+            if pending:
+                result["problems"].append("SCREENSHOT line for a skipped spec: " + spec)
+                pending = []
+            result["skipped"].append(spec)
+    if pending:
+        result["problems"].append("SCREENSHOT line without a spec line: " + pending[0])
+    return result
+
+
+def log_failure(log_lines, log_path, method, exit_code):
+    """Return a list of FAIL lines for compile errors, exceptions or a bad exit code."""
+    out = []
+    compile_errors = [l for l in log_lines if "error CS" in l and re.search(r"error CS\d+", l)]
+    if compile_errors:
+        out.append("compile errors (%d)" % len(compile_errors))
+    exceptions = []
+    for line in log_lines:
+        if line.startswith("MADE: ") or line.startswith(SHOT_PREFIX):
+            continue
+        if any(p.search(line) for p in EXCEPTION_PATTERNS):
+            exceptions.append(line)
+    if exceptions:
+        out.append("exception in %s (%d line(s)): %s"
+                   % (method, len(exceptions), ascii_text(exceptions[0].strip())))
+    if exit_code != 0:
+        out.append("Unity exited with code %d" % exit_code)
+    return out
 
 
 def main(argv):
@@ -87,14 +161,13 @@ def main(argv):
         return fail("Unity wrote no log (exit code %d). Log: %s" % (exit_code, log_path))
 
     made = [l.rstrip() for l in log_lines if l.startswith("MADE: ")]
-    shots = [l.rstrip() for l in log_lines if l.startswith("SCREENSHOT: ")]
 
     if report_compile_errors(log_lines, log_path):
         return 1
 
     exceptions = []
     for line in log_lines:
-        if line.startswith("MADE: ") or line.startswith("SCREENSHOT: "):
+        if line.startswith("MADE: ") or line.startswith(SHOT_PREFIX):
             continue
         if any(p.search(line) for p in EXCEPTION_PATTERNS):
             exceptions.append(line)
@@ -112,13 +185,18 @@ def main(argv):
             print("  " + ascii_text(line))
         return 1
 
-    problems = []
+    specs = parse_specs(log_lines)
+    shots = []
+    for _, paths in specs["photographed"]:
+        shots.extend(paths)
+    skipped = specs["skipped"]
+
+    problems = list(specs["problems"])
     if not made:
         problems.append("no MADE line was printed")
-    if not shots:
-        problems.append("no SCREENSHOT line was printed")
-    for line in shots:
-        path = line[len("SCREENSHOT: "):].strip()
+    if not shots and not skipped:
+        problems.append("no spec was photographed and none was skipped")
+    for path in shots:
         if not os.path.isabs(path):
             problems.append("screenshot path is not absolute: " + path)
         elif not os.path.isfile(path):
@@ -127,8 +205,12 @@ def main(argv):
         print("FAIL: " + ascii_text("; ".join(problems)) + ". Log: " + ascii_text(log_path))
         return 1
 
-    for line in made + shots:
+    for line in made:
         print(line)
+    for path in shots:
+        print(SHOT_PREFIX + path)
+    for spec in skipped:
+        print("SKIPPED: " + spec)
     return 0
 
 
