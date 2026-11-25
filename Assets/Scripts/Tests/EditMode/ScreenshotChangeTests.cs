@@ -59,5 +59,28 @@ namespace GoodEnoughRepairs.Tests
             string line = ScreenshotDecision.BuildLine(Spec, false, true);
             Assert.AreEqual("BUILT: " + Spec + " (screenshot taken)", line);
         }
+
+        [Test]
+        public void OnlyTheChangedSpecIsPhotographedWhenAllShotsExist()
+        {
+            // Three specs, all with an earlier shot, only the second one changed.
+            bool[] changed = { false, true, false };
+            int photographed = 0;
+            for (int i = 0; i < changed.Length; i++)
+            {
+                if (ScreenshotDecision.ShouldPhotograph(true, changed[i], true)) photographed++;
+            }
+            Assert.AreEqual(1, photographed);
+        }
+
+        [Test]
+        public void NoSpecIsPhotographedWhenNothingChangedAndAllShotsExist()
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                Assert.IsFalse(ScreenshotDecision.ShouldPhotograph(true, false, true));
+                StringAssert.StartsWith("SKIPPED (unchanged): ", ScreenshotDecision.BuildLine(Spec, false, false));
+            }
+        }
     }
 }
