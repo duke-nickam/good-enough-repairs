@@ -18,7 +18,7 @@ All code is under `Assets/Scripts`, one subfolder per assembly. Each assembly ha
 | `Data/` | `GoodEnoughRepairs.Data` | the loaders: `BalanceLoader`, `ContentLoader` | Logic, UnityEngine |
 | `UX/` | `GoodEnoughRepairs.UX` | the show layer's view scripts (Programmer) | Logic, Data |
 | `Bots/` | `GoodEnoughRepairs.Bots` | the QA Playtester's buyer and swapper bots | Logic, Data |
-| `Tests/EditMode/` | `GoodEnoughRepairs.Tests.EditMode` | EditMode tests (not in the build) | Logic, Data |
+| `Tests/EditMode/` | `GoodEnoughRepairs.Tests.EditMode` | EditMode tests (not in the build) | Logic, Data, Editor (tests of Editor tools need it) |
 
 The namespace stays `GoodEnoughRepairs` in every folder. `UX/` is outside `Logic/`, so the boundary is real: Logic cannot see UX, Data, a scene or any UnityEngine type.
 
