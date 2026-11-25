@@ -57,7 +57,7 @@ allows: every task costs tokens."""
 TRIAGE_FORMAT = """A task's agent stopped with a question instead of finishing. Decide it like a producer.
 Reply with one JSON object only, no other text. One of:
 {"verdict": "answer", "summary": "<one sentence>", "answer": "<the answer, naming where the GDD, docs/crew/ or the
-  card gives it>"}
+  card gives it>", "add_files": ["<only if the answer has the agent write a file the card does not list>"]}
 {"verdict": "plan", "summary": "<one sentence: what is missing and who builds it>",
  "task": {"title": "<what the agent does>", "agent": "<agent key>", "reviewer": "<agent key>", "what": "<instructions>",
    "acceptance": ["<criterion>"], "files": ["<repo path>"], "reads": ["<repo path>"],
@@ -66,6 +66,8 @@ Reply with one JSON object only, no other text. One of:
  "goal": "<what the tool lets the crew do, one sentence>", "done_when": ["<a fact the designer can check>"]}
 {"verdict": "ask", "summary": "<one sentence>", "questions": ["<a question only the designer can decide>"]}
 answer: the GDD, docs/crew/ or the card already answer the question.
+add_files: an answer may let the agent write an existing file the card lacks, only when the task cannot be done
+without it and it stays in the task's scope; the runner adds it to the card. The agent may write no other file.
 plan or tool: something outside the agent's files is missing. Choose plan for a small piece only this epic needs,
 one task in size. Choose tool for a general tool other epics will use too, or anything bigger than one task: it
 becomes its own request with its own epic, done first; the blocked task waits until that request is closed.
