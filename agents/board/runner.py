@@ -438,6 +438,7 @@ class Runner:
                 self.board.close(t.number)
                 log("Runner", f"#{t.number}: Done, closed")
         items = self.board.items()
+        requests = None  # open requests, read once and only when a closed epic needs them
         for e in (i for i in items if i.kind == "epic"):
             tasks = [i for i in items if i.kind == "task" and i.reason != "NOT_PLANNED" and self.card(i.number)
                      and self.card(i.number).epic == e.number]
@@ -446,9 +447,12 @@ class Runner:
             if total != e.tokens:
                 self.board.set_tokens(e.number, total)  # the epic shows planning plus all its tasks
             if e.state == "CLOSED":
-                if e.reason != "NOT_PLANNED" and e.status != "Done":
-                    self.board.set_status(e.number, "Done")
-                    self.epic_done(e)
+                if e.reason != "NOT_PLANNED":
+                    if e.status != "Done":  # the board's own automation may already have moved it
+                        self.board.set_status(e.number, "Done")
+                    if requests is None:
+                        requests = self.board.requests()
+                    self.epic_done(e, requests)
                 continue
             if not tasks:
                 if e.status != "Backlog":  # an epic without tasks is not planned, so it cannot go further
@@ -472,11 +476,13 @@ class Runner:
             elif any(t.status in ACTIVE or t.state == "CLOSED" for t in tasks) and e.status != "In progress":
                 self.board.set_status(e.number, "In progress")
 
-    def epic_done(self, e):
-        """Tells the goal that planned the epic: its next turn checks the goal again."""
-        for r in self.board.requests():
-            plans = [c.marker for c in r.comments if c.marker and c.marker.get("event") == "plan"]
-            if any(e.number in p.get("epics", []) for p in plans):
+    def epic_done(self, e, requests):
+        """Tells the open goal that planned the epic, once: its next turn checks the goal again."""
+        for r in requests:
+            marks = [c.marker for c in r.comments if c.marker]
+            planned = any(e.number in m.get("epics", []) for m in marks if m.get("event") == "plan")
+            told = any(m.get("epic") == e.number for m in marks if m.get("event") == "epic_done")
+            if planned and not told:
                 self.board.comment(r.number, crew_comment("Runner", f"Epic #{e.number} {e.title} is Done.",
                                                           "epic_done", epic=e.number))
                 log("Runner", f"epic #{e.number}: Done, told request #{r.number}")
