@@ -157,7 +157,7 @@
   "scene": {
     "path": "Assets/Scenes/Main.unity",
     "stationField": "inventoryView",
-    "worldX": 5, "worldY": -0.5, "worldScale": 0.8,
+    "worldX": 5, "worldY": -2.24, "worldScale": 0.8,
     "screenshot": "inventory_panel.png",
     "sampleConditions": [
       { "part": "Engine", "condition": 35 },
