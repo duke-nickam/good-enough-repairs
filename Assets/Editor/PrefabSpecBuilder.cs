@@ -1959,6 +1959,9 @@ namespace GoodEnoughRepairs.EditorTools
             BalanceData balance = LoadBalance();
             if (balance == null) throw Fail(specPath, "the balance could not be loaded for the sample ship");
 
+            // Text elements read the shared content; in batch mode nothing else sets it.
+            TextKeyView.SetShared(LoadContent());
+
             // Every shot except the warning shot is taken with the warning dialog
             // closed. In edit mode WarningView.Awake does not run, so the dialog
             // would stay open (with raw text) in the scene.
