@@ -143,6 +143,16 @@ namespace GoodEnoughRepairs
         public bool IsOver { get { return phase == RunPhase.Over; } }
         public DockingBays Bays { get { return bays; } }
         public Inventory Inventory { get { return inventory; } }
+        /// <summary>
+        /// The run's own move and bin commands. Views bind to these, so every
+        /// credit change goes through the run.
+        /// </summary>
+        public PartMoves Moves { get { return moves; } }
+        /// <summary>
+        /// The run's own buy and release commands (with previews). Views bind to
+        /// these, so every credit change goes through the run.
+        /// </summary>
+        public BuyRelease Commands { get { return buyRelease; } }
         /// <summary>The last finished day's summary, or null.</summary>
         public DaySummary LastSummary { get { return lastSummary; } }
         /// <summary>Ships released without any penalty fill, over the run.</summary>
@@ -319,6 +329,146 @@ namespace GoodEnoughRepairs
                 Action<RunOutcome> r = RunEnded;
                 if (r != null) r(outcome);
             }
+        }
+    }
+
+    /// <summary>
+    /// What the credits counter shows, as plain data. It follows the run's credits
+    /// changed event. The credits view only displays Shown.
+    /// </summary>
+    public sealed class CreditsDisplay
+    {
+        private Run run;
+
+        /// <summary>The credits shown now.</summary>
+        public int Shown { get; private set; }
+
+        /// <summary>Fires after Shown changed (also when bound).</summary>
+        public event Action<int> Changed;
+
+        /// <summary>Connects to a run (or a new run) and takes its credits.</summary>
+        public void Bind(Run newRun)
+        {
+            Unbind();
+            run = newRun;
+            if (run == null) return;
+            run.CreditsChanged += OnCreditsChanged;
+            Set(run.Credits);
+        }
+
+        /// <summary>Disconnects from the run.</summary>
+        public void Unbind()
+        {
+            if (run != null) run.CreditsChanged -= OnCreditsChanged;
+            run = null;
+        }
+
+        private void OnCreditsChanged(int total, int delta)
+        {
+            Set(total);
+        }
+
+        private void Set(int total)
+        {
+            Shown = total;
+            Action<int> handler = Changed;
+            if (handler != null) handler(total);
+        }
+    }
+
+    /// <summary>
+    /// What the end-of-day panel shows, as plain data: open or closed, the title
+    /// key, which button is offered. The summary view only displays it and
+    /// forwards its buttons. It calls the run's commands and holds no other rules.
+    /// </summary>
+    public sealed class SummaryPanelState
+    {
+        public const string TitleDay = "summary_title";
+        public const string TitleWin = "run_end_title_win";
+        public const string TitleBankrupt = "run_end_title_bankrupt";
+
+        private Run run;
+        private Action onContinued;
+        private Action onPlayAgain;
+
+        public bool IsOpen { get; private set; }
+        public bool ShowsContinue { get; private set; }
+        public bool ShowsPlayAgain { get; private set; }
+        public bool IsRunOver { get; private set; }
+        public string TitleKey { get; private set; }
+        public DaySummary Shown { get; private set; }
+
+        /// <summary>Fires after the state changed.</summary>
+        public event Action Changed;
+
+        /// <summary>
+        /// Connects to a run and closes the panel. continued is called after
+        /// Continue moved the run on; playAgain when Play again is pressed.
+        /// </summary>
+        public void Bind(Run newRun, Action continued, Action playAgain)
+        {
+            Unbind();
+            run = newRun;
+            onContinued = continued;
+            onPlayAgain = playAgain;
+            if (run != null) run.DayEnded += OnDayEnded;
+            Hide();
+        }
+
+        /// <summary>Disconnects from the run.</summary>
+        public void Unbind()
+        {
+            if (run != null) run.DayEnded -= OnDayEnded;
+            run = null;
+        }
+
+        private void OnDayEnded(DaySummary summary)
+        {
+            Shown = summary;
+            IsOpen = true;
+            IsRunOver = summary.IsBankrupt || summary.IsLastDay;
+            ShowsContinue = !IsRunOver;
+            ShowsPlayAgain = IsRunOver;
+            if (summary.IsBankrupt) TitleKey = TitleBankrupt;
+            else if (summary.IsLastDay) TitleKey = TitleWin;
+            else TitleKey = TitleDay;
+            Raise();
+        }
+
+        private void Hide()
+        {
+            IsOpen = false;
+            ShowsContinue = false;
+            ShowsPlayAgain = false;
+            IsRunOver = false;
+            Shown = null;
+            Raise();
+        }
+
+        private void Raise()
+        {
+            Action handler = Changed;
+            if (handler != null) handler();
+        }
+
+        /// <summary>Continue: asks the run to move on, then closes. False when refused.</summary>
+        public bool PressContinue()
+        {
+            if (!IsOpen || !ShowsContinue || run == null) return false;
+            RunResult result = run.Continue();
+            if (!result.Success) return false;
+            Hide();
+            if (onContinued != null) onContinued();
+            return true;
+        }
+
+        /// <summary>Play again: closes and asks for a new run. False when not offered.</summary>
+        public bool PressPlayAgain()
+        {
+            if (!IsOpen || !ShowsPlayAgain) return false;
+            Hide();
+            if (onPlayAgain != null) onPlayAgain();
+            return true;
         }
     }
 }

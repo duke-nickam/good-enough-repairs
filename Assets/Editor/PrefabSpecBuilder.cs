@@ -66,10 +66,10 @@
  *     parent, or added by hand) is removed alone. A rename or a move counts as
  *     remove and add.
  *   - Child order follows the spec order.
- *   - Components: ShipView, InventoryView, WarningView, SpriteRenderer and text
- *     (TextMesh and TextKeyView) are removed when the spec no longer asks for
- *     them. Canvas, Image and Button are added when missing but not removed, so
- *     remove the object instead.
+ *   - Components: ShipView, InventoryView, WarningView, CreditsView, DaySummaryView,
+ *     SpriteRenderer and text (TextMesh and TextKeyView) are removed when the spec
+ *     no longer asks for them. Canvas, Image and Button are added when missing but
+ *     not removed, so remove the object instead.
  *   - Links are set when they differ. A link dropped from the spec is not cleared
  *     unless its target object is removed.
  *   - A spec error stops the build before the prefab is saved.
@@ -121,6 +121,8 @@
  *                        "ShipView"        the ship view (UX assembly)
  *                        "InventoryView"   the inventory panel with drag and drop
  *                        "WarningView"     the buy and release warning dialog
+ *                        "CreditsView"     the credits counter
+ *                        "DaySummaryView"  the end-of-day summary panel
  *                        "TextKeyView"     a text element component (not needed
  *                                          when "textKey" is set)
  *                        "SpriteRenderer"  an empty SpriteRenderer (not needed
@@ -156,8 +158,8 @@
  *       of its own text elements once they are linked (see TEXT ON A SHIP).
  *   links[]       sets a reference field on a component to another object:
  *       owner          name of the object that holds the component
- *       component      "ShipView", "InventoryView", "WarningView", "TextKeyView",
- *                      "SpriteRenderer" or "Transform"
+ *       component      "ShipView", "InventoryView", "WarningView", "CreditsView",
+ *                      "DaySummaryView", "TextKeyView", "SpriteRenderer" or "Transform"
  *       field          the serialized field name, for example "body" or "barFills"
  *       index          -1 for a single field (default is 0, so write -1); 0 or more
  *                      for an element of an array field (the array grows if needed)
@@ -173,9 +175,10 @@
  *                      exist (the builder never creates scenes).
  *       stationField   name of the StationView field that gets the instance's
  *                      component, for example "bay1View" (gets the ShipView),
- *                      "inventoryView" (gets the InventoryView) or "warningView"
- *                      (gets the WarningView). Empty means do not connect.
- *                      Not used when "bays" is given.
+ *                      "inventoryView" (gets the InventoryView), "warningView"
+ *                      (gets the WarningView), "creditsView" (gets the CreditsView)
+ *                      or "summaryView" (gets the DaySummaryView). Empty means do
+ *                      not connect. Not used when "bays" is given.
  *       Placement, option A: fit into a screen rectangle (ship prefabs)
  *         refWidth, refHeight   reference screen size in pixels, for example 1280, 720.
  *                      Before placing, the builder sets the camera aspect to
@@ -196,8 +199,8 @@
  *       Placement, option A for several bays: "bays" (see BAYS below).
  *       Placement, option B (used when rectW is 0 and there is no "bays"): worldX,
  *                      worldY, worldScale (worldScale 0 means 1). The prefab origin
- *                      is placed there. Use this for the inventory panel and the
- *                      warning dialog.
+ *                      is placed there. Use this for the inventory panel, the
+ *                      warning dialog, the credits counter and the day summary.
  *       screenshot     file name of the screenshot, for example "ship_in_bay.png".
  *                      Empty means no screenshot. It is saved in the system temp
  *                      folder under ger_shots, outside the project. It is taken
@@ -218,7 +221,9 @@
  *                      scene file. After the shot the scene is loaded again from
  *                      disk, which drops the shown state. With option A the shot has
  *                      the reference width and height. Text elements (textKey) are
- *                      in the screenshot.
+ *                      in the screenshot. A CreditsView or DaySummaryView prefab has
+ *                      no sample yet, so it takes no screenshot: leave "screenshot"
+ *                      out for it.
  *       sampleDialog   only for a WarningView prefab: "release" (default) or "buy".
  *                      Which warning the screenshot shows.
  *       sampleConditions[]   optional. Sets the condition of sample ship parts
@@ -298,6 +303,33 @@
  *   Example link: { "owner": "ShipInBay", "component": "ShipView",
  *     "field": "paymentText", "index": -1, "target": "PaymentText",
  *     "targetType": "TextKeyView" }
+ *
+ * CREDITS COUNTER (CreditsView)
+ *   Put "CreditsView" on the root of its own prefab. Link, with "index": -1:
+ *     creditsText     TextKeyView: a text element with key "credits". The view
+ *                     fills {0} with the run's credits.
+ *   Connect it to the station with "stationField": "creditsView".
+ *
+ * DAY SUMMARY (DaySummaryView)
+ *   Put "DaySummaryView" on the root of its own prefab (not on the hidden panel
+ *   object). Fields to link, all with "index": -1:
+ *     panelRoot       GameObject: a child that holds all the panel objects. Give it
+ *                     "hidden": true so the prefab is saved closed.
+ *     clickBlocker    GameObject, optional: an "Image" object under a "Canvas",
+ *                     shown and hidden with the panel.
+ *     titleText       TextKeyView: the view sets its key (summary_title,
+ *                     run_end_title_win or run_end_title_bankrupt).
+ *     earnedText      TextKeyView, key summary_earned, the view fills {0}
+ *     spentText       TextKeyView, key summary_spent, the view fills {0}
+ *     upkeepText      TextKeyView, key summary_upkeep, the view fills {0}
+ *     balanceText     TextKeyView, key summary_balance, the view fills {0}
+ *     noteText        TextKeyView, key summary_note, hidden when the run is over
+ *     continueButton  Button: shown while the run goes on. Its label is a text
+ *                     element with key summary_continue.
+ *     playAgainButton Button: shown when the run is over. Its label is a text
+ *                     element with key run_end_play_again.
+ *   Connect it to the station with "stationField": "summaryView". The builder also
+ *   adds an EventSystem (Input System UI module) if the scene has none.
  *
  * WARNING DIALOG (WarningView)
  *   Put "WarningView" on the root of its own prefab. One dialog serves all bays.
@@ -1009,6 +1041,8 @@ namespace GoodEnoughRepairs.EditorTools
             if (!Listed(o, "ShipView")) DestroyIfPresent<ShipView>(go);
             if (!Listed(o, "InventoryView")) DestroyIfPresent<InventoryView>(go);
             if (!Listed(o, "WarningView")) DestroyIfPresent<WarningView>(go);
+            if (!Listed(o, "CreditsView")) DestroyIfPresent<CreditsView>(go);
+            if (!Listed(o, "DaySummaryView")) DestroyIfPresent<DaySummaryView>(go);
             if (string.IsNullOrEmpty(o.sprite) && !Listed(o, "SpriteRenderer")) DestroyIfPresent<SpriteRenderer>(go);
 
             // Hidden flag: an object with "hidden": true is saved inactive.
@@ -1129,6 +1163,12 @@ namespace GoodEnoughRepairs.EditorTools
                 case "WarningView":
                     if (go.GetComponent<WarningView>() == null) go.AddComponent<WarningView>();
                     return;
+                case "CreditsView":
+                    if (go.GetComponent<CreditsView>() == null) go.AddComponent<CreditsView>();
+                    return;
+                case "DaySummaryView":
+                    if (go.GetComponent<DaySummaryView>() == null) go.AddComponent<DaySummaryView>();
+                    return;
                 case "TextKeyView":
                     if (go.GetComponent<TextKeyView>() == null) go.AddComponent<TextKeyView>();
                     return;
@@ -1165,6 +1205,12 @@ namespace GoodEnoughRepairs.EditorTools
                     break;
                 case "WarningView":
                     c = go.GetComponent<WarningView>();
+                    break;
+                case "CreditsView":
+                    c = go.GetComponent<CreditsView>();
+                    break;
+                case "DaySummaryView":
+                    c = go.GetComponent<DaySummaryView>();
                     break;
                 case "TextKeyView":
                     c = go.GetComponent<TextKeyView>();
@@ -1654,6 +1700,16 @@ namespace GoodEnoughRepairs.EditorTools
                 component = instance.GetComponent<InventoryView>();
                 needed = "InventoryView";
             }
+            else if (propType.Contains("CreditsView"))
+            {
+                component = instance.GetComponent<CreditsView>();
+                needed = "CreditsView";
+            }
+            else if (propType.Contains("DaySummaryView"))
+            {
+                component = instance.GetComponent<DaySummaryView>();
+                needed = "DaySummaryView";
+            }
             else
             {
                 component = instance.GetComponent<ShipView>();
@@ -1792,9 +1848,10 @@ namespace GoodEnoughRepairs.EditorTools
             ShipView view = first.GetComponent<ShipView>();
             InventoryView invView = first.GetComponent<InventoryView>();
             WarningView warnView = first.GetComponent<WarningView>();
+            DaySummaryView summaryView = first.GetComponent<DaySummaryView>();
 
-            // The warning's UI buttons need an event system in the scene.
-            if (warnView != null)
+            // The warning's and the summary's UI buttons need an event system in the scene.
+            if (warnView != null || summaryView != null)
             {
                 int objectsBefore = CountSceneObjects();
                 UiParts.EnsureEventSystem();

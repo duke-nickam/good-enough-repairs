@@ -4,10 +4,11 @@ namespace GoodEnoughRepairs
 {
     /// <summary>
     /// Entry point of the show layer. Add this component to Main.unity by hand.
-    /// Loads the balance and the text, builds the station with its 3 bays, docks
-    /// ships on a timer and draws everything in OnGUI. It reacts to the bays' events
-    /// and decides no rules: every ship and number comes from Logic, every word
-    /// from ui_text.json.
+    /// Loads the balance and the text, creates the Run with the factory and starts
+    /// its days. The Run docks the ships and counts the day; this view only shows
+    /// them, hands the Run's commands to the other views and starts a new run on
+    /// Play again. It decides no rules: every ship and number comes from Logic,
+    /// every word from ui_text.json.
     /// </summary>
     public sealed class StationView : MonoBehaviour
     {
@@ -34,16 +35,22 @@ namespace GoodEnoughRepairs
 
         /// <summary>
         /// Optional inventory panel prefab instance. When assigned, it gets the
-        /// shared inventory and the move and bin commands, and runs the drag and drop.
+        /// run's move and bin commands, and runs the drag and drop.
         /// </summary>
         public InventoryView inventoryView;
 
         /// <summary>
-        /// Optional warning dialog prefab instance. When assigned, it gets the buy
-        /// and release commands and the mechanic's lines, and the ship view buy and
-        /// release buttons use it. Every release goes through it.
+        /// Optional warning dialog prefab instance. When assigned, it gets the run's
+        /// buy and release commands and the mechanic's lines, and the ship view buy
+        /// and release buttons use it. Every release goes through it.
         /// </summary>
         public WarningView warningView;
+
+        /// <summary>Optional credits counter prefab instance. Shows the run's credits.</summary>
+        public CreditsView creditsView;
+
+        /// <summary>Optional end-of-day summary prefab instance.</summary>
+        public DaySummaryView summaryView;
 
         private const float Margin = 20f;
         private const float Gap = 16f;
@@ -51,15 +58,18 @@ namespace GoodEnoughRepairs
 
         private BalanceData balance;
         private ContentData content;
-        private DockingBays bays;
-        private BuyRelease buyRelease;
-        private System.Random shipRandom;
+        private Run run;
+        private int runsStarted;
         private Ship[] shown;
         private ShipPanel[] views;
         private int surplusMargin;
-        private int arrivalIntervalMs;
-        private float untilNextShipMs;
         private GUIStyle centeredLabel;
+
+        /// <summary>The run being shown, or null before the start.</summary>
+        public Run CurrentRun
+        {
+            get { return run; }
+        }
 
         /// <summary>The ship view of a bay (0-2), or null when the bay has none.</summary>
         private ShipView ViewOf(int bay)
@@ -87,34 +97,68 @@ namespace GoodEnoughRepairs
                 return;
             }
 
-            arrivalIntervalMs = Mathf.Max(1, balance.days[0].shipEverySeconds) * 1000;
             surplusMargin = BarBand.SurplusMargin(balance.requiredFighterPercent, balance.requiredFreighterPercent);
-            shipRandom = new System.Random(seed);
+            shown = new Ship[GameRules.DockingBays];
+            views = new ShipPanel[GameRules.DockingBays];
 
-            bays = new DockingBays();
-            shown = new Ship[bays.BayCount];
-            views = new ShipPanel[bays.BayCount];
-            bays.ShipDocked += OnShipDocked;
-            bays.ShipLeft += OnShipLeft;
-            untilNextShipMs = 0f;
+            StartNewRun();
+        }
 
-            // One shared inventory for the move, bin, buy and release commands.
-            Inventory inventory = new Inventory();
-            buyRelease = new BuyRelease(bays, inventory, balance);
-            buyRelease.PartBought += OnPartBought;
+        // Makes a fresh run (a new seed each time), connects every view to it and
+        // starts day 1. There is no day start screen yet, so the day starts at once.
+        private void StartNewRun()
+        {
+            Disconnect();
 
-            if (inventoryView != null) inventoryView.Bind(new PartMoves(inventory, balance), balance);
-            if (warningView != null) warningView.Bind(buyRelease, content);
-            for (int bay = 0; bay < bays.BayCount; bay++)
+            for (int bay = 0; bay < shown.Length; bay++)
+            {
+                shown[bay] = null;
+                views[bay] = null;
+            }
+
+            run = RunFactory.Create(balance, content, seed + runsStarted);
+            runsStarted++;
+
+            run.Bays.ShipDocked += OnShipDocked;
+            run.Bays.ShipLeft += OnShipLeft;
+            run.Commands.PartBought += OnPartBought;
+
+            if (inventoryView != null) inventoryView.Bind(run.Moves, balance);
+            if (warningView != null) warningView.Bind(run.Commands, content);
+            for (int bay = 0; bay < shown.Length; bay++)
             {
                 ShipView v = ViewOf(bay);
-                if (v != null) v.Bind(buyRelease, warningView, content);
+                if (v != null) v.Bind(run.Commands, warningView, content);
             }
+            if (creditsView != null) creditsView.Bind(run);
+            if (summaryView != null) summaryView.Bind(run, OnContinued, OnPlayAgain);
+
+            run.StartDay();
+        }
+
+        private void Disconnect()
+        {
+            if (run == null) return;
+            run.Bays.ShipDocked -= OnShipDocked;
+            run.Bays.ShipLeft -= OnShipLeft;
+            run.Commands.PartBought -= OnPartBought;
+            run = null;
+        }
+
+        // Temporary: with no day start screen, the next day starts after Continue.
+        private void OnContinued()
+        {
+            if (run != null) run.StartDay();
+        }
+
+        private void OnPlayAgain()
+        {
+            StartNewRun();
         }
 
         private void Update()
         {
-            if (bays == null) return;
+            if (run == null) return;
 
             for (int bay = 0; bay < shown.Length; bay++)
             {
@@ -123,15 +167,6 @@ namespace GoodEnoughRepairs
                 v.Show(shown[bay], surplusMargin);
                 if (shown[bay] != null) CenterInBay(v, bay);
             }
-
-            if (bays.IsFull) return;
-
-            untilNextShipMs -= Time.deltaTime * 1000f;
-            if (untilNextShipMs > 0f) return;
-
-            untilNextShipMs = arrivalIntervalMs;
-            Ship ship = ShipFactory.Create(balance, balance.days[0], shipRandom);
-            bays.TryDock(ship);
         }
 
         /// <summary>
@@ -156,7 +191,7 @@ namespace GoodEnoughRepairs
 
         private void OnGUI()
         {
-            if (bays == null) return;
+            if (run == null) return;
 
             if (centeredLabel == null)
             {
@@ -192,10 +227,7 @@ namespace GoodEnoughRepairs
 
         private void OnDestroy()
         {
-            if (bays == null) return;
-            bays.ShipDocked -= OnShipDocked;
-            bays.ShipLeft -= OnShipLeft;
-            if (buyRelease != null) buyRelease.PartBought -= OnPartBought;
+            Disconnect();
         }
 
         private void OnShipDocked(Ship ship, int bay)
