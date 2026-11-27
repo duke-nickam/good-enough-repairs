@@ -17,6 +17,10 @@
       "sortingOrder": 103, "posX": -1.6, "posY": -1.35, "scaleX": 2.6, "scaleY": 0.7 },
     { "name": "CancelButton", "parent": "DialogRoot", "sprite": "box", "color": "#8A8F99",
       "sortingOrder": 103, "posX": 1.6, "posY": -1.35, "scaleX": 2.6, "scaleY": 0.7 },
+    { "name": "UiCanvas", "parent": "DialogRoot", "sortingOrder": 105, "components": [ "Canvas" ] },
+    { "name": "BlockerImage", "parent": "UiCanvas", "scaleX": 24, "scaleY": 14, "components": [ "Image" ] },
+    { "name": "ConfirmUiButton", "parent": "UiCanvas", "posX": -1.6, "posY": -1.35, "scaleX": 2.6, "scaleY": 0.7, "components": [ "Button" ] },
+    { "name": "CancelUiButton", "parent": "UiCanvas", "posX": 1.6, "posY": -1.35, "scaleX": 2.6, "scaleY": 0.7, "components": [ "Button" ] },
     { "name": "TitleText", "parent": "DialogRoot", "textKey": "release_title", "sortingOrder": 104,
       "posX": 0, "posY": 1.7, "textSize": 0.32, "textAlign": "center" },
     { "name": "MechanicText", "parent": "DialogRoot", "textKey": "station_title", "sortingOrder": 104,
@@ -64,7 +68,10 @@
     { "owner": "WarningDialog", "component": "WarningView", "field": "releasePenaltyText", "index": -1,
       "target": "ReleasePenaltyText", "targetType": "TextKeyView" },
     { "owner": "WarningDialog", "component": "WarningView", "field": "releaseNetText", "index": -1,
-      "target": "ReleaseNetText", "targetType": "TextKeyView" }
+      "target": "ReleaseNetText", "targetType": "TextKeyView" },
+    { "owner": "WarningDialog", "component": "WarningView", "field": "confirmUiButton", "index": -1, "target": "ConfirmUiButton", "targetType": "Button" },
+    { "owner": "WarningDialog", "component": "WarningView", "field": "cancelUiButton", "index": -1, "target": "CancelUiButton", "targetType": "Button" },
+    { "owner": "WarningDialog", "component": "WarningView", "field": "clickBlocker", "index": -1, "target": "BlockerImage", "targetType": "GameObject" }
   ],
   "scene": {
     "path": "Assets/Scenes/Main.unity",
