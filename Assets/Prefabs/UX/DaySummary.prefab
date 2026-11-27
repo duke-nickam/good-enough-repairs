@@ -981,7 +981,7 @@ TextMesh:
   m_GameObject: {fileID: 4898904642321558748}
   m_Text: '[summary_note]'
   m_OffsetZ: 0
-  m_CharacterSize: 0.028125001
+  m_CharacterSize: 0.03125
   m_LineSpacing: 1
   m_Anchor: 3
   m_Alignment: 0

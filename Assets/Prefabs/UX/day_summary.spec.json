@@ -28,7 +28,7 @@
     { "name": "BalanceText", "parent": "PanelRoot", "textKey": "summary_balance", "sortingOrder": 104,
       "posX": -6.4, "posY": -0.6, "textSize": 0.36, "textAlign": "left" },
     { "name": "NoteText", "parent": "PanelRoot", "textKey": "summary_note", "sortingOrder": 104,
-      "posX": -6.4, "posY": -1.5, "textSize": 0.18, "textAlign": "left" },
+      "posX": -6.4, "posY": -1.5, "textSize": 0.2, "textAlign": "left" },
 
     { "name": "ButtonCanvas", "parent": "PanelRoot", "sortingOrder": 103, "components": [ "Canvas" ] },
     { "name": "ContinueButton", "parent": "ButtonCanvas", "sprite": "box", "color": "passes",
