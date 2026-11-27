@@ -3,8 +3,8 @@
  *
  * Turns a prefab spec (a JSON file) into a prefab. It can also place instances
  * in a scene, connect them to StationView fields, show a docked sample ship (or a
- * sample inventory, or a sample warning dialog) in edit mode and save a
- * screenshot outside the project.
+ * sample inventory, a sample warning dialog, a sample credits counter or a sample
+ * day summary) in edit mode and save a screenshot outside the project.
  *
  * HOW TO RUN
  *   PrefabSpecBuilder.BuildAll()          builds every *.spec.json under Assets/
@@ -210,10 +210,15 @@
  *                      instance, or, for an InventoryView, the sample ship's five
  *                      parts in inventory slots 1-5, or, for a WarningView, the
  *                      warning dialog open on the sample ship with its message
- *                      lines filled. With "bays", the first instance gets the seed 1
+ *                      lines filled, or, for a CreditsView, the credits of a sample
+ *                      run (the starting credits from balance.json), or, for a
+ *                      DaySummaryView, the summary open after a sample day (see
+ *                      SAMPLES FOR CREDITS AND DAY SUMMARY below). With "bays", the
+ *                      first instance gets the seed 1
  *                      ship and every other instance its own sample ship (seed 2,
- *                      3). For the inventory and warning shots, every ShipView in
- *                      the scene gets its own sample ship too, so no '{' text shows.
+ *                      3). For the inventory, warning, credits and summary shots,
+ *                      every ShipView in the scene gets its own sample ship too, so
+ *                      no '{' text shows.
  *                      Every shot except the warning shot is taken with the warning
  *                      dialog hidden.
  *                      All of this is done after the scene is saved, so the shown
@@ -221,9 +226,7 @@
  *                      scene file. After the shot the scene is loaded again from
  *                      disk, which drops the shown state. With option A the shot has
  *                      the reference width and height. Text elements (textKey) are
- *                      in the screenshot. A CreditsView or DaySummaryView prefab has
- *                      no sample yet, so it takes no screenshot: leave "screenshot"
- *                      out for it.
+ *                      in the screenshot.
  *       sampleDialog   only for a WarningView prefab: "release" (default) or "buy".
  *                      Which warning the screenshot shows.
  *       sampleConditions[]   optional. Sets the condition of sample ship parts
@@ -243,6 +246,19 @@
  *                        { "part": "Engine", "condition": 35 },
  *                        { "part": "HullPlate", "condition": 65 },
  *                        { "part": "ShieldGenerator", "condition": 95 } ]
+ *
+ * SAMPLES FOR CREDITS AND DAY SUMMARY
+ *   Both samples use a real Run made by RunFactory (balance.json, content, seed 1).
+ *   - CreditsView: the view is bound to the run and shows its credits, which are
+ *     the starting credits from balance.json.
+ *   - DaySummaryView: the view is bound to the run, then a sample day is played
+ *     through the run's own StartDay on a copy of the balance with no ships on any
+ *     day. The day starts, upkeep from balance.json is charged and the day ends
+ *     at once, so the summary opens with the real rules: Earned 0, Spent 0, Upkeep
+ *     from balance.json, Balance after upkeep. The panel is open with the title,
+ *     all four number lines, the note and the Continue button filled from
+ *     ui_text.json. The run-over state (Play again) has no sample.
+ *   The copy of the balance is only used for the sample. Nothing is saved.
  *
  * BAYS: ONE SHIP VIEW IN EACH OF THE THREE BAYS (scene.bays)
  *   "bays" is an array with one entry per bay the spec places. It needs refWidth,
@@ -1848,6 +1864,7 @@ namespace GoodEnoughRepairs.EditorTools
             ShipView view = first.GetComponent<ShipView>();
             InventoryView invView = first.GetComponent<InventoryView>();
             WarningView warnView = first.GetComponent<WarningView>();
+            CreditsView creditsView = first.GetComponent<CreditsView>();
             DaySummaryView summaryView = first.GetComponent<DaySummaryView>();
 
             // The warning's and the summary's UI buttons need an event system in the scene.
@@ -1874,10 +1891,11 @@ namespace GoodEnoughRepairs.EditorTools
             bool shotExists = requested && File.Exists(ShotPath(sc.screenshot));
             if (ScreenshotDecision.ShouldPhotograph(requested, changed, shotExists))
             {
-                if (view == null && invView == null && warnView == null)
+                if (view == null && invView == null && warnView == null && creditsView == null &&
+                    summaryView == null)
                 {
                     throw Fail(specPath,
-                        "a screenshot needs a ShipView, an InventoryView or a WarningView on the prefab root");
+                        "a screenshot needs a ShipView, an InventoryView, a WarningView, a CreditsView or a DaySummaryView on the prefab root");
                 }
                 List<ShipView> others = new List<ShipView>();
                 for (int i = 1; i < instances.Count; i++)
@@ -1887,8 +1905,8 @@ namespace GoodEnoughRepairs.EditorTools
                 }
                 int w = screenPlacement ? Mathf.RoundToInt(sc.refWidth) : 1280;
                 int h = screenPlacement ? Mathf.RoundToInt(sc.refHeight) : 720;
-                TakeScreenshot(view, others, invView, warnView, sc.sampleDialog, cam, sc.screenshot,
-                    SampleOverrides(sc, specPath), w, h, specPath);
+                TakeScreenshot(view, others, invView, warnView, creditsView, summaryView, sc.sampleDialog, cam,
+                    sc.screenshot, SampleOverrides(sc, specPath), w, h, specPath);
                 photographed = true;
             }
 
@@ -1916,11 +1934,27 @@ namespace GoodEnoughRepairs.EditorTools
             }
         }
 
+        // A copy of the balance in which no day has ships. A run made from it ends
+        // its first day as soon as it starts: the real rules charge the upkeep and
+        // build the day summary. Used only for the day summary sample.
+        private static BalanceData EmptyDaysCopy(BalanceData balance)
+        {
+            BalanceData copy = JsonUtility.FromJson<BalanceData>(JsonUtility.ToJson(balance));
+            if (copy.days != null)
+            {
+                for (int i = 0; i < copy.days.Length; i++)
+                {
+                    if (copy.days[i] != null) copy.days[i].ships = 0;
+                }
+            }
+            return copy;
+        }
+
         // Done after the scene is saved: showing the sample changes bar scales and
         // colors, and that must not end up in the scene file.
         private static void TakeScreenshot(ShipView view, List<ShipView> others, InventoryView invView,
-            WarningView warnView, string dialog, Camera cam, string fileName, int[] conditions, int w, int h,
-            string specPath)
+            WarningView warnView, CreditsView creditsView, DaySummaryView summaryView, string dialog, Camera cam,
+            string fileName, int[] conditions, int w, int h, string specPath)
         {
             BalanceData balance = LoadBalance();
             if (balance == null) throw Fail(specPath, "the balance could not be loaded for the sample ship");
@@ -1979,6 +2013,28 @@ namespace GoodEnoughRepairs.EditorTools
                     // penalty and net lines are filled from the sample ship.
                     if (!warnView.OpenRelease(ship)) throw Fail(specPath, "the sample ship cannot be released");
                 }
+            }
+            else if (creditsView != null)
+            {
+                // Every bay ship view in the scene gets its own sample ship.
+                FillSampleShips(balance, surplusMargin, 2);
+
+                // The credits of a sample run: the starting credits from balance.json.
+                Run run = RunFactory.Create(balance, LoadContent(), 1);
+                creditsView.Bind(run);
+            }
+            else if (summaryView != null)
+            {
+                // Every bay ship view in the scene gets its own sample ship.
+                FillSampleShips(balance, surplusMargin, 2);
+
+                // Bind first, then play a sample day through the run's own rules: the
+                // day ends at once (no ships), and the view opens with the summary.
+                Run run = RunFactory.Create(EmptyDaysCopy(balance), LoadContent(), 1);
+                summaryView.Bind(run, null, null);
+                RunResult started = run.StartDay();
+                if (!started.Success) throw Fail(specPath, "the sample run could not start its day");
+                if (!summaryView.IsOpen) throw Fail(specPath, "the day summary did not open for the sample day");
             }
             else
             {
