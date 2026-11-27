@@ -105,14 +105,17 @@ GOAL_FORMAT = """Reply with one JSON object only, no other text. One of:
 {"type": "gaps", "goal": "<the goal>", "done_when": "<its done-when>", "summary": "<one or two sentences>",
  "gaps": [{"key": "g1", "title": "<feature name, for the epic>", "goal": "<what the player gets, one sentence>",
    "epic": <number of an open epic on the board that already is this gap, or null>, "swap_loop": true or false,
-   "cut_order": <0 to 4>, "size": "S" or "M" or "L", "needs": ["<keys of gaps that must be done before this one>"]}]}
+   "cut_order": <0 to 4>, "size": "S" or "M" or "L", "needs": ["<keys of gaps that must be done before this one>"],
+   "evidence": "<the report's finding for this gap: its status and what the code has or lacks>"}]}
 
 How goals work:
 - A goal is a state the game should reach; it is met when its done-when is true. Before your first gaps reply the
   designer must have confirmed the goal and its done-when in the thread: if not, reply "goal". A request that
   states both clearly counts as confirmed. The standing goal is confirmed already.
-- You check the board, not the code: a feature is done when its epic is Done (built, tested and merged). An open
-  epic that has tasks is in progress: it is not a gap.
+- The Lead Programmer's code status report says, for each feature, what the code really has, with evidence. The
+  code decides: a feature is done only when the report finds it done. A Done epic whose feature the report finds
+  partial or missing is a gap again (say what is missing in its goal); a feature the report finds done is not a gap,
+  even without an epic. An open epic that has tasks is in progress: it is not a gap.
 - Gaps are everything still missing for the goal, in GDD order. When the board already has an open epic without
   tasks for a gap, give its number in "epic" instead of making a new one; such an epic that is no longer a gap is
   dropped.
@@ -127,6 +130,21 @@ How goals work:
 - When the designer asks to plan a certain epic next, the goal is that epic Done, and that epic is its only gap.
 - Do not plan tasks now: the runner ranks the gaps with your priority function and then asks you for the tasks
   of the top one."""
+
+CODE_STATUS_FORMAT = """Task: the code status report. The Director plans from it, so it must say what the code really
+has, not what the board or the docs claim. For each feature of the production plan (every "Never cut" line and every
+cut order item), look in the code with Read, Grep and Glob and judge:
+- done: the rules work in Logic (with tests) and the player can use it in the station scene
+- partial: some of it is in the code; say exactly what is missing
+- missing: nothing for it in the code
+Name your evidence: files and classes (or tests) that prove it, or what you searched for and did not find. Then
+list code that no feature covers, one line each. Do not judge style; this is not a review.
+
+Reply with one JSON object only, no other text:
+{"summary": "<one or two sentences>",
+ "features": [{"feature": "<the production plan's words>", "status": "done" or "partial" or "missing",
+   "evidence": "<files and classes, or what you searched for>", "missing": "<what is missing; empty when done>"}],
+ "not_in_plan": ["<code no feature covers, one line each>"]}"""
 
 DESIGN_FORMAT = """This attempt is your design note, not the code: before writing code, explain your plan to the
 Director the way you would to a project manager, in game terms, not code. Reply in exactly this format, and write
@@ -399,6 +417,8 @@ def validate_gaps(reply, open_epics):
             p.append(f"{k}: cut_order must be 0 to 4")
         if g.get("size") not in ("S", "M", "L"):
             p.append(f"{k}: size must be S, M or L")
+        if not str(g.get("evidence") or "").strip():
+            p.append(f"{k}: evidence missing: give the code status report's finding for this gap")
         for n in g.get("needs") or []:
             if n not in keys or n == k:
                 p.append(f"{k}: needs unknown gap {n!r}")
@@ -406,6 +426,60 @@ def validate_gaps(reply, open_epics):
     if len(set(epics)) != len(epics):
         p.append("two gaps name the same epic")
     return p
+
+
+def validate_code_status(reply):
+    """Rules a code status report must follow."""
+    feats = reply.get("features")
+    if not isinstance(feats, list) or not feats:
+        return ["a code status report needs at least one feature"]
+    p = []
+    for f in feats:
+        name = f.get("feature") or "?"
+        if not f.get("feature"):
+            p.append("every feature needs its name")
+        if f.get("status") not in ("done", "partial", "missing"):
+            p.append(f"{name}: status must be done, partial or missing")
+        if not str(f.get("evidence") or "").strip():
+            p.append(f"{name}: evidence missing: name files and classes, or what you searched for")
+        if f.get("status") in ("partial", "missing") and not str(f.get("missing") or "").strip():
+            p.append(f"{name}: say what is missing")
+    if not isinstance(reply.get("not_in_plan", []), list):
+        p.append("not_in_plan must be a list")
+    return p
+
+
+def code_status_markdown(report):
+    """The report as Markdown: a table, then code no feature covers."""
+    rows = ["| Feature | Status | Evidence | Missing |", "| --- | --- | --- | --- |"]
+    for f in report.get("features") or []:
+        cells = [str(f.get(k) or "").replace("|", "/").replace("\n", " ") for k in ("feature", "status", "evidence", "missing")]
+        rows.append("| " + " | ".join(cells) + " |")
+    extra = report.get("not_in_plan") or []
+    tail = ("\n\nIn the code, not in the plan:\n" + "\n".join(f"- {x}" for x in extra)) if extra else ""
+    return f"{report.get('summary', '')}\n\n" + "\n".join(rows) + tail
+
+
+CODE_INDEX_FOLDERS = ("Assets/Scripts", "Assets/Editor", "Assets/GameData", "Assets/Prefabs", "agents/checks")
+
+
+def code_index(root):
+    """Every code and data file under the code folders, with the types and public methods a .cs file declares."""
+    root = pathlib.Path(root)
+    lines = []
+    for folder in CODE_INDEX_FOLDERS:
+        for p in sorted((root / folder).rglob("*")):
+            if p.suffix not in (".cs", ".json", ".py", ".asmdef") or not p.is_file():
+                continue
+            rel = p.relative_to(root).as_posix()
+            if p.suffix != ".cs":
+                lines.append(rel)
+                continue
+            text = p.read_text(encoding="utf-8", errors="replace")
+            types = re.findall(r"\b(?:class|struct|enum|interface)\s+(\w+)", text)
+            methods = sorted(set(re.findall(r"\bpublic\s+(?:static\s+)?[\w<>\[\],. ]+?\s+(\w+)\s*\(", text)))
+            lines.append(f"{rel}: {', '.join(dict.fromkeys(types))}" + (f" - {', '.join(methods)}" if methods else ""))
+    return "\n".join(lines)
 
 
 def touched_paths(task):
@@ -455,7 +529,7 @@ class ClaudeAgents:
         self.crew_docs = ""  # docs/crew/*.md, set by the runner each pass
         self.check_usage = ""  # how each check script in agents/checks/ is called, set by the runner each pass
 
-    def _call(self, agent, task_kind, prompt, attempt=1, images=None):
+    def _call(self, agent, task_kind, prompt, attempt=1, images=None, read_root=None):
         exe = shutil.which("claude")
         if not exe:
             raise AgentError("Claude Code CLI not found. Install it and log in.")
@@ -470,6 +544,8 @@ class ClaudeAgents:
             base = [exe, "-p", "--model", model, "--output-format", "json", "--no-session-persistence",
                     "--system-prompt-file", str(sp)]
             tools = ["--tools", ""]  # no tools
+            if read_root:  # read-only look at the repo; the call itself still runs outside it
+                tools = ["--tools", "Read,Grep,Glob", "--allowedTools", "Read,Grep,Glob", "--add-dir", str(read_root)]
             if images:  # screenshots go into the first message, so the review takes one turn
                 try:
                     return (*self._call_with_images(base, prompt, images, tmp, agent), model)
@@ -487,7 +563,9 @@ class ClaudeAgents:
             res = None
             for extra in (tools, []):  # retry without the flags if this CLI rejects them
                 res = subprocess.run(base + extra, input=prompt, capture_output=True, text=True, encoding="utf-8",
-                                     cwd=tmp, timeout=900, env={**os.environ})
+                                     cwd=tmp, timeout=1800 if read_root else 900, env={**os.environ})
+                if read_root:
+                    break  # without the tool flags it could not read the code: report the failure instead
                 if res.returncode == 0:
                     break
         if res.returncode != 0:
@@ -532,14 +610,27 @@ class ClaudeAgents:
 
     # ------------------------------------------------------------ the three kinds of work
 
-    def goal(self, request_thread, board_summary, problems=None):
+    def goal(self, request_thread, board_summary, problems=None, code_status=""):
         """The goal step: confirm the goal, find its gaps, or say it is met."""
         prompt = (f"GDD:\n\n{gdd_sections(self.gdd, ['*'])}\n\n---\n\nProduction plan:\n\n{self.production_plan}"
                   f"\n\n---\n\nThe goal's request thread:\n\n{request_thread}\n\n---\n\n"
-                  f"The board now:\n{board_summary or 'empty'}")
+                  f"The board now:\n{board_summary or 'empty'}\n\n---\n\n"
+                  f"The Lead Programmer's code status report:\n\n{code_status or 'none'}")
         if problems:
             prompt += "\n\nYour last reply broke these rules; send a corrected one:\n" + "\n".join(f"- {x}" for x in problems)
         text, usage, model = self._call("director", "Task: work toward the goal.\n\n" + GOAL_FORMAT, prompt)
+        return extract_json(text), usage, model
+
+    def code_status(self, repo_root, code_index, problems=None):
+        """The Lead Programmer looks in the code (read only) and says which features it really has."""
+        prompt = (f"GDD sections:\n\n{gdd_sections(self.gdd, self.s['reads']['lead_programmer'])}\n\n---\n\n"
+                  f"Production plan:\n\n{self.production_plan}\n\n---\n\n"
+                  f"Technical design and crew docs:\n\n{self.crew_docs}\n\n---\n\n"
+                  f"The repo is at {repo_root}. Its code and data files, with the types and methods each declares:\n\n"
+                  f"{code_index}")
+        if problems:
+            prompt += "\n\nYour last reply broke these rules; send a corrected one:\n" + "\n".join(f"- {x}" for x in problems)
+        text, usage, model = self._call("lead_programmer", CODE_STATUS_FORMAT, prompt, read_root=repo_root)
         return extract_json(text), usage, model
 
     def plan(self, request_thread, board_summary, repo_files, problems=None, epic=None):

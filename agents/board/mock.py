@@ -10,11 +10,11 @@ USAGE = {"input_tokens": 1200, "cache_read_input_tokens": 14000, "cache_creation
 
 GAPS = [
     {"key": "g1", "title": "Ships and parts", "goal": "Ships dock with parts the player can compare to the required level.",
-     "swap_loop": True, "cut_order": 0, "size": "M", "needs": []},
+     "swap_loop": True, "cut_order": 0, "size": "M", "needs": [], "evidence": "missing: no ship or part classes found"},
     {"key": "g2", "title": "Inventory", "goal": "Removed parts wait in a 10-slot inventory for a later ship.",
-     "swap_loop": True, "cut_order": 0, "size": "S", "needs": ["g1"]},
+     "swap_loop": True, "cut_order": 0, "size": "S", "needs": ["g1"], "evidence": "missing: no inventory class found"},
     {"key": "g3", "title": "Guided tutorial", "goal": "A first-time player learns swapping on day 0.",
-     "swap_loop": False, "cut_order": 1, "size": "L", "needs": ["g2"]},
+     "swap_loop": False, "cut_order": 1, "size": "L", "needs": ["g2"], "evidence": "missing: no tutorial found"},
 ]
 
 TASKS = {
@@ -58,7 +58,7 @@ class MockAgents:
     def __init__(self):
         self.goal_calls = 0
 
-    def goal(self, thread, board, problems=None):
+    def goal(self, thread, board, problems=None, code_status=""):
         self.goal_calls += 1
         gaps = [dict(g) for g in GAPS]
         if self.goal_calls > 1:  # the first epic is Done: the rest are the gaps, on the epics the board already has
@@ -69,6 +69,11 @@ class MockAgents:
             gaps[0]["needs"] = []
         return {"type": "gaps", "goal": "Every GDD feature in the current scope is done.",
                 "done_when": "Every such feature has a Done epic.", "summary": "Mock gaps.", "gaps": gaps}, USAGE, "mock"
+
+    def code_status(self, repo_root, index, problems=None):
+        return {"summary": "Mock code status.", "not_in_plan": [],
+                "features": [{"feature": g["title"], "status": "missing", "evidence": "searched Assets/Scripts: none",
+                              "missing": "all of it"} for g in GAPS]}, USAGE, "mock"
 
     def plan(self, thread, board, files, problems=None, epic=None):
         return {"type": "plan", "summary": f"Tasks for {epic['title']}.",

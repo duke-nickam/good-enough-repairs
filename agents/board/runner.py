@@ -13,7 +13,7 @@ import shlex
 import subprocess
 import sys
 
-from .agents import (AgentError, added_file_problems, describe_tokens, parse_design_note, parse_work, sum_usage, total_tokens,
+from .agents import (AgentError, added_file_problems, code_index, code_status_markdown, validate_code_status, describe_tokens, parse_design_note, parse_work, sum_usage, total_tokens,
                      validate_gaps, validate_plan)
 from .model import AGENTS, STANDING_GOAL, Card, crew_comment, slug
 from .priority import rank
@@ -216,10 +216,11 @@ class Runner:
         thread = f"# {r.title}\n\n{r.body}\n\n" + self.thread_text(r, limit=30)
         summary = self.board_summary(items)
         unplanned = self.unplanned_epics(items)
+        code_status, _ = self.code_status_for(r)
         usages, problems, reply = [], None, None
         for _ in range(2):  # one retry if the reply breaks the rules
             try:
-                reply, usage, _model = self.agents.goal(thread, summary, problems)
+                reply, usage, _model = self.agents.goal(thread, summary, problems, code_status)
             except (AgentError, ValueError) as e:
                 log("Director", f"request #{r.number}: reply unusable ({e})")
                 problems, reply = [f"reply unusable: {e}"], None
@@ -263,6 +264,51 @@ class Runner:
             return
         self.apply_gaps(r, reply, items, unplanned, spent, open_planned)
 
+    def code_status_for(self, r):
+        """The Lead Programmer's code status report for the code as it is now (read only), made once per commit
+        and posted once on the goal. Returns (Markdown, tokens of a new report, 0 when it was kept)."""
+        repo = getattr(self.ws, "repo_root", self.ws.root)
+        try:
+            sha = self.ws.git("rev-parse", "HEAD")
+        except Exception:
+            sha = "mock"
+        cache = pathlib.Path(self.ws.root) / ".git" / "crew_code_status.json"
+        try:
+            saved = json.loads(cache.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            saved = {}
+        tokens = 0
+        if saved.get("sha") != sha:
+            report, usages, problems = None, [], None
+            log("Lead Programmer", f"code status: reading the code at {sha[:7]}")
+            for _ in range(2):  # one retry if the reply breaks the rules
+                try:
+                    report, usage, _model = self.agents.code_status(repo, code_index(repo), problems)
+                except (AgentError, ValueError) as e:
+                    problems, report = [f"reply unusable: {e}"], None
+                    continue
+                usages.append(usage)
+                problems = validate_code_status(report)
+                if not problems:
+                    break
+            tokens = sum(total_tokens(u) for u in usages)
+            if problems or not report:
+                log("Lead Programmer", f"code status: no valid report ({'; '.join(problems or [])}); the Director "
+                                       "plans from the board alone")
+                return "none (the Lead Programmer's report failed this time)", tokens
+            saved = {"sha": sha, "markdown": code_status_markdown(report), "tokens": tokens}
+            try:
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                cache.write_text(json.dumps(saved), encoding="utf-8")
+            except OSError:
+                pass
+            log("Lead Programmer", f"code status: {len(report['features'])} feature(s) checked ({tokens:,} tokens)")
+        if not any(c.marker and c.marker.get("event") == "code_status" and c.marker.get("sha") == sha for c in r.comments):
+            self.board.comment(r.number, crew_comment(
+                "Lead Programmer", f"Code status at `{sha[:7]}` (what the code really has; the Director plans from "
+                                   f"it):\n\n{saved['markdown']}", "code_status", sha=sha, tokens=tokens))
+        return saved["markdown"], tokens
+
     def designer_spoke_since_plan(self, r):
         """True when a designer comment comes after the goal's latest planned epic."""
         for c in reversed(r.comments):
@@ -300,7 +346,8 @@ class Runner:
             last = self.board.issue(en).last_marker("priority")
             if not last or last.get("why") != text:
                 self.board.comment(en, crew_comment("Director", text, "priority", why=text))
-            lines.append(f"- #{en} {gaps[key]['title']}: {text}")
+            evidence = gaps[key].get("evidence")
+            lines.append(f"- #{en} {gaps[key]['title']}: {text}" + (f"\n  Code: {evidence}" if evidence else ""))
         self.board.comment(r.number, crew_comment(
             "Director", f"**Goal:** {reply['goal']}\n**Done when:** {reply['done_when']}\n\n{reply.get('summary', '')}"
                         f"\n\nGaps, best first:\n" + "\n".join(lines), "gaps",

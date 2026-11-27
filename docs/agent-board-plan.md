@@ -122,7 +122,7 @@ A sound on the PC tells the designer when a task goes to Needs designer and when
 
 A goal is a state the game should reach, e.g. "every GDD feature is done", "the swap loop is playable" or "the game feels more relaxed". The Director is a goal-oriented agent: it works toward a goal in a loop until the goal is met.
 
-- **Where goals come from:** the designer sets one in a request. With `director_autoplan` on, the Director also has a standing goal when no request gives one: every GDD feature in the current scope (`production-plan.md`) done. Like a lead before AI, it checks the board, not the code: a feature is done when its epic is Done (built, tested and merged).
+- **Where goals come from:** the designer sets one in a request. With `director_autoplan` on, the Director also has a standing goal when no request gives one: every GDD feature in the current scope (`production-plan.md`) done. Like a director in a studio, it does not read code: before it ranks gaps, the Lead Programmer reports what the code really has, feature by feature with files as evidence (once per commit on main, posted on the goal). The code decides: a feature is done only when the report finds it, so a Done epic whose feature the code lacks is a gap again.
 - **Done when:** every goal has one, confirmed by the designer in the request thread before planning. A measurable goal is met when the board, the checks or the simulation say so; a taste goal ("funnier") is met when the designer says so, after a playtest.
 
 The loop:
