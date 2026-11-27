@@ -34,12 +34,23 @@
  *   changed the prefab (a property, an object added or removed, a link), a sprite
  *   file or its import settings were made or fixed, or the scene changed (an
  *   instance added, removed, moved or scaled, or a StationView link set).
- *   A spec with a screenshot is photographed when it changed, or when no earlier
- *   shot of it exists in the temp folder ger_shots (outside the project). A spec
- *   that did not change and already has its shot is not photographed. Nothing is
- *   stored in the project for this, so an unchanged build leaves no Git diff.
+ *   A spec with a screenshot is photographed when it changed, when no earlier
+ *   shot of it exists in the temp folder ger_shots (outside the project), or when
+ *   a game data file (balance.json or a file in content/) is newer than the
+ *   earlier shot, so a text change in ui_text.json always gives a new shot. A spec
+ *   that did not change, has its shot and has no newer data is not photographed.
+ *   Nothing is stored in the project for this, so an unchanged build leaves no
+ *   Git diff.
  *   To photograph everything again, delete the ger_shots folder in the system temp
  *   folder. The decision is ScreenshotDecision.ShouldPhotograph.
+ *
+ * TEXT IN SCREENSHOTS
+ *   Before a shot, the builder loads the content files and then refreshes every
+ *   text element (TextKeyView) in the open scene, hidden panels included. Text
+ *   elements that no view fills itself (for example the summary title, note and
+ *   button labels) then show their ui_text.json string, not the raw [key]. The
+ *   views fill their own number lines after that. The refresh is done after the
+ *   scene is saved and the scene is loaded again afterwards, so it is not saved.
  *
  * UNCHANGED BUILD WRITES NOTHING
  *   A build with a spec that has not changed leaves the prefab files, the scene
@@ -204,8 +215,8 @@
  *       screenshot     file name of the screenshot, for example "ship_in_bay.png".
  *                      Empty means no screenshot. It is saved in the system temp
  *                      folder under ger_shots, outside the project. It is taken
- *                      only for a changed spec or one with no earlier shot (see
- *                      ONE LINE PER SPEC above). Before the shot
+ *                      only for a changed spec, one with no earlier shot, or one
+ *                      with newer game data (see ONE LINE PER SPEC above). Before the shot
  *                      the builder shows a docked sample ship (day 1, seed 1) on the
  *                      instance, or, for an InventoryView, the sample ship's five
  *                      parts in inventory slots 1-5, or, for a WarningView, the
@@ -590,7 +601,7 @@ namespace GoodEnoughRepairs.EditorTools
     /// are attached through direct references in the switches below.
     /// An existing prefab or scene instance is updated in place, never rebuilt.
     /// A build that changes nothing writes no prefab and no scene, and takes no
-    /// screenshot of a spec that already has one.
+    /// screenshot of a spec that already has a current one.
     /// </summary>
     public static class PrefabSpecBuilder
     {
@@ -1758,6 +1769,91 @@ namespace GoodEnoughRepairs.EditorTools
             return Path.GetFullPath(Path.Combine(dir, fileName));
         }
 
+        /// <summary>
+        /// The game data files a screenshot depends on: balance.json and every JSON
+        /// file in content/. Used to retake a shot when the text or numbers changed.
+        /// </summary>
+        public static string[] DataFiles()
+        {
+            List<string> files = new List<string>();
+            string balance = GameDataFile("balance.json");
+            if (File.Exists(balance)) files.Add(balance);
+            string content = GameDataFile("content");
+            if (Directory.Exists(content))
+            {
+                string[] found = Directory.GetFiles(content, "*.json", SearchOption.TopDirectoryOnly);
+                Array.Sort(found, StringComparer.Ordinal);
+                files.AddRange(found);
+            }
+            return files.ToArray();
+        }
+
+        /// <summary>
+        /// True when the shot file is missing, or any of the data files was written
+        /// after it. A stale shot may show old text (for example raw [key] text).
+        /// </summary>
+        public static bool ShotIsStale(string shotPath, string[] dataFiles)
+        {
+            if (!File.Exists(shotPath)) return true;
+            DateTime shotTime = File.GetLastWriteTimeUtc(shotPath);
+            if (dataFiles == null) return false;
+            for (int i = 0; i < dataFiles.Length; i++)
+            {
+                if (File.Exists(dataFiles[i]) && File.GetLastWriteTimeUtc(dataFiles[i]) > shotTime) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Refreshes every text element (TextKeyView) in the open scene, hidden
+        /// objects included, from the shared content. Text elements that no view
+        /// fills itself (labels in a hidden panel, for example) then show their
+        /// ui_text.json string and not the raw [key]. Returns how many were refreshed.
+        /// </summary>
+        public static int RefreshAllTexts()
+        {
+            TextKeyView[] views = UnityEngine.Object.FindObjectsByType<TextKeyView>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            int count = 0;
+            for (int i = 0; i < views.Length; i++)
+            {
+                if (views[i] == null) continue;
+                views[i].Refresh();
+                count++;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Shows how the builder's text fill works for one key, for tests. It makes
+        /// a text element the way the builder does (before any content is loaded),
+        /// optionally hides it like a closed panel, then, when contentLoaded is true,
+        /// loads the real content files and runs RefreshAllTexts. Returns the text
+        /// the element shows. The shared content is reset afterwards.
+        /// </summary>
+        public static string FillTextSample(string textKey, bool contentLoaded, bool hidden)
+        {
+            GameObject go = new GameObject("SampleText_" + textKey);
+            try
+            {
+                TextKeyView.SetShared(ContentData.Empty());
+                SpecObject o = new SpecObject();
+                o.name = go.name;
+                o.textKey = textKey;
+                ApplyText(go, o, "sample");
+                go.SetActive(!hidden);
+
+                if (contentLoaded) TextKeyView.SetShared(LoadContent());
+                RefreshAllTexts();
+                return go.GetComponent<TextMesh>().text;
+            }
+            finally
+            {
+                TextKeyView.SetShared(ContentData.Empty());
+                UnityEngine.Object.DestroyImmediate(go);
+            }
+        }
+
         // changed comes in as "the prefab or a sprite changed" and goes out as
         // "anything in this spec changed" (the scene included).
         private static void PlaceInScene(PrefabSpec spec, string specPath, ref bool changed, out bool photographed)
@@ -1888,8 +1984,10 @@ namespace GoodEnoughRepairs.EditorTools
             Debug.Log("MADE: " + sc.path);
 
             bool requested = !string.IsNullOrEmpty(sc.screenshot);
-            bool shotExists = requested && File.Exists(ShotPath(sc.screenshot));
-            if (ScreenshotDecision.ShouldPhotograph(requested, changed, shotExists))
+            // An earlier shot counts only when it is newer than every data file, so a
+            // text change in ui_text.json gives a new shot.
+            bool shotCurrent = requested && !ShotIsStale(ShotPath(sc.screenshot), DataFiles());
+            if (ScreenshotDecision.ShouldPhotograph(requested, changed, shotCurrent))
             {
                 if (view == null && invView == null && warnView == null && creditsView == null &&
                     summaryView == null)
@@ -1961,6 +2059,12 @@ namespace GoodEnoughRepairs.EditorTools
 
             // Text elements read the shared content; in batch mode nothing else sets it.
             TextKeyView.SetShared(LoadContent());
+
+            // The text elements were filled when the prefab was built, before the
+            // content was loaded. Fill all of them again now, hidden panels included,
+            // so labels no view fills itself show their ui_text.json string.
+            // The views then fill their own number lines below.
+            RefreshAllTexts();
 
             // Every shot except the warning shot is taken with the warning dialog
             // closed. In edit mode WarningView.Awake does not run, so the dialog

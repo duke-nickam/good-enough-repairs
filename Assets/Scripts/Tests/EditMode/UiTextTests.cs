@@ -1,4 +1,6 @@
+using System;
 using System.IO;
+using GoodEnoughRepairs.EditorTools;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -156,6 +158,66 @@ namespace GoodEnoughRepairs.Tests
             for (int i = 0; i < keys.Length; i++)
             {
                 Assert.IsTrue(c.HasText(keys[i]), "missing key in ui_text.json: " + keys[i]);
+            }
+        }
+
+        // ---- the builder's text fill (through the builder, so the test needs no
+        // reference to the UX assembly)
+
+        [Test]
+        public void BuilderTextFill_BeforeContentIsLoaded_ShowsKeyInBrackets()
+        {
+            Assert.AreEqual("[summary_continue]",
+                PrefabSpecBuilder.FillTextSample("summary_continue", false, false));
+        }
+
+        [Test]
+        public void BuilderTextFill_AfterRefresh_ResolvesKeysOfRealFile()
+        {
+            Assert.AreEqual("Continue", PrefabSpecBuilder.FillTextSample("summary_continue", true, false));
+            Assert.AreEqual("Play again", PrefabSpecBuilder.FillTextSample("run_end_play_again", true, false));
+        }
+
+        [Test]
+        public void BuilderTextFill_HiddenPanelText_IsResolvedToo()
+        {
+            string title = PrefabSpecBuilder.FillTextSample("summary_title", true, true);
+            Assert.AreEqual("End of day", title);
+            string note = PrefabSpecBuilder.FillTextSample("summary_note", true, true);
+            Assert.IsFalse(note.StartsWith("["), note);
+            Assert.IsTrue(note.Contains("balance"), note);
+        }
+
+        [Test]
+        public void ShotIsStale_MissingShot_IsStale()
+        {
+            string missing = Path.Combine(Path.GetTempPath(), "ger_test_missing_" + Guid.NewGuid().ToString("N") + ".png");
+            Assert.IsTrue(PrefabSpecBuilder.ShotIsStale(missing, new string[0]));
+        }
+
+        [Test]
+        public void ShotIsStale_NewerDataFile_IsStale_OlderIsNot()
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "ger_test_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                string shot = Path.Combine(dir, "shot.png");
+                string data = Path.Combine(dir, "ui_text.json");
+                File.WriteAllText(shot, "x");
+                File.WriteAllText(data, "{}");
+                DateTime now = DateTime.UtcNow;
+
+                File.SetLastWriteTimeUtc(shot, now);
+                File.SetLastWriteTimeUtc(data, now.AddMinutes(-5));
+                Assert.IsFalse(PrefabSpecBuilder.ShotIsStale(shot, new[] { data }));
+
+                File.SetLastWriteTimeUtc(data, now.AddMinutes(5));
+                Assert.IsTrue(PrefabSpecBuilder.ShotIsStale(shot, new[] { data }));
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
             }
         }
     }
