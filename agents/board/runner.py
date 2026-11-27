@@ -46,15 +46,23 @@ def log(who, msg):
     print(f"[{datetime.datetime.now():%H:%M:%S}] {who:<17} {msg}", flush=True)
 
 
+ALERT_TONES = {  # (frequency in Hz, length in ms): the same on every PC, unlike the Windows system sounds
+    "needs_designer": [(1320, 120), (1320, 120)],  # two short high beeps: something waits for you
+    "pr": [(660, 110), (880, 110), (1100, 180)],  # rising: an epic is done, its pull request is open
+    "stopped": [(440, 400)],  # one low tone: the run stopped, nothing to do
+}
+
+
 def alert(settings, kind):
-    """A sound on the designer's PC: 'needs_designer' (a task waits for you) or 'stopped' (the run ended)."""
+    """A sound on the designer's PC, one tone pattern per kind: 'needs_designer', 'pr' or 'stopped'."""
     if not settings.get("sound", True):
         return
     try:
         import winsound  # Windows only
-        winsound.MessageBeep(winsound.MB_ICONEXCLAMATION if kind == "needs_designer" else winsound.MB_ICONASTERISK)
-    except ImportError:
-        print("\a", end="", flush=True)  # other systems: the terminal bell
+        for freq, ms in ALERT_TONES.get(kind, ALERT_TONES["stopped"]):
+            winsound.Beep(freq, ms)
+    except (ImportError, RuntimeError):
+        print("\a", end="", flush=True)  # other systems, or no sound device: the terminal bell
 
 
 class Runner:
@@ -472,6 +480,7 @@ class Runner:
                 self.board.set_status(e.number, "Waiting for review")
                 self.board.comment(e.number, crew_comment("Runner", f"All tasks are Done. Pull request: {url}", "pr",
                                                           url=url))
+                alert(self.s, "pr")
                 log("Runner", f"epic #{e.number}: all tasks Done, pull request opened")
             elif any(t.status in ACTIVE or t.state == "CLOSED" for t in tasks) and e.status != "In progress":
                 self.board.set_status(e.number, "In progress")
