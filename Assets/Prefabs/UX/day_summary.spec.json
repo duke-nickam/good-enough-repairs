@@ -9,6 +9,9 @@
     { "name": "PanelRoot", "hidden": true },
     { "name": "Backdrop", "parent": "PanelRoot", "sprite": "box", "color": "#000000A0",
       "sortingOrder": 100, "scaleX": 40, "scaleY": 24 },
+    { "name": "BlockerCanvas", "parent": "PanelRoot", "sortingOrder": 100, "components": [ "Canvas" ] },
+    { "name": "BlockerImage", "parent": "BlockerCanvas", "scaleX": 40, "scaleY": 24,
+      "components": [ "Image" ] },
     { "name": "Panel", "parent": "PanelRoot", "sprite": "box", "color": "panel",
       "sortingOrder": 101, "scaleX": 10, "scaleY": 7 },
     { "name": "TextArea", "parent": "PanelRoot", "sprite": "box", "color": "#FFFFFF14",
@@ -44,6 +47,8 @@
   "links": [
     { "owner": "DaySummary", "component": "DaySummaryView", "field": "panelRoot", "index": -1,
       "target": "PanelRoot", "targetType": "GameObject" },
+    { "owner": "DaySummary", "component": "DaySummaryView", "field": "clickBlocker", "index": -1,
+      "target": "BlockerImage", "targetType": "GameObject" },
     { "owner": "DaySummary", "component": "DaySummaryView", "field": "titleText", "index": -1,
       "target": "TitleText", "targetType": "TextKeyView" },
     { "owner": "DaySummary", "component": "DaySummaryView", "field": "earnedText", "index": -1,
@@ -64,6 +69,7 @@
   "scene": {
     "path": "Assets/Scenes/Main.unity",
     "stationField": "summaryView",
-    "worldX": 0, "worldY": 0, "worldScale": 1.5
+    "worldX": 0, "worldY": 0, "worldScale": 1.2,
+    "screenshot": "day_summary.png"
   }
 }
