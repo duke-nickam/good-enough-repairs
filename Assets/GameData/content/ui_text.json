@@ -34,6 +34,19 @@
     { "key": "release_penalty", "text": "Parts fitted from my shelf: {0}, cost {1}." },
     { "key": "release_net", "text": "Net result: {0}" },
     { "key": "confirm_release", "text": "Release" },
-    { "key": "cancel_release", "text": "Cancel" }
+    { "key": "cancel_release", "text": "Cancel" },
+    { "key": "summary_title", "text": "End of day" },
+    { "key": "summary_earned", "text": "Earned: {0}" },
+    { "key": "summary_spent", "text": "Spent: {0}" },
+    { "key": "summary_upkeep", "text": "Upkeep: {0}" },
+    { "key": "summary_balance", "text": "Balance: {0}" },
+    { "key": "summary_note", "text": "The counter can dip below zero during the day. Only the balance at the end of the day counts." },
+    { "key": "summary_continue", "text": "Continue" },
+    { "key": "run_end_title_win", "text": "All days survived" },
+    { "key": "run_end_title_bankrupt", "text": "Bankrupt" },
+    { "key": "run_end_credits_earned", "text": "Credits earned: {0}" },
+    { "key": "run_end_ships_repaired", "text": "Ships repaired: {0}" },
+    { "key": "run_end_parts_saved", "text": "Parts saved from the junkyard: {0}" },
+    { "key": "run_end_play_again", "text": "Play again" }
   ]
 }

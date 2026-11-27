@@ -3,8 +3,8 @@
  *
  * Turns a prefab spec (a JSON file) into a prefab. It can also place instances
  * in a scene, connect them to StationView fields, show a docked sample ship (or a
- * sample inventory, or a sample warning dialog) in edit mode and save a
- * screenshot outside the project.
+ * sample inventory, a sample warning dialog, a sample credits counter or a sample
+ * day summary) in edit mode and save a screenshot outside the project.
  *
  * HOW TO RUN
  *   PrefabSpecBuilder.BuildAll()          builds every *.spec.json under Assets/
@@ -34,12 +34,23 @@
  *   changed the prefab (a property, an object added or removed, a link), a sprite
  *   file or its import settings were made or fixed, or the scene changed (an
  *   instance added, removed, moved or scaled, or a StationView link set).
- *   A spec with a screenshot is photographed when it changed, or when no earlier
- *   shot of it exists in the temp folder ger_shots (outside the project). A spec
- *   that did not change and already has its shot is not photographed. Nothing is
- *   stored in the project for this, so an unchanged build leaves no Git diff.
+ *   A spec with a screenshot is photographed when it changed, when no earlier
+ *   shot of it exists in the temp folder ger_shots (outside the project), or when
+ *   a game data file (balance.json or a file in content/) is newer than the
+ *   earlier shot, so a text change in ui_text.json always gives a new shot. A spec
+ *   that did not change, has its shot and has no newer data is not photographed.
+ *   Nothing is stored in the project for this, so an unchanged build leaves no
+ *   Git diff.
  *   To photograph everything again, delete the ger_shots folder in the system temp
  *   folder. The decision is ScreenshotDecision.ShouldPhotograph.
+ *
+ * TEXT IN SCREENSHOTS
+ *   Before a shot, the builder loads the content files and then refreshes every
+ *   text element (TextKeyView) in the open scene, hidden panels included. Text
+ *   elements that no view fills itself (for example the summary title, note and
+ *   button labels) then show their ui_text.json string, not the raw [key]. The
+ *   views fill their own number lines after that. The refresh is done after the
+ *   scene is saved and the scene is loaded again afterwards, so it is not saved.
  *
  * UNCHANGED BUILD WRITES NOTHING
  *   A build with a spec that has not changed leaves the prefab files, the scene
@@ -66,10 +77,10 @@
  *     parent, or added by hand) is removed alone. A rename or a move counts as
  *     remove and add.
  *   - Child order follows the spec order.
- *   - Components: ShipView, InventoryView, WarningView, SpriteRenderer and text
- *     (TextMesh and TextKeyView) are removed when the spec no longer asks for
- *     them. Canvas, Image and Button are added when missing but not removed, so
- *     remove the object instead.
+ *   - Components: ShipView, InventoryView, WarningView, CreditsView, DaySummaryView,
+ *     SpriteRenderer and text (TextMesh and TextKeyView) are removed when the spec
+ *     no longer asks for them. Canvas, Image and Button are added when missing but
+ *     not removed, so remove the object instead.
  *   - Links are set when they differ. A link dropped from the spec is not cleared
  *     unless its target object is removed.
  *   - A spec error stops the build before the prefab is saved.
@@ -121,6 +132,8 @@
  *                        "ShipView"        the ship view (UX assembly)
  *                        "InventoryView"   the inventory panel with drag and drop
  *                        "WarningView"     the buy and release warning dialog
+ *                        "CreditsView"     the credits counter
+ *                        "DaySummaryView"  the end-of-day summary panel
  *                        "TextKeyView"     a text element component (not needed
  *                                          when "textKey" is set)
  *                        "SpriteRenderer"  an empty SpriteRenderer (not needed
@@ -156,8 +169,8 @@
  *       of its own text elements once they are linked (see TEXT ON A SHIP).
  *   links[]       sets a reference field on a component to another object:
  *       owner          name of the object that holds the component
- *       component      "ShipView", "InventoryView", "WarningView", "TextKeyView",
- *                      "SpriteRenderer" or "Transform"
+ *       component      "ShipView", "InventoryView", "WarningView", "CreditsView",
+ *                      "DaySummaryView", "TextKeyView", "SpriteRenderer" or "Transform"
  *       field          the serialized field name, for example "body" or "barFills"
  *       index          -1 for a single field (default is 0, so write -1); 0 or more
  *                      for an element of an array field (the array grows if needed)
@@ -173,9 +186,10 @@
  *                      exist (the builder never creates scenes).
  *       stationField   name of the StationView field that gets the instance's
  *                      component, for example "bay1View" (gets the ShipView),
- *                      "inventoryView" (gets the InventoryView) or "warningView"
- *                      (gets the WarningView). Empty means do not connect.
- *                      Not used when "bays" is given.
+ *                      "inventoryView" (gets the InventoryView), "warningView"
+ *                      (gets the WarningView), "creditsView" (gets the CreditsView)
+ *                      or "summaryView" (gets the DaySummaryView). Empty means do
+ *                      not connect. Not used when "bays" is given.
  *       Placement, option A: fit into a screen rectangle (ship prefabs)
  *         refWidth, refHeight   reference screen size in pixels, for example 1280, 720.
  *                      Before placing, the builder sets the camera aspect to
@@ -196,21 +210,26 @@
  *       Placement, option A for several bays: "bays" (see BAYS below).
  *       Placement, option B (used when rectW is 0 and there is no "bays"): worldX,
  *                      worldY, worldScale (worldScale 0 means 1). The prefab origin
- *                      is placed there. Use this for the inventory panel and the
- *                      warning dialog.
+ *                      is placed there. Use this for the inventory panel, the
+ *                      warning dialog, the credits counter and the day summary.
  *       screenshot     file name of the screenshot, for example "ship_in_bay.png".
  *                      Empty means no screenshot. It is saved in the system temp
  *                      folder under ger_shots, outside the project. It is taken
- *                      only for a changed spec or one with no earlier shot (see
- *                      ONE LINE PER SPEC above). Before the shot
+ *                      only for a changed spec, one with no earlier shot, or one
+ *                      with newer game data (see ONE LINE PER SPEC above). Before the shot
  *                      the builder shows a docked sample ship (day 1, seed 1) on the
  *                      instance, or, for an InventoryView, the sample ship's five
  *                      parts in inventory slots 1-5, or, for a WarningView, the
  *                      warning dialog open on the sample ship with its message
- *                      lines filled. With "bays", the first instance gets the seed 1
+ *                      lines filled, or, for a CreditsView, the credits of a sample
+ *                      run (the starting credits from balance.json), or, for a
+ *                      DaySummaryView, the summary open after a sample day (see
+ *                      SAMPLES FOR CREDITS AND DAY SUMMARY below). With "bays", the
+ *                      first instance gets the seed 1
  *                      ship and every other instance its own sample ship (seed 2,
- *                      3). For the inventory and warning shots, every ShipView in
- *                      the scene gets its own sample ship too, so no '{' text shows.
+ *                      3). For the inventory, warning, credits and summary shots,
+ *                      every ShipView in the scene gets its own sample ship too, so
+ *                      no '{' text shows.
  *                      Every shot except the warning shot is taken with the warning
  *                      dialog hidden.
  *                      All of this is done after the scene is saved, so the shown
@@ -238,6 +257,23 @@
  *                        { "part": "Engine", "condition": 35 },
  *                        { "part": "HullPlate", "condition": 65 },
  *                        { "part": "ShieldGenerator", "condition": 95 } ]
+ *
+ * SAMPLES FOR CREDITS AND DAY SUMMARY
+ *   Both samples use a real Run made by RunFactory (balance.json, content, seed 1).
+ *   - CreditsView: the view is bound to the run and shows its credits, which are
+ *     the starting credits from balance.json.
+ *   - DaySummaryView: the view is bound to the run, then a sample day is played
+ *     through the run's own StartDay on a copy of the balance with no ships on any
+ *     day. The day starts, upkeep from balance.json is charged and the day ends
+ *     at once, so the summary opens with the real rules: Earned 0, Spent 0, Upkeep
+ *     from balance.json, Balance after upkeep. The panel is open with the title,
+ *     all four number lines, the note and the Continue button filled from
+ *     ui_text.json. The run-over state (Play again) has no sample.
+ *     If the scene has a CreditsView (the credits counter behind the panel), it is
+ *     bound to the same run before the day starts, so it reads the run's credits
+ *     after the upkeep, the same number as the summary's balance line. A scene
+ *     with no CreditsView is fine.
+ *   The copy of the balance is only used for the sample. Nothing is saved.
  *
  * BAYS: ONE SHIP VIEW IN EACH OF THE THREE BAYS (scene.bays)
  *   "bays" is an array with one entry per bay the spec places. It needs refWidth,
@@ -298,6 +334,33 @@
  *   Example link: { "owner": "ShipInBay", "component": "ShipView",
  *     "field": "paymentText", "index": -1, "target": "PaymentText",
  *     "targetType": "TextKeyView" }
+ *
+ * CREDITS COUNTER (CreditsView)
+ *   Put "CreditsView" on the root of its own prefab. Link, with "index": -1:
+ *     creditsText     TextKeyView: a text element with key "credits". The view
+ *                     fills {0} with the run's credits.
+ *   Connect it to the station with "stationField": "creditsView".
+ *
+ * DAY SUMMARY (DaySummaryView)
+ *   Put "DaySummaryView" on the root of its own prefab (not on the hidden panel
+ *   object). Fields to link, all with "index": -1:
+ *     panelRoot       GameObject: a child that holds all the panel objects. Give it
+ *                     "hidden": true so the prefab is saved closed.
+ *     clickBlocker    GameObject, optional: an "Image" object under a "Canvas",
+ *                     shown and hidden with the panel.
+ *     titleText       TextKeyView: the view sets its key (summary_title,
+ *                     run_end_title_win or run_end_title_bankrupt).
+ *     earnedText      TextKeyView, key summary_earned, the view fills {0}
+ *     spentText       TextKeyView, key summary_spent, the view fills {0}
+ *     upkeepText      TextKeyView, key summary_upkeep, the view fills {0}
+ *     balanceText     TextKeyView, key summary_balance, the view fills {0}
+ *     noteText        TextKeyView, key summary_note, hidden when the run is over
+ *     continueButton  Button: shown while the run goes on. Its label is a text
+ *                     element with key summary_continue.
+ *     playAgainButton Button: shown when the run is over. Its label is a text
+ *                     element with key run_end_play_again.
+ *   Connect it to the station with "stationField": "summaryView". The builder also
+ *   adds an EventSystem (Input System UI module) if the scene has none.
  *
  * WARNING DIALOG (WarningView)
  *   Put "WarningView" on the root of its own prefab. One dialog serves all bays.
@@ -542,7 +605,7 @@ namespace GoodEnoughRepairs.EditorTools
     /// are attached through direct references in the switches below.
     /// An existing prefab or scene instance is updated in place, never rebuilt.
     /// A build that changes nothing writes no prefab and no scene, and takes no
-    /// screenshot of a spec that already has one.
+    /// screenshot of a spec that already has a current one.
     /// </summary>
     public static class PrefabSpecBuilder
     {
@@ -1009,6 +1072,8 @@ namespace GoodEnoughRepairs.EditorTools
             if (!Listed(o, "ShipView")) DestroyIfPresent<ShipView>(go);
             if (!Listed(o, "InventoryView")) DestroyIfPresent<InventoryView>(go);
             if (!Listed(o, "WarningView")) DestroyIfPresent<WarningView>(go);
+            if (!Listed(o, "CreditsView")) DestroyIfPresent<CreditsView>(go);
+            if (!Listed(o, "DaySummaryView")) DestroyIfPresent<DaySummaryView>(go);
             if (string.IsNullOrEmpty(o.sprite) && !Listed(o, "SpriteRenderer")) DestroyIfPresent<SpriteRenderer>(go);
 
             // Hidden flag: an object with "hidden": true is saved inactive.
@@ -1129,6 +1194,12 @@ namespace GoodEnoughRepairs.EditorTools
                 case "WarningView":
                     if (go.GetComponent<WarningView>() == null) go.AddComponent<WarningView>();
                     return;
+                case "CreditsView":
+                    if (go.GetComponent<CreditsView>() == null) go.AddComponent<CreditsView>();
+                    return;
+                case "DaySummaryView":
+                    if (go.GetComponent<DaySummaryView>() == null) go.AddComponent<DaySummaryView>();
+                    return;
                 case "TextKeyView":
                     if (go.GetComponent<TextKeyView>() == null) go.AddComponent<TextKeyView>();
                     return;
@@ -1165,6 +1236,12 @@ namespace GoodEnoughRepairs.EditorTools
                     break;
                 case "WarningView":
                     c = go.GetComponent<WarningView>();
+                    break;
+                case "CreditsView":
+                    c = go.GetComponent<CreditsView>();
+                    break;
+                case "DaySummaryView":
+                    c = go.GetComponent<DaySummaryView>();
                     break;
                 case "TextKeyView":
                     c = go.GetComponent<TextKeyView>();
@@ -1654,6 +1731,16 @@ namespace GoodEnoughRepairs.EditorTools
                 component = instance.GetComponent<InventoryView>();
                 needed = "InventoryView";
             }
+            else if (propType.Contains("CreditsView"))
+            {
+                component = instance.GetComponent<CreditsView>();
+                needed = "CreditsView";
+            }
+            else if (propType.Contains("DaySummaryView"))
+            {
+                component = instance.GetComponent<DaySummaryView>();
+                needed = "DaySummaryView";
+            }
             else
             {
                 component = instance.GetComponent<ShipView>();
@@ -1684,6 +1771,91 @@ namespace GoodEnoughRepairs.EditorTools
         {
             string dir = Path.Combine(Path.GetTempPath(), ShotFolder);
             return Path.GetFullPath(Path.Combine(dir, fileName));
+        }
+
+        /// <summary>
+        /// The game data files a screenshot depends on: balance.json and every JSON
+        /// file in content/. Used to retake a shot when the text or numbers changed.
+        /// </summary>
+        public static string[] DataFiles()
+        {
+            List<string> files = new List<string>();
+            string balance = GameDataFile("balance.json");
+            if (File.Exists(balance)) files.Add(balance);
+            string content = GameDataFile("content");
+            if (Directory.Exists(content))
+            {
+                string[] found = Directory.GetFiles(content, "*.json", SearchOption.TopDirectoryOnly);
+                Array.Sort(found, StringComparer.Ordinal);
+                files.AddRange(found);
+            }
+            return files.ToArray();
+        }
+
+        /// <summary>
+        /// True when the shot file is missing, or any of the data files was written
+        /// after it. A stale shot may show old text (for example raw [key] text).
+        /// </summary>
+        public static bool ShotIsStale(string shotPath, string[] dataFiles)
+        {
+            if (!File.Exists(shotPath)) return true;
+            DateTime shotTime = File.GetLastWriteTimeUtc(shotPath);
+            if (dataFiles == null) return false;
+            for (int i = 0; i < dataFiles.Length; i++)
+            {
+                if (File.Exists(dataFiles[i]) && File.GetLastWriteTimeUtc(dataFiles[i]) > shotTime) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Refreshes every text element (TextKeyView) in the open scene, hidden
+        /// objects included, from the shared content. Text elements that no view
+        /// fills itself (labels in a hidden panel, for example) then show their
+        /// ui_text.json string and not the raw [key]. Returns how many were refreshed.
+        /// </summary>
+        public static int RefreshAllTexts()
+        {
+            TextKeyView[] views = UnityEngine.Object.FindObjectsByType<TextKeyView>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            int count = 0;
+            for (int i = 0; i < views.Length; i++)
+            {
+                if (views[i] == null) continue;
+                views[i].Refresh();
+                count++;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Shows how the builder's text fill works for one key, for tests. It makes
+        /// a text element the way the builder does (before any content is loaded),
+        /// optionally hides it like a closed panel, then, when contentLoaded is true,
+        /// loads the real content files and runs RefreshAllTexts. Returns the text
+        /// the element shows. The shared content is reset afterwards.
+        /// </summary>
+        public static string FillTextSample(string textKey, bool contentLoaded, bool hidden)
+        {
+            GameObject go = new GameObject("SampleText_" + textKey);
+            try
+            {
+                TextKeyView.SetShared(ContentData.Empty());
+                SpecObject o = new SpecObject();
+                o.name = go.name;
+                o.textKey = textKey;
+                ApplyText(go, o, "sample");
+                go.SetActive(!hidden);
+
+                if (contentLoaded) TextKeyView.SetShared(LoadContent());
+                RefreshAllTexts();
+                return go.GetComponent<TextMesh>().text;
+            }
+            finally
+            {
+                TextKeyView.SetShared(ContentData.Empty());
+                UnityEngine.Object.DestroyImmediate(go);
+            }
         }
 
         // changed comes in as "the prefab or a sprite changed" and goes out as
@@ -1792,9 +1964,11 @@ namespace GoodEnoughRepairs.EditorTools
             ShipView view = first.GetComponent<ShipView>();
             InventoryView invView = first.GetComponent<InventoryView>();
             WarningView warnView = first.GetComponent<WarningView>();
+            CreditsView creditsView = first.GetComponent<CreditsView>();
+            DaySummaryView summaryView = first.GetComponent<DaySummaryView>();
 
-            // The warning's UI buttons need an event system in the scene.
-            if (warnView != null)
+            // The warning's and the summary's UI buttons need an event system in the scene.
+            if (warnView != null || summaryView != null)
             {
                 int objectsBefore = CountSceneObjects();
                 UiParts.EnsureEventSystem();
@@ -1814,13 +1988,16 @@ namespace GoodEnoughRepairs.EditorTools
             Debug.Log("MADE: " + sc.path);
 
             bool requested = !string.IsNullOrEmpty(sc.screenshot);
-            bool shotExists = requested && File.Exists(ShotPath(sc.screenshot));
-            if (ScreenshotDecision.ShouldPhotograph(requested, changed, shotExists))
+            // An earlier shot counts only when it is newer than every data file, so a
+            // text change in ui_text.json gives a new shot.
+            bool shotCurrent = requested && !ShotIsStale(ShotPath(sc.screenshot), DataFiles());
+            if (ScreenshotDecision.ShouldPhotograph(requested, changed, shotCurrent))
             {
-                if (view == null && invView == null && warnView == null)
+                if (view == null && invView == null && warnView == null && creditsView == null &&
+                    summaryView == null)
                 {
                     throw Fail(specPath,
-                        "a screenshot needs a ShipView, an InventoryView or a WarningView on the prefab root");
+                        "a screenshot needs a ShipView, an InventoryView, a WarningView, a CreditsView or a DaySummaryView on the prefab root");
                 }
                 List<ShipView> others = new List<ShipView>();
                 for (int i = 1; i < instances.Count; i++)
@@ -1830,8 +2007,8 @@ namespace GoodEnoughRepairs.EditorTools
                 }
                 int w = screenPlacement ? Mathf.RoundToInt(sc.refWidth) : 1280;
                 int h = screenPlacement ? Mathf.RoundToInt(sc.refHeight) : 720;
-                TakeScreenshot(view, others, invView, warnView, sc.sampleDialog, cam, sc.screenshot,
-                    SampleOverrides(sc, specPath), w, h, specPath);
+                TakeScreenshot(view, others, invView, warnView, creditsView, summaryView, sc.sampleDialog, cam,
+                    sc.screenshot, SampleOverrides(sc, specPath), w, h, specPath);
                 photographed = true;
             }
 
@@ -1859,14 +2036,39 @@ namespace GoodEnoughRepairs.EditorTools
             }
         }
 
+        // A copy of the balance in which no day has ships. A run made from it ends
+        // its first day as soon as it starts: the real rules charge the upkeep and
+        // build the day summary. Used only for the day summary sample.
+        private static BalanceData EmptyDaysCopy(BalanceData balance)
+        {
+            BalanceData copy = JsonUtility.FromJson<BalanceData>(JsonUtility.ToJson(balance));
+            if (copy.days != null)
+            {
+                for (int i = 0; i < copy.days.Length; i++)
+                {
+                    if (copy.days[i] != null) copy.days[i].ships = 0;
+                }
+            }
+            return copy;
+        }
+
         // Done after the scene is saved: showing the sample changes bar scales and
         // colors, and that must not end up in the scene file.
         private static void TakeScreenshot(ShipView view, List<ShipView> others, InventoryView invView,
-            WarningView warnView, string dialog, Camera cam, string fileName, int[] conditions, int w, int h,
-            string specPath)
+            WarningView warnView, CreditsView creditsView, DaySummaryView summaryView, string dialog, Camera cam,
+            string fileName, int[] conditions, int w, int h, string specPath)
         {
             BalanceData balance = LoadBalance();
             if (balance == null) throw Fail(specPath, "the balance could not be loaded for the sample ship");
+
+            // Text elements read the shared content; in batch mode nothing else sets it.
+            TextKeyView.SetShared(LoadContent());
+
+            // The text elements were filled when the prefab was built, before the
+            // content was loaded. Fill all of them again now, hidden panels included,
+            // so labels no view fills itself show their ui_text.json string.
+            // The views then fill their own number lines below.
+            RefreshAllTexts();
 
             // Every shot except the warning shot is taken with the warning dialog
             // closed. In edit mode WarningView.Awake does not run, so the dialog
@@ -1922,6 +2124,37 @@ namespace GoodEnoughRepairs.EditorTools
                     // penalty and net lines are filled from the sample ship.
                     if (!warnView.OpenRelease(ship)) throw Fail(specPath, "the sample ship cannot be released");
                 }
+            }
+            else if (creditsView != null)
+            {
+                // Every bay ship view in the scene gets its own sample ship.
+                FillSampleShips(balance, surplusMargin, 2);
+
+                // The credits of a sample run: the starting credits from balance.json.
+                Run run = RunFactory.Create(balance, LoadContent(), 1);
+                creditsView.Bind(run);
+            }
+            else if (summaryView != null)
+            {
+                // Every bay ship view in the scene gets its own sample ship.
+                FillSampleShips(balance, surplusMargin, 2);
+
+                Run run = RunFactory.Create(EmptyDaysCopy(balance), LoadContent(), 1);
+
+                // The credits counter behind the panel (if the scene has one) follows
+                // the same run, so it reads the run's credits and agrees with the
+                // summary's balance line. Bound before the day starts, so it also
+                // shows the upkeep change.
+                CreditsView sceneCredits = UnityEngine.Object.FindFirstObjectByType<CreditsView>(
+                    FindObjectsInactive.Include);
+                if (sceneCredits != null) sceneCredits.Bind(run);
+
+                // Bind first, then play a sample day through the run's own rules: the
+                // day ends at once (no ships), and the view opens with the summary.
+                summaryView.Bind(run, null, null);
+                RunResult started = run.StartDay();
+                if (!started.Success) throw Fail(specPath, "the sample run could not start its day");
+                if (!summaryView.IsOpen) throw Fail(specPath, "the day summary did not open for the sample day");
             }
             else
             {
