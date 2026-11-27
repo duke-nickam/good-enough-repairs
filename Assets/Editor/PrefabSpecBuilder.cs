@@ -269,6 +269,10 @@
  *     from balance.json, Balance after upkeep. The panel is open with the title,
  *     all four number lines, the note and the Continue button filled from
  *     ui_text.json. The run-over state (Play again) has no sample.
+ *     If the scene has a CreditsView (the credits counter behind the panel), it is
+ *     bound to the same run before the day starts, so it reads the run's credits
+ *     after the upkeep, the same number as the summary's balance line. A scene
+ *     with no CreditsView is fine.
  *   The copy of the balance is only used for the sample. Nothing is saved.
  *
  * BAYS: ONE SHIP VIEW IN EACH OF THE THREE BAYS (scene.bays)
@@ -2135,9 +2139,18 @@ namespace GoodEnoughRepairs.EditorTools
                 // Every bay ship view in the scene gets its own sample ship.
                 FillSampleShips(balance, surplusMargin, 2);
 
+                Run run = RunFactory.Create(EmptyDaysCopy(balance), LoadContent(), 1);
+
+                // The credits counter behind the panel (if the scene has one) follows
+                // the same run, so it reads the run's credits and agrees with the
+                // summary's balance line. Bound before the day starts, so it also
+                // shows the upkeep change.
+                CreditsView sceneCredits = UnityEngine.Object.FindFirstObjectByType<CreditsView>(
+                    FindObjectsInactive.Include);
+                if (sceneCredits != null) sceneCredits.Bind(run);
+
                 // Bind first, then play a sample day through the run's own rules: the
                 // day ends at once (no ships), and the view opens with the summary.
-                Run run = RunFactory.Create(EmptyDaysCopy(balance), LoadContent(), 1);
                 summaryView.Bind(run, null, null);
                 RunResult started = run.StartDay();
                 if (!started.Success) throw Fail(specPath, "the sample run could not start its day");
