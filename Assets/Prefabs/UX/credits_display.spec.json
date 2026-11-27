@@ -20,7 +20,7 @@
   "scene": {
     "path": "Assets/Scenes/Main.unity",
     "stationField": "creditsView",
-    "worldX": 5.5, "worldY": 4.1, "worldScale": 1.25,
+    "worldX": 5.5, "worldY": 4.1, "worldScale": 1.3,
     "screenshot": "credits_display.png"
   }
 }

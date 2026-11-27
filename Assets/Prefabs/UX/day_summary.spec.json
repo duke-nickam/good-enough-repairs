@@ -15,7 +15,7 @@
     { "name": "Panel", "parent": "PanelRoot", "sprite": "box", "color": "panel",
       "sortingOrder": 101, "scaleX": 14, "scaleY": 7 },
     { "name": "TextArea", "parent": "PanelRoot", "sprite": "box", "color": "#FFFFFF14",
-      "sortingOrder": 102, "posX": 0, "posY": 0.2, "scaleX": 13.4, "scaleY": 4.2 },
+      "sortingOrder": 102, "posX": 0, "posY": 0.25, "scaleX": 13.4, "scaleY": 4.2 },
 
     { "name": "TitleText", "parent": "PanelRoot", "textKey": "summary_title", "sortingOrder": 104,
       "posX": 0, "posY": 2.7, "textSize": 0.45, "textAlign": "center" },
