@@ -1,0 +1,25 @@
+{
+  "prefabPath": "Assets/Prefabs/UX/CreditsDisplay.prefab",
+  "sprites": [
+    { "key": "box", "path": "Assets/Prefabs/UX/ShipInBayArt/PlaceholderBox.png",
+      "pivotX": 0.5, "pivotY": 0.5, "pixelsPerUnit": 4 }
+  ],
+  "root": { "name": "CreditsDisplay", "components": [ "CreditsView" ] },
+  "objects": [
+    { "name": "Frame", "sprite": "box", "color": "track", "sortingOrder": 0,
+      "posX": 0, "posY": 0, "scaleX": 4.4, "scaleY": 1.0 },
+    { "name": "Back", "sprite": "box", "color": "panel", "sortingOrder": 1,
+      "posX": 0, "posY": 0, "scaleX": 4.2, "scaleY": 0.8 },
+    { "name": "CreditsText", "textKey": "credits", "sortingOrder": 2,
+      "posX": 0, "posY": 0, "textSize": 0.4, "textAlign": "center" }
+  ],
+  "links": [
+    { "owner": "CreditsDisplay", "component": "CreditsView", "field": "creditsText", "index": -1,
+      "target": "CreditsText", "targetType": "TextKeyView" }
+  ],
+  "scene": {
+    "path": "Assets/Scenes/Main.unity",
+    "stationField": "creditsView",
+    "worldX": 12, "worldY": 8.5, "worldScale": 2
+  }
+}
